@@ -5,6 +5,16 @@
 **Status**: Draft  
 **Input**: User description: "Build an application that helps users create, follow, and update a fitness plan through a conversation with an AI fitness agent. A fitness plan is made up of a meal plan and a workout plan that helps the users reach their fitness goal. fitness plans can be for any goal over any time period. They can be short and simple to get ready for an upcoming event, or they can be long multi-year pursuits with multiple phases. A schedule can then be maintained for the user that follows the workout and meal plan. The inspiration to build this app is how time consuming fitness training scheduling can be, especially when you are not sure of unexpected obstructions or what days off you will need during training. In addition to helping maintain the users plan and schedule, the AI should also help in ideating new ways to improve things"
 
+## Clarifications
+
+### Session 2025-11-15
+
+- Q: How should meal plans be generated (AI text suggestions only, third-party recipe API, curated database, or AI-generated full recipes)? → A: Use USDA FoodData Central API for nutrition data; AI generates meal suggestions by combining USDA ingredients with calculated portions to hit macro targets
+- Q: How should exercises be sourced (AI-generated from scratch, third-party API, curated database, or hybrid approach)? → A: Build a curated database of 200-500 common exercises with standardized attributes (muscle groups, equipment, difficulty, alternatives)
+- Q: What authentication method should be used (email/password only, email/password with JWT, OAuth social logins, passwordless magic links, or hybrid)? → A: Email/password with JWT tokens (stateless, scalable)
+- Q: How should the system handle users returning after extended absence (2+ weeks) - resume from last date, mark missed items as skipped, prompt for reassessment via AI, or archive old plan? → A: Prompt user to reassess their current state via AI conversation before resuming
+- Q: How should AI plan generation handle the 30-second response time target and manage context? → A: Use orchestrated multi-agent architecture with parallel specialist workers (Conversation Agent → Fitness Plan Agent → Workout Plan Agent + Meal Plan Agent running simultaneously); store state/data in Redis/PostgreSQL with storage references instead of passing full data to LLMs; generate plans asynchronously with streaming progress updates and background notifications so users can navigate away
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Create Initial Fitness Plan via AI Conversation (Priority: P1)
@@ -96,15 +106,15 @@ A user with an ambitious long-term goal (e.g., "compete in a triathlon in 18 mon
 
 ### Edge Cases
 
-- What happens when a user stops using the application for an extended period (e.g., 2+ weeks) and returns?
-- How does the system handle conflicting user requests (e.g., "I want to lose weight but also build significant muscle")?
-- What happens when a user's goal becomes unrealistic given their available time and adherence patterns?
-- How does the system respond when a user reports an injury that affects certain types of exercises?
-- What happens when a user completes their fitness goal ahead of schedule?
-- How does the system handle users who repeatedly skip the same types of workouts or meals?
-- What happens when a user wants to maintain their current fitness level rather than progress toward a new goal?
-- How does the system accommodate users with dietary restrictions (allergies, vegetarian, vegan, religious restrictions)?
-- What happens when a user travels to a different time zone or location without equipment access?
+- What happens when a user stops using the application for an extended period (e.g., 2+ weeks) and returns? → System detects inactivity and initiates AI conversation to reassess current state, offering to resume with adjustments, restart current phase, or create new plan while preserving historical data
+- How does the system handle conflicting user requests (e.g., "I want to lose weight but also build significant muscle")? → AI agent educates user on realistic expectations, suggests body recomposition approach (slight calorie deficit with high protein), or helps prioritize primary goal
+- What happens when a user's goal becomes unrealistic given their available time and adherence patterns? → AI proactively detects low adherence (< 60% for 3+ weeks), initiates conversation to adjust timeline, reduce frequency, or simplify plan
+- How does the system respond when a user reports an injury that affects certain types of exercises? → AI conversation captures injury details, excludes affected movements, suggests rehabilitation exercises, adjusts intensity for impacted muscle groups (uses exercise alternatives from curated database)
+- What happens when a user completes their fitness goal ahead of schedule? → AI celebrates achievement, prompts user to set new goal (progression or maintenance), offers to create follow-up plan building on progress
+- How does the system handle users who repeatedly skip the same types of workouts or meals? → AI detects pattern (3+ skips of same type), proactively suggests alternatives via conversation (FR-023, FR-024), adjusts plan to user preferences
+- What happens when a user wants to maintain their current fitness level rather than progress toward a new goal? → System supports maintenance mode: AI generates plan with stable intensity/volume, focuses on consistency over progression, adjusts calories to maintenance level
+- How does the system accommodate users with dietary restrictions (allergies, vegetarian, vegan, religious restrictions)? → Captured during onboarding (FR-030, FR-033), stored in user profile, AI filters meal suggestions to respect restrictions, USDA API enables ingredient-level filtering
+- What happens when a user travels to a different time zone or location without equipment access? → User reports travel as disruption event (FR-016), AI adjusts schedule for timezone, suggests bodyweight/hotel gym alternatives based on available equipment, may reduce frequency during travel period
 
 ## Requirements *(mandatory)*
 
@@ -138,6 +148,10 @@ A user with an ambitious long-term goal (e.g., "compete in a triathlon in 18 mon
 - **FR-018**: System MUST adjust plan timelines when significant schedule changes occur
 - **FR-019**: System MUST support manual rest day insertion by user request
 - **FR-020**: System MUST prevent harmful overtraining by suggesting rest when appropriate
+- **FR-059**: System MUST detect when a user returns after 14+ days of inactivity
+- **FR-060**: When returning after extended absence, system MUST initiate AI conversation to reassess user's current fitness level, available time, and whether original goals are still relevant
+- **FR-061**: AI MUST offer options to resume existing plan (with adjustments), restart current phase, or create a new plan based on reassessment conversation
+- **FR-062**: System MUST preserve all historical progress data even when plans are modified or restarted
 
 **AI Interaction & Suggestions**
 
@@ -148,6 +162,32 @@ A user with an ambitious long-term goal (e.g., "compete in a triathlon in 18 mon
 - **FR-025**: System MUST analyze user progress and adherence patterns to suggest plan improvements
 - **FR-026**: System MUST guide users to set realistic, measurable fitness goals
 - **FR-027**: System MUST provide explanations for plan structure, phase transitions, and recommendations
+
+**AI Orchestration & Architecture**
+
+- **FR-063**: System MUST implement multi-agent orchestration framework with specialized agents: Conversation Agent (user interaction), Fitness Plan Agent (plan coordination), Workout Plan Agent (exercise selection), Meal Plan Agent (nutrition planning)
+- **FR-064**: Workout Plan Agent and Meal Plan Agent MUST run simultaneously in parallel when generating plans (independent tasks)
+- **FR-065**: System MUST use Redis for ephemeral state storage (conversation context, intermediate results) and PostgreSQL for persistent data
+- **FR-066**: AI agents MUST receive storage references (IDs) instead of full data objects to manage context window efficiently
+- **FR-067**: System MUST generate fitness plans asynchronously using background workers
+- **FR-068**: System MUST stream real-time progress updates to users during plan generation (e.g., "Creating workout schedule...", "Calculating nutrition targets...")
+- **FR-069**: Users MUST be able to navigate away during plan generation and return later
+- **FR-070**: System MUST send notifications when background plan generation completes
+- **FR-071**: Conversation Agent MUST extract and pass only relevant information to specialist agents (not full conversation history)
+
+**Nutrition Data Integration**
+
+- **FR-044**: System MUST integrate with USDA FoodData Central API to access authoritative nutrition data for 300K+ foods
+- **FR-045**: AI MUST generate meal suggestions by combining USDA food items with calculated portions to meet user's calorie and macronutrient targets
+- **FR-046**: System MUST display nutritional information (calories, protein, carbs, fat) for all suggested meals
+- **FR-047**: System MAY support offline meal generation by optionally downloading USDA database locally (POST-MVP: requires ~2GB local storage and periodic sync mechanism)
+
+**Exercise Database**
+
+- **FR-048**: System MUST maintain a curated database of 200-500 common exercises with standardized attributes
+- **FR-049**: Each exercise MUST include target muscle groups, required equipment, difficulty level, and recommended alternatives
+- **FR-050**: AI MUST select exercises from the curated database when generating workout plans based on user's equipment access and fitness level
+- **FR-051**: System MUST support exercise variations (e.g., beginner/intermediate/advanced progressions) within the database
 
 **User Information & Preferences**
 
@@ -174,20 +214,33 @@ A user with an ambitious long-term goal (e.g., "compete in a triathlon in 18 mon
 - **FR-042**: System MUST allow users to access their data from multiple devices
 - **FR-043**: System MUST handle users returning after extended absences gracefully
 
+**Authentication & Security**
+
+- **FR-052**: System MUST support user registration with email and password
+- **FR-053**: System MUST securely hash passwords using industry-standard algorithms (bcrypt, Argon2)
+- **FR-054**: System MUST issue JWT (JSON Web Tokens) upon successful authentication
+- **FR-055**: System MUST validate JWT tokens on all protected API endpoints
+- **FR-056**: System MUST support token refresh mechanism to maintain user sessions
+- **FR-057**: System MUST enforce password complexity requirements (minimum 8 characters, at least 1 uppercase letter, 1 lowercase letter, 1 number, 1 special character)
+- **FR-058**: JWT tokens MUST include user ID, email, and expiration timestamp
+
 ### Key Entities
 
-- **User**: Represents an individual using the application; attributes include authentication credentials, profile information (current fitness level, goals, preferences), dietary restrictions, equipment access, schedule constraints
+- **User**: Represents an individual using the application; attributes include email (unique), password hash (bcrypt/Argon2), JWT refresh token, profile information (current fitness level, goals, preferences), dietary restrictions, equipment access, schedule constraints, account creation timestamp, last login timestamp
 - **Fitness Plan**: Represents a complete plan to achieve a fitness goal; attributes include goal description, duration, start date, target end date, current status, overall structure; contains workout plan and meal plan; may contain multiple phases
 - **Phase**: Represents a distinct period within a multi-phase plan; attributes include phase number, name, objectives, duration, start date, end date; contains phase-specific workouts and meals
 - **Workout Plan**: Component of a fitness plan defining exercise routines; attributes include workout frequency, rest days, progression strategy; contains individual workouts
 - **Workout**: Represents a single workout session; attributes include name, target date, exercises, duration, intensity level, completion status, notes
-- **Exercise**: Represents an individual exercise within a workout; attributes include name, sets, reps, duration, intensity, target muscle groups, equipment required, alternatives
+- **Exercise**: Represents an exercise from curated database; attributes include exercise ID, name, description, target muscle groups (primary/secondary), required equipment, difficulty level (beginner/intermediate/advanced), sets, reps, duration, rest period, alternative exercise IDs, instruction notes, video/image reference
 - **Meal Plan**: Component of a fitness plan defining nutrition strategy; attributes include calorie targets, macronutrient distribution, meal frequency; contains individual meals
-- **Meal**: Represents a single meal instance; attributes include meal type (breakfast, lunch, dinner, snack), target date/time, recipes or food items, nutritional information, completion status
+- **Meal**: Represents a single meal instance; attributes include meal type (breakfast, lunch, dinner, snack), target date/time, food items (from USDA FoodData Central), portion sizes, nutritional information (calories, macros), completion status
+- **Food Item**: Represents a food from USDA FoodData Central; attributes include FDC ID, description, serving size, nutritional data (calories, protein, carbs, fat, micronutrients)
 - **Schedule**: Represents the user's day-to-day timeline of workouts and meals; attributes include current date, scheduled items, completion tracking, upcoming items; links workouts and meals to specific dates
 - **Progress Record**: Represents historical tracking data; attributes include date, completed workouts, completed meals, adherence rate, measurements, notes, milestones achieved
 - **Conversation**: Represents interaction history between user and AI agent; attributes include timestamp, messages, context, intent, action taken; enables continuous conversational experience
 - **Disruption Event**: Represents an unexpected obstruction reported by user; attributes include type (illness, travel, injury, commitment), start date, duration, affected activities, resolution (how schedule was adjusted)
+- **Plan Generation Job**: Represents asynchronous plan generation task; attributes include job ID, user ID, status (queued/in-progress/completed/failed), progress percentage, progress message, started timestamp, completed timestamp, result reference (fitness plan ID when complete)
+- **Agent Context Reference**: Represents data stored in Redis/PostgreSQL referenced by storage ID; attributes include reference ID, data type (user_profile/conversation_summary/plan_parameters), storage location (Redis key or PostgreSQL table/row), expiration (for Redis), created timestamp
 
 ## Success Criteria *(mandatory)*
 
@@ -197,7 +250,7 @@ A user with an ambitious long-term goal (e.g., "compete in a triathlon in 18 mon
 
 - **SC-001**: Users can create their first fitness plan in under 10 minutes through conversational interaction
 - **SC-002**: 90% of users successfully generate a complete fitness plan (with both workout and meal components) on their first attempt
-- **SC-003**: Users receive their fitness plan within 30 seconds of providing all required information
+- **SC-003**: Plan generation begins within 2 seconds with visible progress updates; complete plans delivered within 30 seconds for 90% of cases (users can navigate away and receive notification when ready)
 
 **Daily Usage & Engagement**
 
@@ -232,6 +285,7 @@ A user with an ambitious long-term goal (e.g., "compete in a triathlon in 18 mon
 - **SC-020**: Schedule data synchronizes across devices within 5 seconds
 - **SC-021**: System maintains 99.5% uptime during peak usage hours (6 AM - 10 PM local time)
 - **SC-022**: All user data persists reliably with zero data loss incidents
+- **SC-027**: Parallel agent execution (Workout Plan Agent + Meal Plan Agent) reduces total plan generation time by 40% compared to sequential processing
 
 **Time Savings & Value**
 

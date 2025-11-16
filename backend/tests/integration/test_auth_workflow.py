@@ -1,0 +1,71 @@
+"""Integration test for authentication workflow."""
+import pytest
+from httpx import AsyncClient
+
+from src.main import app
+
+
+@pytest.mark.asyncio
+async def test_auth_workflow():
+    """Test complete authentication workflow: register → login → access protected endpoint."""
+    async with AsyncClient(app=app, base_url="http://test") as client:
+        # 1. Register a new user
+        register_response = await client.post(
+            "/api/v1/auth/register",
+            json={
+                "email": "test@example.com",
+                "password": "SecurePassword123!",
+                "name": "Test User",
+            },
+        )
+        assert register_response.status_code == 201
+        register_data = register_response.json()
+        assert "access_token" in register_data
+        assert "refresh_token" in register_data
+        access_token = register_data["access_token"]
+
+        # 2. Access protected endpoint with token
+        me_response = await client.get(
+            "/api/v1/users/me",
+            headers={"Authorization": f"Bearer {access_token}"},
+        )
+        assert me_response.status_code == 200
+        me_data = me_response.json()
+        assert me_data["email"] == "test@example.com"
+        assert me_data["name"] == "Test User"
+
+        # 3. Login with credentials
+        login_response = await client.post(
+            "/api/v1/auth/login",
+            json={
+                "email": "test@example.com",
+                "password": "SecurePassword123!",
+            },
+        )
+        assert login_response.status_code == 200
+        login_data = login_response.json()
+        assert "access_token" in login_data
+        assert "refresh_token" in login_data
+
+        # 4. Refresh token
+        refresh_response = await client.post(
+            "/api/v1/auth/refresh",
+            json={"refresh_token": login_data["refresh_token"]},
+        )
+        assert refresh_response.status_code == 200
+        refresh_data = refresh_response.json()
+        assert "access_token" in refresh_data
+
+
+@pytest.mark.asyncio
+async def test_invalid_login():
+    """Test login with invalid credentials."""
+    async with AsyncClient(app=app, base_url="http://test") as client:
+        response = await client.post(
+            "/api/v1/auth/login",
+            json={
+                "email": "nonexistent@example.com",
+                "password": "wrongpassword",
+            },
+        )
+        assert response.status_code == 401
