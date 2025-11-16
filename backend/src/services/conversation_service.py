@@ -45,8 +45,8 @@ class ConversationService:
 
         self.db.add(conversation)
         await self.db.commit()
-        await self.db.refresh(conversation)
-
+        # Note: refresh not needed after commit - the object is already in the session
+        
         return conversation
 
     async def get_conversation(

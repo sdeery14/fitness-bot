@@ -1,9 +1,11 @@
 """Authentication endpoints."""
-from fastapi import APIRouter, HTTPException, Response, status
-from pydantic import BaseModel, EmailStr
+import re
+
+from fastapi import APIRouter, HTTPException, status
+from pydantic import BaseModel, EmailStr, field_validator
 
 from src.api.deps import DatabaseSession
-from src.schemas import create_success_response
+from src.schemas import create_error_response, create_success_response
 from src.services.auth_service import AuthService
 
 router = APIRouter()
@@ -17,6 +19,20 @@ class RegisterRequest(BaseModel):
     full_name: str
     date_of_birth: str
     current_fitness_level: str
+
+    @field_validator('password')
+    @classmethod
+    def validate_password(cls, v: str) -> str:
+        """Validate password meets security requirements."""
+        if len(v) < 8:
+            raise ValueError("Password must be at least 8 characters long")
+        if not re.search(r'[A-Z]', v):
+            raise ValueError("Password must contain at least one uppercase letter")
+        if not re.search(r'[a-z]', v):
+            raise ValueError("Password must contain at least one lowercase letter")
+        if not re.search(r'[0-9]', v):
+            raise ValueError("Password must contain at least one digit")
+        return v
 
 
 class LoginRequest(BaseModel):
@@ -68,9 +84,22 @@ async def register(
             fitness_level=request.current_fitness_level,
         )
     except ValueError as e:
+        # Check if it's a duplicate email error
+        if "already registered" in str(e).lower():
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=create_error_response(
+                    code="ALREADY_EXISTS",
+                    message=str(e),
+                ),
+            ) from e
+        # Other validation errors
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e),
+            detail=create_error_response(
+                code="VALIDATION_ERROR",
+                message=str(e),
+            ),
         ) from e
 
     # Generate tokens
@@ -119,7 +148,10 @@ async def login(
     if not result:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid email or password",
+            detail=create_error_response(
+                code="INVALID_CREDENTIALS",
+                message="Invalid email or password",
+            ),
         )
 
     user, access_token, refresh_token = result
@@ -163,11 +195,16 @@ async def refresh(
     if not access_token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or expired refresh token",
+            detail=create_error_response(
+                code="INVALID_TOKEN",
+                message="Invalid or expired refresh token",
+            ),
         )
 
+    from src.config import settings
     return create_success_response({
         "access_token": access_token,
         "refresh_token": request.refresh_token,  # Return same refresh token
         "token_type": "bearer",
+        "expires_in": settings.JWT_ACCESS_TOKEN_EXPIRE_MINUTES * 60,  # seconds
     })

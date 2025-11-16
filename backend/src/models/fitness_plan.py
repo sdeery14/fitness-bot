@@ -29,7 +29,7 @@ class FitnessPlan(Base, UUIDMixin, TimestampMixin):
     start_date = Column(DateTime(timezone=True), nullable=False)
     end_date = Column(DateTime(timezone=True), nullable=False)
     status = Column(
-        Enum("draft", "active", "completed", "abandoned", name="plan_status"),
+        Enum("draft", "active", "paused", "completed", "abandoned", name="plan_status"),
         nullable=False,
         default="draft",
     )

@@ -2,12 +2,14 @@
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from src.api.v1 import ai_agent, auth, fitness_plans, users
 from src.config import settings
+from src.schemas import create_error_response
 from src.utils.cache import redis_client
 
 
@@ -30,6 +32,7 @@ app = FastAPI(
     redoc_url="/api/redoc",
     openapi_url="/api/openapi.json",
     lifespan=lifespan,
+    redirect_slashes=False,  # Disable automatic redirect for trailing slashes
 )
 
 # CORS middleware
@@ -46,22 +49,68 @@ app.add_middleware(
 
 
 # Exception handlers
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException):
+    """Handle HTTP exceptions with proper error response format."""
+    # If detail is already a dict (our error response), return it
+    if isinstance(exc.detail, dict):
+        return JSONResponse(
+            status_code=exc.status_code,
+            content=exc.detail,
+        )
+    
+    # Map status codes to error codes
+    error_code = "HTTP_ERROR"
+    if exc.status_code == 404:
+        error_code = "NOT_FOUND"
+    elif exc.status_code == 400:
+        error_code = "BAD_REQUEST"
+    elif exc.status_code == 401:
+        error_code = "UNAUTHORIZED"
+    elif exc.status_code == 403:
+        error_code = "FORBIDDEN"
+    elif exc.status_code == 409:
+        error_code = "CONFLICT"
+    
+    # Create error response
+    return JSONResponse(
+        status_code=exc.status_code,
+        content=create_error_response(
+            code=error_code,
+            message=str(exc.detail),
+        ),
+    )
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    """Handle Pydantic validation errors with proper error response format."""
+    # Get first error for simplicity
+    errors = exc.errors()
+    first_error = errors[0] if errors else {}
+    
+    field = ".".join(str(loc) for loc in first_error.get("loc", []))
+    message = first_error.get("msg", "Validation error")
+    
+    return JSONResponse(
+        status_code=400,
+        content=create_error_response(
+            code="VALIDATION_ERROR",
+            message=message,
+            field=field if field else None,
+        ),
+    )
+
+
 @app.exception_handler(Exception)
-async def global_exception_handler(request, exc):
+async def global_exception_handler(request: Request, exc: Exception):
     """Global exception handler."""
     return JSONResponse(
         status_code=500,
-        content={
-            "status": "error",
-            "error": {
-                "code": "INTERNAL_ERROR",
-                "message": "An unexpected error occurred" if settings.ENVIRONMENT == "production" else str(exc),
-            },
-            "metadata": {
-                "timestamp": None,
-                "request_id": None,
-            },
-        },
+        content=create_error_response(
+            code="INTERNAL_ERROR",
+            message="An unexpected error occurred" if settings.ENVIRONMENT == "production" else str(exc),
+        ),
     )
 
 

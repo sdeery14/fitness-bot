@@ -8,6 +8,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from src.api.deps import CurrentUserId, DatabaseSession
+from src.schemas import create_success_response
 from src.services.ai_service import AIOrchestrationService
 from src.services.plan_service import PlanService
 from src.services.user_service import UserService
@@ -18,6 +19,7 @@ router = APIRouter()
 class StartConversationRequest(BaseModel):
     """Start conversation request."""
 
+    conversation_type: str = "plan_creation"  # Type: plan_creation, plan_update, general_question
     initial_message: str | None = None  # Optional: if None, AI initiates with greeting
     force_new: bool = False  # Force create a new conversation instead of resuming
 
@@ -70,12 +72,12 @@ class GeneratePlanResponse(BaseModel):
     error: str | None = None
 
 
-@router.post("/conversations", response_model=ConversationResponse)
+@router.post("/conversations", status_code=status.HTTP_201_CREATED)
 async def start_conversation(
     request: StartConversationRequest,
     user_id: CurrentUserId,
     db: DatabaseSession,
-) -> ConversationResponse:
+):
     """Start a new AI conversation for fitness planning.
 
     Args:
@@ -89,6 +91,14 @@ async def start_conversation(
     Raises:
         HTTPException: If user not found or conversation fails
     """
+    # Validate conversation_type
+    valid_types = ["plan_creation", "plan_update", "general_question"]
+    if request.conversation_type not in valid_types:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid conversation_type. Must be one of: {', '.join(valid_types)}",
+        )
+
     user_service = UserService(db)
     user = await user_service.get_user(user_id)
 
@@ -107,7 +117,7 @@ async def start_conversation(
             force_new=request.force_new,
         )
 
-        return ConversationResponse(**result)
+        return create_success_response(result)
 
     except Exception as e:
         import traceback
@@ -119,13 +129,13 @@ async def start_conversation(
         ) from e
 
 
-@router.post("/conversations/{conversation_id}/messages", response_model=MessageResponse)
+@router.post("/conversations/{conversation_id}/messages")
 async def send_message(
     conversation_id: str,
     request: SendMessageRequest,
     user_id: CurrentUserId,
     db: DatabaseSession,
-) -> MessageResponse:
+):
     """Send a message in an existing conversation.
 
     Args:
@@ -140,6 +150,13 @@ async def send_message(
     Raises:
         HTTPException: If conversation not found or send fails
     """
+    # Validate message is not empty
+    if not request.message or not request.message.strip():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Message cannot be empty",
+        )
+    
     user_service = UserService(db)
     user = await user_service.get_user(user_id)
 
@@ -158,12 +175,28 @@ async def send_message(
             user_message=request.message,
         )
 
-        return MessageResponse(
-            agent_response=result["agent_response"],
-            status=result["status"],
-            context=result["context"],
-        )
+        # Generate a message_id (could use UUID from database message in future)
+        import uuid
+        message_id = str(uuid.uuid4())
+        
+        return create_success_response({
+            "message_id": message_id,
+            "conversation_id": result["conversation_id"],
+            "user_message": result["user_message"],
+            "assistant_response": result["assistant_message"],
+        })
 
+    except ValueError as e:
+        # Conversation not found or invalid state
+        if "not found" in str(e).lower():
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=str(e),
+            ) from e
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e),
+        ) from e
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -190,14 +223,44 @@ async def get_conversation(
     Raises:
         HTTPException: If conversation not found
     """
-    # For MVP, return basic info
-    # In full implementation, would retrieve from Conversation model
-    return {
-        "conversation_id": conversation_id,
-        "user_id": str(user_id),
-        "status": "active",
-        "messages": [],  # Would retrieve from Message model
-    }
+    from src.services.conversation_service import ConversationService
+    from src.schemas import create_error_response
+    
+    try:
+        conv_service = ConversationService(db)
+        conversation = await conv_service.get_conversation(conversation_id)
+        
+        if not conversation:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=create_error_response(
+                    code="NOT_FOUND",
+                    message=f"Conversation {conversation_id} not found"
+                )
+            )
+        
+        # Check authorization
+        if str(conversation.user_id) != str(user_id):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Not authorized to access this conversation"
+            )
+        
+        return create_success_response({
+            "id": str(conversation.id),
+            "conversation_id": str(conversation.id),
+            "user_id": str(conversation.user_id),
+            "status": conversation.status,
+            "conversation_type": conversation.conversation_type,
+            "messages": [],  # Would retrieve from Message model in full implementation
+        })
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to retrieve conversation: {str(e)}"
+        ) from e
 
 
 @router.post("/conversations/{conversation_id}/generate-plan", response_model=GeneratePlanResponse)
@@ -253,20 +316,42 @@ async def generate_plan(
 async def stream_conversation(
     conversation_id: str,
     user_id: CurrentUserId,
+    db: DatabaseSession,
 ) -> StreamingResponse:
     """Stream AI responses in real-time (SSE).
 
     Args:
         conversation_id: Conversation ID
         user_id: Current authenticated user ID
+        db: Database session
 
     Returns:
         Server-Sent Events stream
+
+    Raises:
+        HTTPException: If conversation not found
 
     Note:
         For MVP, this returns a simple SSE stream.
         Full implementation would integrate with OpenAI streaming API.
     """
+    from src.services.conversation_service import ConversationService
+
+    # Validate conversation exists and user has access
+    conv_service = ConversationService(db)
+    conversation = await conv_service.get_conversation(conversation_id)
+
+    if not conversation:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Conversation {conversation_id} not found"
+        )
+
+    if str(conversation.user_id) != str(user_id):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to access this conversation"
+        )
 
     async def event_generator() -> AsyncGenerator[str, None]:
         """Generate SSE events."""

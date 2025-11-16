@@ -1,10 +1,12 @@
 """Fitness plan endpoints."""
+from datetime import datetime
 from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel
 
 from src.api.deps import CurrentUserId, DatabaseSession
+from src.schemas import create_success_response
 from src.services.plan_service import PlanService
 
 router = APIRouter()
@@ -31,24 +33,27 @@ class PlanResponse(BaseModel):
 class CreatePlanRequest(BaseModel):
     """Plan creation request."""
 
-    goal: str
-    requirements: dict
+    goal_description: str
+    goal_type: str
     duration_weeks: int = 12
+    start_date: str | None = None
+    plan_snapshot: dict | None = None
 
 
 class UpdatePlanRequest(BaseModel):
     """Plan update request."""
 
-    status: str | None = None
-    requirements: dict | None = None
+    current_status: str | None = None
+    plan_snapshot: dict | None = None
 
 
-@router.post("/", response_model=PlanResponse, status_code=status.HTTP_201_CREATED)
+@router.post("", status_code=status.HTTP_201_CREATED)
+@router.post("/", status_code=status.HTTP_201_CREATED)
 async def create_plan(
     request: CreatePlanRequest,
     user_id: CurrentUserId,
     db: DatabaseSession,
-) -> PlanResponse:
+):
     """Create a new fitness plan.
 
     Args:
@@ -62,26 +67,94 @@ async def create_plan(
     Raises:
         HTTPException: If creation fails
     """
+    from src.schemas import create_error_response
+
+    # Validate request fields
+    if not request.goal_type or not request.goal_type.strip():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=create_error_response(
+                code="VALIDATION_ERROR",
+                message="goal_type cannot be empty"
+            )
+        )
+    
+    if not request.goal_description or not request.goal_description.strip():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=create_error_response(
+                code="VALIDATION_ERROR",
+                message="goal_description cannot be empty"
+            )
+        )
+    
+    if request.duration_weeks <= 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=create_error_response(
+                code="VALIDATION_ERROR",
+                message="duration_weeks must be greater than 0"
+            )
+        )
+    
     plan_service = PlanService(db)
 
     try:
+        # Check for active plan
+        active_plan = await plan_service.get_active_plan(user_id)
+        if active_plan:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=create_error_response(
+                    code="CONFLICT",
+                    message="User already has an active fitness plan"
+                )
+            )
+        
+        # Parse start_date if provided
+        start_date_obj = None
+        if request.start_date:
+            if isinstance(request.start_date, str):
+                start_date_obj = datetime.fromisoformat(request.start_date.replace('Z', '+00:00'))
+            else:
+                start_date_obj = request.start_date
+
         plan = await plan_service.create_plan(
             user_id=user_id,
-            goal=request.goal,
-            requirements=request.requirements,
+            goal=request.goal_type,
+            requirements={"goal_description": request.goal_description},
             duration_weeks=request.duration_weeks,
+            start_date=start_date_obj,
         )
 
-        return PlanResponse(
-            id=str(plan.id),
-            user_id=str(plan.user_id),
-            goal=plan.goal,
-            duration_weeks=plan.duration_weeks,
-            requirements=plan.requirements,
-            status=plan.status,
-            created_at=plan.created_at.isoformat(),
-            completed_at=plan.completed_at.isoformat() if plan.completed_at else None,
-        )
+        # Format dates - if time is midnight (00:00:00), return just the date part
+        start_date_str = None
+        if plan.start_date:
+            if plan.start_date.time().replace(tzinfo=None) == datetime.min.time():
+                start_date_str = plan.start_date.date().isoformat()
+            else:
+                start_date_str = plan.start_date.isoformat()
+
+        target_end_date_str = None
+        if plan.end_date:
+            if plan.end_date.time().replace(tzinfo=None) == datetime.min.time():
+                target_end_date_str = plan.end_date.date().isoformat()
+            else:
+                target_end_date_str = plan.end_date.isoformat()
+
+        return create_success_response({
+            "id": str(plan.id),
+            "user_id": str(plan.user_id),
+            "goal_description": plan.goal_description,
+            "goal_type": plan.goal_type,
+            "duration_weeks": plan.duration_weeks,
+            "start_date": start_date_str,
+            "target_end_date": target_end_date_str,
+            "current_status": plan.status,
+            "plan_snapshot": plan.plan_snapshot or {},
+            "created_at": plan.created_at.isoformat(),
+            "updated_at": plan.updated_at.isoformat(),
+        })
 
     except ValueError as e:
         raise HTTPException(
@@ -90,12 +163,82 @@ async def create_plan(
         ) from e
 
 
-@router.get("/{plan_id}", response_model=PlanResponse)
+@router.get("/active")
+async def get_active_plan(
+    user_id: CurrentUserId,
+    db: DatabaseSession,
+):
+    """Get user's active fitness plan.
+
+    Args:
+        user_id: Current authenticated user ID
+        db: Database session
+
+    Returns:
+        Active plan if exists
+
+    Raises:
+        HTTPException: 404 if no active plan found
+    """
+    plan_service = PlanService(db)
+
+    try:
+        # Get active plan (status = 'active')
+        plan = await plan_service.get_active_plan(user_id)
+
+        if not plan:
+            from src.schemas import create_error_response
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=create_error_response(
+                    code="NOT_FOUND",
+                    message="No active fitness plan found"
+                )
+            )
+
+        # Format dates - if time is midnight (00:00:00), return just the date part
+        start_date_str = None
+        if plan.start_date:
+            if plan.start_date.time().replace(tzinfo=None) == datetime.min.time():
+                start_date_str = plan.start_date.date().isoformat()
+            else:
+                start_date_str = plan.start_date.isoformat()
+
+        target_end_date_str = None
+        if plan.end_date:
+            if plan.end_date.time().replace(tzinfo=None) == datetime.min.time():
+                target_end_date_str = plan.end_date.date().isoformat()
+            else:
+                target_end_date_str = plan.end_date.isoformat()
+
+        return create_success_response({
+            "id": str(plan.id),
+            "user_id": str(plan.user_id),
+            "goal_description": plan.goal_description,
+            "goal_type": plan.goal_type,
+            "duration_weeks": plan.duration_weeks,
+            "start_date": start_date_str,
+            "target_end_date": target_end_date_str,
+            "current_status": plan.status,
+            "plan_snapshot": plan.plan_snapshot,
+            "created_at": plan.created_at.isoformat(),
+            "updated_at": plan.updated_at.isoformat(),
+        })
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to retrieve active plan: {str(e)}"
+        ) from e
+
+
+@router.get("/{plan_id}")
 async def get_plan(
     plan_id: UUID,
     user_id: CurrentUserId,
     db: DatabaseSession,
-) -> PlanResponse:
+):
     """Get a specific fitness plan.
 
     Args:
@@ -109,13 +252,18 @@ async def get_plan(
     Raises:
         HTTPException: If plan not found or not owned by user
     """
+    from src.schemas import create_error_response
+
     plan_service = PlanService(db)
     plan = await plan_service.get_plan(plan_id)
 
     if not plan:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Plan not found",
+            detail=create_error_response(
+                code="NOT_FOUND",
+                message=f"Fitness plan {plan_id} not found"
+            )
         )
 
     # Verify ownership
@@ -125,58 +273,28 @@ async def get_plan(
             detail="Not authorized to access this plan",
         )
 
-    return PlanResponse(
-        id=str(plan.id),
-        user_id=str(plan.user_id),
-        goal=plan.goal,
-        duration_weeks=plan.duration_weeks,
-        requirements=plan.requirements,
-        status=plan.status,
-        created_at=plan.created_at.isoformat(),
-        completed_at=plan.completed_at.isoformat() if plan.completed_at else None,
-    )
+    return create_success_response({
+        "id": str(plan.id),
+        "user_id": str(plan.user_id),
+        "goal_description": plan.goal_description,
+        "goal_type": plan.goal_type,
+        "duration_weeks": plan.duration_weeks,
+        "start_date": plan.start_date.isoformat(),
+        "target_end_date": plan.end_date.isoformat(),
+        "current_status": plan.status,
+        "plan_snapshot": plan.plan_snapshot,
+        "created_at": plan.created_at.isoformat(),
+        "updated_at": plan.updated_at.isoformat(),
+    })
 
 
-@router.get("/active", response_model=PlanResponse | None)
-async def get_active_plan(
-    user_id: CurrentUserId,
-    db: DatabaseSession,
-) -> PlanResponse | None:
-    """Get user's active fitness plan.
-
-    Args:
-        user_id: Current authenticated user ID
-        db: Database session
-
-    Returns:
-        Active plan if exists, None otherwise
-    """
-    plan_service = PlanService(db)
-    plans = await plan_service.get_user_plans(user_id, limit=1)
-
-    if not plans:
-        return None
-
-    plan = plans[0]
-    return PlanResponse(
-        id=str(plan.id),
-        user_id=str(plan.user_id),
-        goal=plan.goal,
-        duration_weeks=plan.duration_weeks,
-        requirements=plan.requirements,
-        status=plan.status,
-        created_at=plan.created_at.isoformat(),
-        completed_at=plan.completed_at.isoformat() if plan.completed_at else None,
-    )
-
-
-@router.patch("/{plan_id}", response_model=PlanResponse)
+@router.patch("/{plan_id}")
 async def update_plan(
     plan_id: UUID,
     request: UpdatePlanRequest,
     user_id: CurrentUserId,
     db: DatabaseSession,
-) -> PlanResponse:
+):
     """Update a fitness plan.
 
     Args:
@@ -191,13 +309,18 @@ async def update_plan(
     Raises:
         HTTPException: If plan not found or not owned by user
     """
+    from src.schemas import create_error_response
+
     plan_service = PlanService(db)
     plan = await plan_service.get_plan(plan_id)
 
     if not plan:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Plan not found",
+            detail=create_error_response(
+                code="NOT_FOUND",
+                message=f"Fitness plan {plan_id} not found"
+            )
         )
 
     # Verify ownership
@@ -208,31 +331,37 @@ async def update_plan(
         )
 
     # Update status if provided
-    if request.status is not None:
+    if request.current_status is not None:
         plan = await plan_service.update_plan_status(
             plan_id=plan_id,
-            status=request.status,
+            status=request.current_status,
         )
 
-    # Update requirements if provided
-    if request.requirements is not None:
-        plan.requirements = {**plan.requirements, **request.requirements}
+    # Update plan_snapshot if provided
+    if request.plan_snapshot is not None:
+        plan.plan_snapshot = {**(plan.plan_snapshot or {}), **request.plan_snapshot}
         await db.commit()
         await db.refresh(plan)
 
     if not plan:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Plan not found after update",
+            detail=create_error_response(
+                code="NOT_FOUND",
+                message=f"Fitness plan {plan_id} not found after update"
+            )
         )
 
-    return PlanResponse(
-        id=str(plan.id),
-        user_id=str(plan.user_id),
-        goal=plan.goal,
-        duration_weeks=plan.duration_weeks,
-        requirements=plan.requirements,
-        status=plan.status,
-        created_at=plan.created_at.isoformat(),
-        completed_at=plan.completed_at.isoformat() if plan.completed_at else None,
-    )
+    return create_success_response({
+        "id": str(plan.id),
+        "user_id": str(plan.user_id),
+        "goal_description": plan.goal_description,
+        "goal_type": plan.goal_type,
+        "duration_weeks": plan.duration_weeks,
+        "start_date": plan.start_date.isoformat(),
+        "target_end_date": plan.end_date.isoformat(),
+        "current_status": plan.status,
+        "plan_snapshot": plan.plan_snapshot,
+        "created_at": plan.created_at.isoformat(),
+        "updated_at": plan.updated_at.isoformat(),
+    })

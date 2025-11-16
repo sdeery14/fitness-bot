@@ -56,12 +56,15 @@ export default function ChatPage() {
         throw new Error(data.detail || "Failed to start conversation");
       }
 
-      setConversationId(data.conversation_id);
+      // Backend response format: { status, data: { conversation_id, ... }, metadata }
+      const responseData = data.data || data; // Support both new and old formats
+      
+      setConversationId(responseData.conversation_id);
       
       // Load message history (backend returns both user message and AI response)
-      if (data.message_history && data.message_history.length > 0) {
+      if (responseData.message_history && responseData.message_history.length > 0) {
         // Map backend's "assistant" sender_type to frontend's "ai"
-        const mappedMessages = data.message_history.map((msg: any) => ({
+        const mappedMessages = responseData.message_history.map((msg: any) => ({
           ...msg,
           sender_type: msg.sender_type === "assistant" ? "ai" : msg.sender_type,
         }));
@@ -129,11 +132,14 @@ export default function ChatPage() {
         throw new Error(data.detail || "Failed to send message");
       }
 
+      // Backend response format: { status, data: { agent_response, ... }, metadata }
+      const responseData = data.data || data; // Support both new and old formats
+
       // Replace optimistic message with real messages from backend
       setMessages((prev) => {
         console.log("Current messages:", prev);
         console.log("Replacing optimistic message");
-        console.log("Adding AI response:", data.agent_response);
+        console.log("Adding AI response:", responseData.agent_response);
         
         return [
           ...prev.filter((m) => m.id !== tempMessageId), // Remove optimistic message
@@ -146,7 +152,7 @@ export default function ChatPage() {
           { 
             id: (Date.now() + 1).toString(), 
             sender_type: "ai", 
-            message_content: data.agent_response,
+            message_content: responseData.agent_response,
             created_at: new Date().toISOString(),
           },
         ];

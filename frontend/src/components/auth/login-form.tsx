@@ -38,9 +38,12 @@ export function LoginForm() {
 
       const data = await res.json();
 
+      // Backend response format: { status, data: { access_token, refresh_token, user }, metadata }
+      const responseData = data.data || data; // Support both new and old formats
+
       // Store tokens in localStorage
-      localStorage.setItem("access_token", data.access_token);
-      localStorage.setItem("refresh_token", data.refresh_token);
+      localStorage.setItem("access_token", responseData.access_token);
+      localStorage.setItem("refresh_token", responseData.refresh_token);
 
       // Redirect to dashboard
       router.push("/dashboard/chat");

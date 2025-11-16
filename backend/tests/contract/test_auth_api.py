@@ -159,7 +159,7 @@ class TestLoginEndpoint:
         user_data = data["data"]["user"]
         assert user_data["id"] == str(test_user.id)
         assert user_data["email"] == test_user.email
-        assert user_data["full_name"] == test_user.full_name
+        assert user_data["full_name"] == test_user.name
 
         # Contract: Response contains metadata
         assert "metadata" in data

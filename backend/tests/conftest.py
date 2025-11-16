@@ -14,6 +14,7 @@ from src.config import settings
 from src.database import Base
 from src.main import app
 from src.models import *  # noqa: F401, F403 - Import all models to create tables
+from src.models.user import User  # Explicit import for type hints
 
 # Test database URL (override settings)
 TEST_DATABASE_URL = settings.DATABASE_URL.replace("/fitness_bot", "/fitness_bot_test")
@@ -102,6 +103,7 @@ async def async_client(engine):
 async def test_user(engine):
     """Create a test user for auth tests."""
     from src.services.auth_service import AuthService
+    from src.services.user_service import UserService
 
     async_session_maker = sessionmaker(
         engine,
@@ -110,46 +112,92 @@ async def test_user(engine):
     )
 
     async with async_session_maker() as session:
-        auth_service = AuthService(session)
-        user = await auth_service.register(
-            email="testuser@example.com",
-            password="testpass123",
-            name="Test User",
-            date_of_birth="1990-01-01",
-            fitness_level="intermediate",
-        )
-        await session.commit()
-        await session.refresh(user)
+        user_service = UserService(session)
         
-        # Return user but keep session open for test
-        yield user
+        # Check if user already exists
+        existing_user = await user_service.get_user_by_email("testuser@example.com")
+        
+        if existing_user:
+            # Return existing user
+            yield existing_user
+        else:
+            # Create new user
+            auth_service = AuthService(session)
+            user = await auth_service.register(
+                email="testuser@example.com",
+                password="testpass123",
+                name="Test User",
+                date_of_birth="1990-01-01",
+                fitness_level="intermediate",
+            )
+            await session.commit()
+            await session.refresh(user)
+            
+            # Return user
+            yield user
 
 
 @pytest_asyncio.fixture
-async def auth_headers(async_client: AsyncClient) -> dict:
-    """Create authenticated user and return auth headers."""
-    # Register test user
-    register_payload = {
-        "email": "test@example.com",
-        "password": "Test123!@#",
-        "full_name": "Test User",
-        "date_of_birth": "1990-01-01",
-        "current_fitness_level": "beginner",
-    }
-
-    response = await async_client.post("/api/v1/auth/register", json=register_payload)
-    assert response.status_code == 201
-
-    # Login to get token
+async def auth_headers(async_client: AsyncClient, test_user: User) -> dict:
+    """Create authenticated user and return auth headers using test_user."""
+    # Login as test_user (testuser@example.com)
     login_payload = {
-        "email": "test@example.com",
-        "password": "Test123!@#"
+        "email": "testuser@example.com",
+        "password": "testpass123"
     }
 
     response = await async_client.post("/api/v1/auth/login", json=login_payload)
-    assert response.status_code == 200
+    assert response.status_code == 200, f"Login failed: {response.json()}"
 
     data = response.json()
     token = data["data"]["access_token"]
 
     return {"Authorization": f"Bearer {token}"}
+
+
+@pytest_asyncio.fixture
+async def test_conversation(engine, test_user):
+    """Create a test conversation for AI agent tests."""
+    from src.services.conversation_service import ConversationService
+
+    async_session_maker = sessionmaker(
+        engine,
+        class_=AsyncSession,
+        expire_on_commit=False,
+    )
+
+    async with async_session_maker() as session:
+        conversation_service = ConversationService(session)
+        conversation = await conversation_service.create_conversation(
+            user_id=test_user.id,
+            conversation_type="plan_creation",
+        )
+        await session.commit()
+        await session.refresh(conversation)
+        yield conversation
+
+
+@pytest_asyncio.fixture
+async def test_fitness_plan(engine, test_user):
+    """Create a test fitness plan for plan tests."""
+    from src.services.plan_service import PlanService
+
+    async_session_maker = sessionmaker(
+        engine,
+        class_=AsyncSession,
+        expire_on_commit=False,
+    )
+
+    async with async_session_maker() as session:
+        plan_service = PlanService(session)
+        plan = await plan_service.create_plan(
+            user_id=test_user.id,
+            goal="weight_loss",
+            requirements={"goal_description": "Test goal", "test": True},
+            duration_weeks=12,
+        )
+        # Set plan to active status for tests that need an active plan
+        plan.status = "active"
+        await session.commit()
+        await session.refresh(plan)
+        yield plan

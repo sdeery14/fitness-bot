@@ -28,6 +28,7 @@ class PlanService:
         goal: str,
         requirements: dict,
         duration_weeks: int = 12,
+        start_date: datetime | None = None,
     ) -> FitnessPlan:
         """Create a new fitness plan.
 
@@ -36,6 +37,7 @@ class PlanService:
             goal: Primary fitness goal
             requirements: User requirements and constraints
             duration_weeks: Plan duration in weeks (default 12)
+            start_date: Optional start date (defaults to now)
 
         Returns:
             Created plan instance
@@ -53,7 +55,8 @@ class PlanService:
 
         # Create plan
         from datetime import timedelta
-        start_date = datetime.now(UTC)
+        if start_date is None:
+            start_date = datetime.now(UTC)
         end_date = start_date + timedelta(weeks=duration_weeks)
 
         plan = FitnessPlan(
@@ -63,7 +66,7 @@ class PlanService:
             duration_weeks=duration_weeks,
             start_date=start_date,
             end_date=end_date,
-            status="draft",  # Will be updated when generation completes
+            status="active",  # Set to active immediately upon creation
             plan_snapshot={},  # Initialize empty, will be populated when plan is generated
         )
 
@@ -111,6 +114,25 @@ class PlanService:
         )
         result = await self.db.execute(stmt)
         return list(result.scalars().all())
+
+    async def get_active_plan(self, user_id: UUID) -> FitnessPlan | None:
+        """Get the active fitness plan for a user.
+
+        Args:
+            user_id: User's UUID
+
+        Returns:
+            Active plan if found, None otherwise
+        """
+        stmt = (
+            select(FitnessPlan)
+            .where(FitnessPlan.user_id == user_id)
+            .where(FitnessPlan.status == "active")
+            .order_by(FitnessPlan.created_at.desc())
+            .limit(1)
+        )
+        result = await self.db.execute(stmt)
+        return result.scalar_one_or_none()
 
     async def update_plan_status(
         self,

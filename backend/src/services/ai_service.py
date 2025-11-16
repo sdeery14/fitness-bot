@@ -85,8 +85,10 @@ class AIOrchestrationService:
                 ]
                 return {
                     "conversation_id": session_id,
+                    "conversation_type": db_conversation.conversation_type,
                     "agent_response": last_message.message_content,
-                    "status": "conversation",
+                    "status": db_conversation.status,
+                    "started_at": db_conversation.created_at.isoformat() if db_conversation.created_at else None,
                     "context": db_conversation.conversation_context or {},
                     "message_history": message_history,
                 }
@@ -172,8 +174,10 @@ What would you like to achieve?"""
 
         return {
             "conversation_id": session_id,
+            "conversation_type": db_conversation.conversation_type,
             "agent_response": agent_response,
-            "status": "conversation",
+            "status": db_conversation.status,
+            "started_at": db_conversation.created_at.isoformat() if db_conversation.created_at else None,
             "context": plan_context.model_dump(),
             "message_history": message_history,
         }
@@ -195,10 +199,19 @@ What would you like to achieve?"""
             Dict with agent_response, status, and updated context
         """
         # Load conversation from database
-        db_conversation = await self.conversation_service.get_conversation_by_session_id(
-            session_id=conversation_id,
-            load_messages=True,
-        )
+        from uuid import UUID
+        try:
+            conversation_uuid = UUID(conversation_id)
+            db_conversation = await self.conversation_service.get_conversation(
+                conversation_id=conversation_uuid,
+                load_messages=True,
+            )
+        except ValueError:
+            # If not a valid UUID, try session_id format
+            db_conversation = await self.conversation_service.get_conversation_by_session_id(
+                session_id=conversation_id,
+                load_messages=True,
+            )
 
         if not db_conversation:
             raise ValueError(f"Conversation not found: {conversation_id}")
@@ -281,12 +294,25 @@ What would you like to achieve?"""
         # Check if requirements are complete (agent indicates readiness to generate plan)
         requirements_complete = self._check_requirements_complete(result)
 
+        # Get the saved messages for response
+        from datetime import datetime, UTC
+        user_message_time = datetime.now(UTC).isoformat()
+        assistant_message_time = datetime.now(UTC).isoformat()
+
         return {
-            "conversation_id": conversation_id,
+            "conversation_id": str(db_conversation.id),
             "agent_response": agent_response,
             "status": "plan_generated" if plan_id else ("ready_for_plan" if requirements_complete else "conversation"),
             "context": plan_context.model_dump(),
             "plan_id": plan_id,
+            "user_message": {
+                "content": user_message,
+                "sent_at": user_message_time,
+            },
+            "assistant_message": {
+                "content": agent_response,
+                "sent_at": assistant_message_time,
+            },
         }
 
     async def generate_plan(
