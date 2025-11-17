@@ -288,8 +288,8 @@
 
 ### Frontend Components for User Story 3
 
-- [ ] T121 [P] [US3] Create disruption report dialog component in frontend/src/components/fitness/disruption-report-dialog.tsx for user to report issues
-- [ ] T122 [US3] Add disruption reporting to dashboard page in frontend/src/app/dashboard/page.tsx with quick action button
+- [X] T121 [P] [US3] Create disruption report dialog component in frontend/src/components/fitness/disruption-report-dialog.tsx for user to report issues
+- [X] T122 [US3] Add disruption reporting to dashboard page in frontend/src/app/dashboard/page.tsx with quick action button
 
 ### Integration & Testing for User Story 3
 

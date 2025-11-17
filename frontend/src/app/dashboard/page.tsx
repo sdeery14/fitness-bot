@@ -10,23 +10,47 @@
 
 'use client';
 
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { DailySchedule } from '@/components/fitness/daily-schedule';
 import { ProgressChart } from '@/components/fitness/progress-chart';
+import { DisruptionReportDialog } from '@/components/fitness/disruption-report-dialog';
 import { Card, CardContent } from '@/components/ui/card';
-import { Calendar, MessageSquare, TrendingUp, User } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Calendar, MessageSquare, TrendingUp, User, AlertTriangle } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 
 export default function DashboardPage() {
   const router = useRouter();
+  const [disruptionDialogOpen, setDisruptionDialogOpen] = useState(false);
+  
+  // TODO: Get actual fitness plan ID from user's active plan
+  const fitnessPlanId = "placeholder-plan-id";
+
+  const handleDisruptionReported = (result: any) => {
+    // Refresh schedule and progress data
+    // In a real implementation, this would trigger a data refetch
+    console.log('Disruption reported:', result);
+  };
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-7xl">
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-2">Dashboard</h1>
-        <p className="text-muted-foreground">
-          Track your progress and stay on schedule
-        </p>
+      {/* Header with Report Disruption Button */}
+      <div className="mb-8 flex items-start justify-between">
+        <div>
+          <h1 className="text-3xl font-bold mb-2">Dashboard</h1>
+          <p className="text-muted-foreground">
+            Track your progress and stay on schedule
+          </p>
+        </div>
+        <Button
+          variant="outline"
+          onClick={() => setDisruptionDialogOpen(true)}
+          className="gap-2"
+        >
+          <AlertTriangle className="h-4 w-4" />
+          Report Disruption
+        </Button>
       </div>
 
       {/* Quick Actions */}
@@ -92,6 +116,14 @@ export default function DashboardPage() {
           <ProgressChart />
         </div>
       </div>
+
+      {/* Disruption Report Dialog */}
+      <DisruptionReportDialog
+        open={disruptionDialogOpen}
+        onOpenChange={setDisruptionDialogOpen}
+        fitnessPlanId={fitnessPlanId}
+        onDisruptionReported={handleDisruptionReported}
+      />
     </div>
   );
 }
