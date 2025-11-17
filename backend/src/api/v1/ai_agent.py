@@ -96,7 +96,13 @@ async def start_conversation(
         HTTPException: If user not found or conversation fails
     """
     # Validate conversation_type
-    valid_types = ["plan_creation", "plan_update", "general_question"]
+    valid_types = [
+        "plan_creation",
+        "plan_update",
+        "plan_modification",
+        "general_question",
+        "disruption_handling",
+    ]
     if request.conversation_type not in valid_types:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

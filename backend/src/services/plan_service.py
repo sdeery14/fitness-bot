@@ -382,3 +382,256 @@ class PlanService:
         await self.db.refresh(plan)
 
         return plan
+
+    async def analyze_progress_for_suggestions(
+        self,
+        user_id: UUID,
+        fitness_plan_id: UUID,
+        days_to_analyze: int = 14,
+    ) -> dict:
+        """Analyze user progress and generate proactive improvement suggestions.
+
+        Args:
+            user_id: User's UUID
+            fitness_plan_id: Fitness plan UUID
+            days_to_analyze: Number of recent days to analyze (default 14)
+
+        Returns:
+            Dictionary with adherence metrics and improvement suggestions
+        """
+        from datetime import date, timedelta
+
+        from sqlalchemy import and_
+
+        from src.models.schedule import Schedule, ScheduleEntry
+
+        end_date = date.today()
+        start_date = end_date - timedelta(days=days_to_analyze)
+
+        # Get recent schedule entries
+        stmt = (
+            select(ScheduleEntry)
+            .join(Schedule)
+            .where(
+                and_(
+                    Schedule.user_id == user_id,
+                    Schedule.fitness_plan_id == fitness_plan_id,
+                    ScheduleEntry.schedule_date >= start_date,
+                    ScheduleEntry.schedule_date <= end_date,
+                )
+            )
+            .order_by(ScheduleEntry.schedule_date)
+        )
+
+        result = await self.db.execute(stmt)
+        entries = result.scalars().all()
+
+        if not entries:
+            return {
+                "has_data": False,
+                "message": "Not enough activity data for analysis",
+                "recommendations": [],
+            }
+
+        # Calculate metrics
+        total_entries = len(entries)
+        completed_entries = sum(1 for e in entries if e.completion_status == "completed")
+        workout_entries = sum(1 for e in entries if e.workout_id)
+        meal_entries = sum(1 for e in entries if e.meal_id)
+        completed_workouts = sum(
+            1 for e in entries if e.workout_id and e.completion_status == "completed"
+        )
+        completed_meals = sum(1 for e in entries if e.meal_id and e.completion_status == "completed")
+
+        overall_adherence = (completed_entries / total_entries * 100) if total_entries > 0 else 0
+        workout_adherence = (completed_workouts / workout_entries * 100) if workout_entries > 0 else 0
+        meal_adherence = (completed_meals / meal_entries * 100) if meal_entries > 0 else 0
+
+        # Analyze patterns by day of week
+        from collections import defaultdict
+
+        day_stats = defaultdict(lambda: {"total": 0, "completed": 0})
+        for entry in entries:
+            day_name = entry.schedule_date.strftime("%A")
+            day_stats[day_name]["total"] += 1
+            if entry.completion_status == "completed":
+                day_stats[day_name]["completed"] += 1
+
+        weak_days = []
+        for day, stats in day_stats.items():
+            day_rate = (stats["completed"] / stats["total"] * 100) if stats["total"] > 0 else 0
+            if day_rate < 70:
+                weak_days.append({"day": day, "adherence_rate": round(day_rate, 1)})
+
+        return {
+            "has_data": True,
+            "analysis_period": {"start_date": start_date.isoformat(), "end_date": end_date.isoformat()},
+            "adherence_metrics": {
+                "overall": round(overall_adherence, 1),
+                "workouts": round(workout_adherence, 1),
+                "meals": round(meal_adherence, 1),
+            },
+            "activity_counts": {
+                "total": total_entries,
+                "completed": completed_entries,
+                "workouts_completed": completed_workouts,
+                "meals_completed": completed_meals,
+            },
+            "patterns": {
+                "weak_days": weak_days,
+            },
+        }
+
+    async def generate_improvement_recommendations(
+        self,
+        user_id: UUID,
+        fitness_plan_id: UUID,
+    ) -> dict:
+        """Generate personalized improvement recommendations based on adherence analysis.
+
+        Args:
+            user_id: User's UUID
+            fitness_plan_id: Fitness plan UUID
+
+        Returns:
+            Dictionary with prioritized recommendations
+        """
+        # Get analysis data
+        analysis = await self.analyze_progress_for_suggestions(user_id, fitness_plan_id)
+
+        if not analysis["has_data"]:
+            return {
+                "recommendations": [],
+                "message": "Complete activities for at least 2 weeks to receive personalized recommendations",
+            }
+
+        adherence = analysis["adherence_metrics"]
+        patterns = analysis["patterns"]
+        recommendations = []
+
+        # Low overall adherence
+        if adherence["overall"] < 50:
+            recommendations.append({
+                "category": "Schedule Simplification",
+                "priority": "high",
+                "title": "Simplify Your Schedule",
+                "description": f"Your current adherence is {adherence['overall']:.0f}%. "
+                "Consider reducing workout frequency to build consistency.",
+                "action_items": [
+                    "Reduce weekly workouts by 1-2 sessions",
+                    "Focus on quality over quantity",
+                    "Build a sustainable habit first",
+                ],
+                "expected_impact": "Improved consistency and motivation",
+            })
+
+        # Moderate adherence
+        elif adherence["overall"] < 70:
+            recommendations.append({
+                "category": "Flexibility & Options",
+                "priority": "medium",
+                "title": "Add Flexible Alternatives",
+                "description": f"You're at {adherence['overall']:.0f}% adherence. "
+                "Adding flexible options can help you hit your targets more consistently.",
+                "action_items": [
+                    "Add shorter workout alternatives for busy days",
+                    "Include home workout options when gym access is limited",
+                    "Allow meal swaps for similar macros",
+                ],
+                "expected_impact": "Better adherence on challenging days",
+            })
+
+        # Strong adherence - ready for progression
+        elif adherence["overall"] >= 80:
+            recommendations.append({
+                "category": "Progressive Overload",
+                "priority": "medium",
+                "title": "Time to Level Up",
+                "description": f"Excellent {adherence['overall']:.0f}% adherence! "
+                "You're ready to increase workout intensity.",
+                "action_items": [
+                    "Increase weights by 5-10%",
+                    "Add 1-2 reps per set",
+                    "Consider adding an extra training session",
+                ],
+                "expected_impact": "Continued progress and adaptation",
+            })
+
+        # Workout vs meal disparity
+        if abs(adherence["workouts"] - adherence["meals"]) > 20:
+            if adherence["workouts"] < adherence["meals"]:
+                recommendations.append({
+                    "category": "Workout Optimization",
+                    "priority": "high",
+                    "title": "Make Workouts More Accessible",
+                    "description": f"Workout adherence ({adherence['workouts']:.0f}%) is notably lower than "
+                    f"meal adherence ({adherence['meals']:.0f}%).",
+                    "action_items": [
+                        "Shorten workout duration",
+                        "Add bodyweight alternatives",
+                        "Schedule workouts at more convenient times",
+                    ],
+                    "expected_impact": "Balanced adherence across all activities",
+                })
+            else:
+                recommendations.append({
+                    "category": "Nutrition Planning",
+                    "priority": "high",
+                    "title": "Simplify Meal Planning",
+                    "description": f"Meal adherence ({adherence['meals']:.0f}%) is notably lower than "
+                    f"workout adherence ({adherence['workouts']:.0f}%).",
+                    "action_items": [
+                        "Batch cook meals for the week",
+                        "Use simpler recipes",
+                        "Allow more flexible meal options",
+                    ],
+                    "expected_impact": "Improved nutrition consistency",
+                })
+
+        # Weak days pattern
+        if patterns["weak_days"]:
+            weak_day_names = ", ".join([d["day"] for d in patterns["weak_days"]])
+            recommendations.append({
+                "category": "Schedule Optimization",
+                "priority": "medium",
+                "title": f"Address {weak_day_names} Challenges",
+                "description": f"Your adherence is consistently lower on {weak_day_names}.",
+                "action_items": [
+                    f"Identify specific barriers on {weak_day_names}",
+                    "Consider lighter activities on these days",
+                    "Prepare in advance to reduce friction",
+                ],
+                "expected_impact": "More consistent week-to-week adherence",
+            })
+
+        # Get plan details for duration-based recommendations
+        plan = await self.get_plan(fitness_plan_id)
+        if plan and plan.start_date:
+            from datetime import date
+
+            days_active = (date.today() - plan.start_date).days
+            if days_active >= 30 and adherence["overall"] >= 75:
+                recommendations.append({
+                    "category": "Goal Expansion",
+                    "priority": "low",
+                    "title": "Consider New Challenges",
+                    "description": f"You've maintained strong adherence for {days_active} days!",
+                    "action_items": [
+                        "Add flexibility or mobility work",
+                        "Incorporate skill-based training",
+                        "Set a new performance goal",
+                    ],
+                    "expected_impact": "Sustained motivation and continued growth",
+                })
+
+        return {
+            "user_id": str(user_id),
+            "fitness_plan_id": str(fitness_plan_id),
+            "analysis_summary": {
+                "overall_adherence": adherence["overall"],
+                "workout_adherence": adherence["workouts"],
+                "meal_adherence": adherence["meals"],
+            },
+            "recommendations": recommendations,
+            "generated_at": datetime.now(UTC).isoformat(),
+        }

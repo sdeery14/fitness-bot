@@ -309,18 +309,18 @@
 
 ### AI Tools for User Story 4
 
-- [ ] T126 [P] [US4] Create workout modification tools in backend/src/ai/tools/workout_tools.py with suggest_alternatives, modify_intensity, adjust_frequency functions (FR-023)
-- [ ] T127 [P] [US4] Create meal modification tools in backend/src/ai/tools/meal_tools.py with suggest_variations, update_macros, swap_ingredients functions (FR-024)
-- [ ] T128 [P] [US4] Create plan analysis tool in backend/src/ai/tools/progress_tools.py with analyze_adherence_patterns, suggest_improvements functions (FR-025)
+- [X] T126 [P] [US4] Create workout modification tools in backend/src/ai/tools/workout_tools.py with suggest_alternatives, modify_intensity, adjust_frequency functions (FR-023)
+- [X] T127 [P] [US4] Create meal modification tools in backend/src/ai/tools/meal_tools.py with suggest_variations, update_macros, swap_ingredients functions (FR-024)
+- [X] T128 [P] [US4] Create plan analysis tool in backend/src/ai/tools/progress_tools.py with analyze_adherence_patterns, suggest_improvements functions (FR-025)
 
 ### Service Layer for User Story 4
 
-- [ ] T129 [US4] Add proactive suggestion methods to backend/src/services/plan_service.py with analyze_progress_for_suggestions, generate_improvement_recommendations based on adherence patterns (FR-025)
+- [X] T129 [US4] Add proactive suggestion methods to backend/src/services/plan_service.py with analyze_progress_for_suggestions, generate_improvement_recommendations based on adherence patterns (FR-025)
 
 ### API Endpoints for User Story 4
 
-- [ ] T130 [US4] Extend AI conversation endpoints in backend/src/api/v1/ai_agent.py to handle plan_modification conversation type
-- [ ] T131 [US4] Implement workout alternatives endpoint in backend/src/api/v1/workouts.py: GET /{workout_id}/alternatives (1 endpoint from contracts)
+- [X] T130 [US4] Extend AI conversation endpoints in backend/src/api/v1/ai_agent.py to handle plan_modification conversation type
+- [X] T131 [US4] Implement workout alternatives endpoint in backend/src/api/v1/workouts.py: GET /{workout_id}/alternatives (1 endpoint from contracts)
 
 ### Frontend Components for User Story 4
 
