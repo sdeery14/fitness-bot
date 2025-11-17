@@ -216,18 +216,18 @@
 
 ### Frontend Components for User Story 2
 
-- [ ] T098 [P] [US2] Create daily schedule component in frontend/src/components/fitness/daily-schedule.tsx to display today's workouts and meals
-- [ ] T099 [P] [US2] Create schedule calendar component in frontend/src/components/fitness/schedule-calendar.tsx for upcoming 14-day view
-- [ ] T100 [P] [US2] Create progress chart component in frontend/src/components/fitness/progress-chart.tsx with adherence rates, streaks visualization
-- [ ] T101 [US2] Create dashboard overview page in frontend/src/app/dashboard/page.tsx with today's schedule summary
-- [ ] T102 [US2] Create schedule page in frontend/src/app/dashboard/schedule/page.tsx with calendar view
-- [ ] T103 [US2] Create progress page in frontend/src/app/dashboard/progress/page.tsx with charts and statistics
+- [X] T098 [P] [US2] Create daily schedule component in frontend/src/components/fitness/daily-schedule.tsx to display today's workouts and meals (317 lines, commit 20fc219)
+- [X] T099 [P] [US2] Create schedule calendar component in frontend/src/components/fitness/schedule-calendar.tsx for upcoming 14-day view (355 lines, commit 20fc219)
+- [X] T100 [P] [US2] Create progress chart component in frontend/src/components/fitness/progress-chart.tsx with adherence rates, streaks visualization (316 lines, commit 20fc219)
+- [X] T101 [US2] Create dashboard overview page in frontend/src/app/dashboard/page.tsx with today's schedule summary (89 lines, commit 20fc219)
+- [X] T102 [US2] Create schedule page in frontend/src/app/dashboard/schedule/page.tsx with calendar view (56 lines, commit 20fc219)
+- [X] T103 [US2] Create progress page in frontend/src/app/dashboard/progress/page.tsx with charts and statistics (28 lines, commit 20fc219)
 
 ### Frontend Hooks & State for User Story 2
 
-- [ ] T104 [P] [US2] Create schedule store in frontend/src/store/schedule-store.ts with Zustand for schedule entries, completion state
-- [ ] T105 [P] [US2] Create schedule hook in frontend/src/hooks/use-schedule.ts for fetching schedule, marking complete
-- [ ] T106 [P] [US2] Create progress hook in frontend/src/hooks/use-progress.ts for fetching stats, logging measurements
+- [X] T104 [P] [US2] Create schedule store in frontend/src/store/schedule-store.ts with Zustand for schedule entries, completion state (172 lines, commit 20fc219)
+- [X] T105 [P] [US2] Create schedule hook in frontend/src/hooks/use-schedule.ts for fetching schedule, marking complete (190 lines, commit 20fc219)
+- [X] T106 [P] [US2] Create progress hook in frontend/src/hooks/use-progress.ts for fetching stats, logging measurements (192 lines, commit 20fc219)
 
 ### Integration & Testing for User Story 2
 
@@ -236,7 +236,19 @@
 - [ ] T109 [US2] Write contract tests for progress endpoints in backend/tests/contract/test_progress_api.py (REMOVED - API response format issues)
 - [ ] T110 [US2] Write E2E test for schedule tracking in frontend/tests/e2e/schedule-tracking.spec.ts with Playwright: view today → complete workout → view progress
 
+### Additional UI Components (shadcn/ui) for User Story 2
+
+- [X] Created dialog.tsx (131 lines) - Modal dialogs for complete/skip actions
+- [X] Created progress.tsx (29 lines) - Progress bars for adherence visualization
+- [X] Created select.tsx (168 lines) - Dropdown for measurement type selection
+- [X] Created skeleton.tsx (14 lines) - Loading placeholders
+- [X] Created tabs.tsx (60 lines) - Tab navigation for schedule page
+
 **Checkpoint**: User Stories 1 AND 2 complete - Users can create plans and follow daily schedules
+
+**Git Commits**:
+- Backend: fc555b3 "feat(phase4): implement User Story 2 backend" (17 files, 2295 insertions)
+- Frontend: 20fc219 "feat(phase4): implement User Story 2 frontend" (14 files, 2106 insertions)
 
 ---
 
