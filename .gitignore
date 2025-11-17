@@ -78,6 +78,9 @@ Thumbs.db
 coverage/
 *.lcov
 .nyc_output/
+test-results/
+playwright-report/
+playwright/.cache/
 
 # Docker
 *.log
