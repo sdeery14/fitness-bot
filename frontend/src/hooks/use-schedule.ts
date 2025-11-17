@@ -30,6 +30,8 @@ export function useSchedule() {
     setUpcomingLoading,
     setUpcomingError,
     updateEntryStatus,
+    confirmUpdate,
+    rollbackUpdate,
   } = useScheduleStore();
 
   /**
@@ -117,24 +119,26 @@ export function useSchedule() {
         });
 
         if (!response.ok) {
-          // Revert optimistic update on error
+          // Rollback optimistic update on error
+          rollbackUpdate(entryId);
           throw new Error(`Failed to mark entry as complete: ${response.statusText}`);
         }
 
         const updatedEntry: ScheduleEntry = await response.json();
+        
+        // Confirm the optimistic update
+        confirmUpdate(entryId);
         
         // Refresh today's schedule to get updated summary
         await fetchTodaySchedule();
         
         return updatedEntry;
       } catch (error) {
-        // Revert optimistic update
-        updateEntryStatus(entryId, 'scheduled');
         console.error('Error marking entry as complete:', error);
         throw error;
       }
     },
-    [updateEntryStatus, fetchTodaySchedule]
+    [updateEntryStatus, confirmUpdate, rollbackUpdate, fetchTodaySchedule]
   );
 
   /**
@@ -158,23 +162,26 @@ export function useSchedule() {
         });
 
         if (!response.ok) {
+          // Rollback optimistic update on error
+          rollbackUpdate(entryId);
           throw new Error(`Failed to skip entry: ${response.statusText}`);
         }
 
         const updatedEntry: ScheduleEntry = await response.json();
+        
+        // Confirm the optimistic update
+        confirmUpdate(entryId);
         
         // Refresh today's schedule
         await fetchTodaySchedule();
         
         return updatedEntry;
       } catch (error) {
-        // Revert optimistic update
-        updateEntryStatus(entryId, 'scheduled');
         console.error('Error skipping entry:', error);
         throw error;
       }
     },
-    [updateEntryStatus, fetchTodaySchedule]
+    [updateEntryStatus, confirmUpdate, rollbackUpdate, fetchTodaySchedule]
   );
 
   return {

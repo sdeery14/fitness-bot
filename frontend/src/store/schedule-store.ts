@@ -61,6 +61,9 @@ interface ScheduleState {
   upcomingLoading: boolean;
   upcomingError: string | null;
 
+  // Optimistic update tracking
+  pendingUpdates: Map<string, ScheduleEntry>;
+
   // Actions
   setTodaySchedule: (schedule: TodaySchedule) => void;
   setTodayLoading: (loading: boolean) => void;
@@ -70,8 +73,14 @@ interface ScheduleState {
   setUpcomingLoading: (loading: boolean) => void;
   setUpcomingError: (error: string | null) => void;
 
-  // Update entry status locally (optimistic update)
+  // Optimistic update: immediately update UI, track for rollback
   updateEntryStatus: (entryId: string, status: ScheduleEntry['completion_status'], notes?: string) => void;
+  
+  // Confirm optimistic update (remove from pending after successful API call)
+  confirmUpdate: (entryId: string) => void;
+  
+  // Rollback optimistic update (revert to previous state on API error)
+  rollbackUpdate: (entryId: string) => void;
 
   // Clear all data
   reset: () => void;
@@ -84,6 +93,7 @@ const initialState = {
   upcomingSchedule: null,
   upcomingLoading: false,
   upcomingError: null,
+  pendingUpdates: new Map<string, ScheduleEntry>(),
 };
 
 export const useScheduleStore = create<ScheduleState>((set) => ({
@@ -99,6 +109,21 @@ export const useScheduleStore = create<ScheduleState>((set) => ({
 
   updateEntryStatus: (entryId, status, notes) =>
     set((state) => {
+      // Store original entry for rollback
+      const pendingUpdates = new Map(state.pendingUpdates);
+      
+      // Find the original entry
+      let originalEntry: ScheduleEntry | undefined;
+      if (state.todaySchedule) {
+        originalEntry = state.todaySchedule.entries.find((e) => e.id === entryId);
+      }
+      if (!originalEntry && state.upcomingSchedule) {
+        originalEntry = state.upcomingSchedule.entries.find((e) => e.id === entryId);
+      }
+      
+      if (originalEntry && !pendingUpdates.has(entryId)) {
+        pendingUpdates.set(entryId, originalEntry);
+      }
       // Update in today's schedule
       if (state.todaySchedule) {
         const updatedEntries = state.todaySchedule.entries.map((entry) =>
@@ -121,6 +146,7 @@ export const useScheduleStore = create<ScheduleState>((set) => ({
         ).length;
 
         return {
+          pendingUpdates,
           todaySchedule: {
             ...state.todaySchedule,
             entries: updatedEntries,
@@ -156,6 +182,7 @@ export const useScheduleStore = create<ScheduleState>((set) => ({
         });
 
         return {
+          pendingUpdates,
           upcomingSchedule: {
             ...state.upcomingSchedule,
             entries: updatedEntries,
@@ -164,7 +191,78 @@ export const useScheduleStore = create<ScheduleState>((set) => ({
         };
       }
 
-      return state;
+      return { pendingUpdates };
+    }),
+
+  confirmUpdate: (entryId) =>
+    set((state) => {
+      const pendingUpdates = new Map(state.pendingUpdates);
+      pendingUpdates.delete(entryId);
+      return { pendingUpdates };
+    }),
+
+  rollbackUpdate: (entryId) =>
+    set((state) => {
+      const originalEntry = state.pendingUpdates.get(entryId);
+      if (!originalEntry) return state;
+
+      const pendingUpdates = new Map(state.pendingUpdates);
+      pendingUpdates.delete(entryId);
+
+      // Rollback in today's schedule
+      if (state.todaySchedule) {
+        const updatedEntries = state.todaySchedule.entries.map((entry) =>
+          entry.id === entryId ? originalEntry : entry
+        );
+
+        // Recalculate summary
+        const completedWorkouts = updatedEntries.filter(
+          (e) => e.entry_type === 'workout' && e.completion_status === 'completed'
+        ).length;
+        const completedMeals = updatedEntries.filter(
+          (e) => e.entry_type === 'meal' && e.completion_status === 'completed'
+        ).length;
+
+        return {
+          pendingUpdates,
+          todaySchedule: {
+            ...state.todaySchedule,
+            entries: updatedEntries,
+            summary: {
+              ...state.todaySchedule.summary,
+              completed_workouts: completedWorkouts,
+              completed_meals: completedMeals,
+            },
+          },
+        };
+      }
+
+      // Rollback in upcoming schedule
+      if (state.upcomingSchedule) {
+        const updatedEntries = state.upcomingSchedule.entries.map((entry) =>
+          entry.id === entryId ? originalEntry : entry
+        );
+
+        // Rebuild grouped_by_date
+        const grouped: Record<string, ScheduleEntry[]> = {};
+        updatedEntries.forEach((entry) => {
+          if (!grouped[entry.entry_date]) {
+            grouped[entry.entry_date] = [];
+          }
+          grouped[entry.entry_date].push(entry);
+        });
+
+        return {
+          pendingUpdates,
+          upcomingSchedule: {
+            ...state.upcomingSchedule,
+            entries: updatedEntries,
+            grouped_by_date: grouped,
+          },
+        };
+      }
+
+      return { pendingUpdates };
     }),
 
   reset: () => set(initialState),
