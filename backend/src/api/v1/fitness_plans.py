@@ -365,3 +365,62 @@ async def update_plan(
         "created_at": plan.created_at.isoformat(),
         "updated_at": plan.updated_at.isoformat(),
     })
+
+
+@router.get("/{plan_id}/suggestions")
+async def get_plan_suggestions(
+    plan_id: UUID,
+    user_id: CurrentUserId,
+    db: DatabaseSession,
+):
+    """Get AI-generated improvement suggestions for a fitness plan.
+
+    This endpoint analyzes the user's progress and adherence patterns
+    to generate personalized recommendations for plan improvements.
+
+    Args:
+        plan_id: Plan UUID
+        user_id: Current authenticated user ID
+        db: Database session
+
+    Returns:
+        Improvement recommendations with analysis summary
+
+    Raises:
+        HTTPException: If plan not found or not owned by user
+    """
+    from src.schemas import create_error_response
+
+    plan_service = PlanService(db)
+    plan = await plan_service.get_plan(plan_id)
+
+    if not plan:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=create_error_response(
+                code="NOT_FOUND",
+                message=f"Fitness plan {plan_id} not found"
+            )
+        )
+
+    # Verify ownership
+    if plan.user_id != user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to access this plan",
+        )
+
+    try:
+        # Generate improvement recommendations based on progress
+        recommendations = await plan_service.generate_improvement_recommendations(
+            user_id=user_id,
+            fitness_plan_id=plan_id,
+        )
+
+        return create_success_response(recommendations)
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to generate suggestions: {str(e)}"
+        ) from e

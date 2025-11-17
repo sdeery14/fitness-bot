@@ -324,14 +324,14 @@
 
 ### Frontend Components for User Story 4
 
-- [ ] T132 [P] [US4] Add plan modification chat interface to frontend/src/app/dashboard/chat/page.tsx with conversation type selector
-- [ ] T133 [P] [US4] Create AI suggestions card component in frontend/src/components/fitness/ai-suggestions-card.tsx for proactive recommendations
+- [X] T132 [P] [US4] Add plan modification chat interface to frontend/src/app/dashboard/chat/page.tsx with conversation type selector
+- [X] T133 [P] [US4] Create AI suggestions card component in frontend/src/components/fitness/ai-suggestions-card.tsx for proactive recommendations
 
 ### Integration & Testing for User Story 4
 
-- [ ] T134 [US4] Write integration test for plan modification in backend/tests/integration/test_plan_modification.py: request change → AI processes → plan updated → verify changes
-- [ ] T135 [US4] Write AI tools test in backend/tests/integration/test_ai_tools.py to verify workout alternatives, meal variations
-- [ ] T136 [US4] Write unit tests for improvement suggestion logic in backend/tests/unit/services/test_plan_service.py
+- [X] T134 [US4] Write integration test for plan modification in backend/tests/integration/test_plan_modification.py: request change → AI processes → plan updated → verify changes
+- [X] T135 [US4] Write AI tools test in backend/tests/integration/test_ai_tools.py to verify workout alternatives, meal variations
+- [X] T136 [US4] Write unit tests for improvement suggestion logic in backend/tests/unit/services/test_plan_service.py
 
 **Checkpoint**: User Stories 1-4 complete - AI acts as continuous fitness coach
 
