@@ -130,6 +130,14 @@ class CSRFProtectionMiddleware(BaseHTTPMiddleware):
         Returns:
             Response, or 403 if CSRF validation fails
         """
+        # Import settings for environment check
+        from src.config import settings
+        
+        # Skip CSRF in development mode (common for SPAs with JWT auth)
+        if settings.ENVIRONMENT == "development":
+            response = await call_next(request)
+            return response
+        
         # Check if path is exempt
         if any(request.url.path.startswith(path) for path in self.exempt_paths):
             response = await call_next(request)
