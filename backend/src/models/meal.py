@@ -1,8 +1,6 @@
 """Meal plan and meal models."""
-from typing import Optional
-from uuid import UUID
 
-from sqlalchemy import Column, Enum, ForeignKey, Integer, JSON, Numeric, String, Text
+from sqlalchemy import Column, ForeignKey, Integer, JSON, Numeric, String
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import relationship
 

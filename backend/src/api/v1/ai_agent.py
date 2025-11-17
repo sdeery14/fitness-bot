@@ -15,7 +15,6 @@ from src.services.plan_service import PlanService
 from src.services.schedule_service import ScheduleService
 from src.services.user_service import UserService
 from src.models.conversation import DisruptionEvent
-from src.workers.schedule_recalc import recalculate_schedule_for_disruption
 
 router = APIRouter()
 

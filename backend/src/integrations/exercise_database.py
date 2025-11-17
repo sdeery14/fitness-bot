@@ -5,14 +5,8 @@ covering various muscle groups, equipment types, and difficulty levels.
 Supports FR-048, FR-049, FR-050, FR-051.
 """
 import asyncio
-import json
-from uuid import UUID, uuid4
 
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.database import AsyncSessionLocal
-from src.models.workout import Exercise
 
 
 # Comprehensive exercise database

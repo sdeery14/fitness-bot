@@ -11,7 +11,6 @@ from agents import function_tool
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.models.conversation import DisruptionEvent
-from src.models.schedule import ScheduleEntry
 from src.services.schedule_service import ScheduleService
 from src.services.user_service import UserService
 

@@ -3,9 +3,7 @@
 import asyncio
 from uuid import UUID
 
-from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.config import settings
 from src.database import AsyncSessionLocal
 from src.models.conversation import DisruptionEvent
 from src.services.schedule_service import ScheduleService

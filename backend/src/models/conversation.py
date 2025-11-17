@@ -1,9 +1,6 @@
 """Conversation and message models."""
-from datetime import date, datetime
-from typing import Optional
-from uuid import UUID
 
-from sqlalchemy import Column, Date, DateTime, Enum, ForeignKey, Integer, JSON, String, Text
+from sqlalchemy import Column, Date, Enum, ForeignKey, Integer, JSON, String, Text
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import relationship
 

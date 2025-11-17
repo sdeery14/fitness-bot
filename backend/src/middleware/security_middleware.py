@@ -199,8 +199,6 @@ def validate_sql_injection_protection() -> dict[str, bool]:
     Returns:
         Dict with validation results
     """
-    import inspect
-    import os
     from pathlib import Path
 
     results = {
@@ -212,7 +210,7 @@ def validate_sql_injection_protection() -> dict[str, bool]:
 
     # Check that we're using SQLAlchemy ORM
     try:
-        from src.database import Base
+        from src.database import Base  # noqa: F401 - Import to verify ORM availability
         results["uses_orm"] = True
     except ImportError:
         results["issues_found"].append("SQLAlchemy ORM not found")

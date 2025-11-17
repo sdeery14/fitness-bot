@@ -1,5 +1,4 @@
 """USDA FoodData Central API client for nutritional data."""
-import asyncio
 from typing import Any, Optional
 
 import httpx

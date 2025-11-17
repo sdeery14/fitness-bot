@@ -1,7 +1,4 @@
 """User model."""
-from datetime import datetime
-from typing import Optional
-from uuid import UUID
 
 from sqlalchemy import Boolean, Column, DateTime, JSON, String
 from sqlalchemy.orm import relationship

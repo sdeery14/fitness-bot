@@ -1,6 +1,6 @@
 """Progress service for tracking adherence, measurements, and milestones."""
 
-from datetime import UTC, date, datetime, timedelta
+from datetime import date, timedelta
 from decimal import Decimal
 from uuid import UUID
 

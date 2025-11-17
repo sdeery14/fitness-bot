@@ -1,7 +1,4 @@
 """Fitness plan and phase models."""
-from datetime import datetime
-from typing import Optional
-from uuid import UUID
 
 from sqlalchemy import Column, DateTime, Enum, ForeignKey, Integer, JSON, String, Text
 from sqlalchemy.dialects.postgresql import UUID as PGUUID

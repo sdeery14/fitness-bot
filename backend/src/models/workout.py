@@ -1,8 +1,6 @@
 """Workout and exercise models."""
-from typing import Optional
-from uuid import UUID
 
-from sqlalchemy import Column, Enum, ForeignKey, Integer, JSON, String, Text
+from sqlalchemy import Column, ForeignKey, Integer, JSON, String, Text
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import relationship
 

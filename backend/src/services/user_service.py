@@ -1,5 +1,5 @@
 """User service for user profile and preference management."""
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from uuid import UUID
 
 from sqlalchemy import desc, select
