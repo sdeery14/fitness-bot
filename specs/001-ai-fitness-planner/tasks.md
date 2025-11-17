@@ -383,9 +383,9 @@
 - [X] T149 [P] Add input validation helpers in backend/src/utils/validators.py for common validation patterns
 - [X] T150 [P] Create date/time utilities in backend/src/utils/date_utils.py for timezone handling, schedule calculations
 - [X] T151 [P] Implement frontend error boundaries in frontend/src/app/error.tsx and frontend/src/app/global-error.tsx
-- [ ] T152 [P] Add loading states and skeleton screens to all frontend pages for better UX
-- [ ] T153 [P] Implement optimistic UI updates for completion tracking (mark complete immediately, rollback on error)
-- [ ] T154 [P] Add accessibility audit: keyboard navigation, ARIA labels, screen reader support (WCAG 2.1 Level AA per constitution)
+- [X] T152 [P] Add loading states and skeleton screens to all frontend pages for better UX
+- [X] T153 [P] Implement optimistic UI updates for completion tracking (mark complete immediately, rollback on error)
+- [X] T154 [P] Add accessibility audit: keyboard navigation, ARIA labels, screen reader support (WCAG 2.1 Level AA per constitution)
 - [ ] T155 [P] Create API documentation in docs/api-guide.md based on contracts/api-contracts.md
 - [ ] T156 [P] Create architecture documentation in docs/architecture.md explaining multi-agent design
 - [ ] T157 [P] Create deployment guide in docs/deployment.md for Docker/cloud deployment
