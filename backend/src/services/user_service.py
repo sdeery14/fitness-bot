@@ -5,7 +5,7 @@ from uuid import UUID
 from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.models.schedule import ProgressRecord
+from src.models.progress import ProgressRecord
 from src.models.user import User
 
 

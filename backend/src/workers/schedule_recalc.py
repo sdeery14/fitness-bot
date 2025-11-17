@@ -6,7 +6,7 @@ from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.config import settings
-from src.database import async_session_maker
+from src.database import AsyncSessionLocal
 from src.models.conversation import DisruptionEvent
 from src.services.schedule_service import ScheduleService
 from src.services.user_service import UserService
@@ -29,7 +29,7 @@ def recalculate_schedule_for_disruption(disruption_id: str) -> dict:
         dict: Recalculation result with status and details
     """
     async def _process_disruption():
-        async with async_session_maker() as db:
+        async with AsyncSessionLocal() as db:
             # Load the disruption event
             from sqlalchemy import select
             stmt = select(DisruptionEvent).where(DisruptionEvent.id == UUID(disruption_id))
@@ -103,7 +103,7 @@ def check_user_inactivity(user_id: str, fitness_plan_id: str) -> dict:
         dict: Inactivity check result with recommendation
     """
     async def _check_inactivity():
-        async with async_session_maker() as db:
+        async with AsyncSessionLocal() as db:
             service = UserService(db)
             result = await service.check_inactivity(
                 user_id=UUID(user_id),
@@ -139,7 +139,7 @@ def process_missed_workouts(user_id: str, fitness_plan_id: str, days_to_check: i
         dict: Analysis of missed workouts with recommendations
     """
     async def _process_missed():
-        async with async_session_maker() as db:
+        async with AsyncSessionLocal() as db:
             from datetime import date, timedelta
             from sqlalchemy import and_, select
 
