@@ -37,8 +37,8 @@ export function MessageInput({
   };
 
   return (
-    <div className="border-t border-gray-200 bg-white py-4">
-      <form onSubmit={handleSubmit} className="max-w-3xl mx-auto px-4">
+    <div className="border-t border-gray-200 bg-white py-4" role="region" aria-label="Message input">
+      <form onSubmit={handleSubmit} className="max-w-3xl mx-auto px-4" aria-label="Send message form">
         <div className="relative flex items-end gap-2 bg-white border-2 border-gray-300 rounded-2xl shadow-lg focus-within:border-blue-500 focus-within:shadow-xl transition-all">
           <Textarea
             value={input}
@@ -48,17 +48,21 @@ export function MessageInput({
             disabled={disabled}
             className="min-h-[52px] max-h-[200px] resize-none flex-1 bg-transparent border-0 px-4 py-3 text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-0"
             rows={1}
+            aria-label="Message input"
+            aria-describedby="message-input-help"
           />
           <button
             type="submit"
             disabled={disabled || !input.trim()}
             className="flex-shrink-0 m-2 h-10 w-10 inline-flex items-center justify-center text-white rounded-xl transition-all disabled:opacity-40 disabled:cursor-not-allowed bg-blue-600 hover:bg-blue-700 active:bg-blue-800"
+            aria-label="Send message"
+            aria-disabled={disabled || !input.trim()}
           >
-            <Send className="h-5 w-5" />
+            <Send className="h-5 w-5" aria-hidden="true" />
             <span className="sr-only">Send message</span>
           </button>
         </div>
-        <p className="text-xs text-gray-500 text-center mt-2">
+        <p className="text-xs text-gray-500 text-center mt-2" id="message-input-help" aria-live="polite">
           Press Enter to send, Shift + Enter for new line
         </p>
       </form>

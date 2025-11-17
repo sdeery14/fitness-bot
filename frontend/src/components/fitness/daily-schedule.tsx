@@ -166,11 +166,11 @@ export function DailySchedule() {
 
   return (
     <>
-      <Card>
+      <Card role="region" aria-labelledby="daily-schedule-title">
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
-              <CardTitle>Today&apos;s Schedule</CardTitle>
+              <CardTitle id="daily-schedule-title">Today&apos;s Schedule</CardTitle>
               <CardDescription>
                 {new Date(todaySchedule.date).toLocaleDateString('en-US', {
                   weekday: 'long',
@@ -181,93 +181,114 @@ export function DailySchedule() {
               </CardDescription>
             </div>
             <div className="text-right">
-              <div className="text-2xl font-bold">{completionRate}%</div>
-              <div className="text-sm text-muted-foreground">Completed</div>
+              <div 
+                className="text-2xl font-bold" 
+                role="status" 
+                aria-live="polite"
+                aria-label={`${completionRate}% of today's activities completed`}
+              >
+                {completionRate}%
+              </div>
+              <div className="text-sm text-muted-foreground" aria-hidden="true">Completed</div>
             </div>
           </div>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
             {/* Summary Stats */}
-            <div className="grid grid-cols-2 gap-4 pb-4 border-b">
+            <div className="grid grid-cols-2 gap-4 pb-4 border-b" role="group" aria-label="Activity summary">
               <div>
                 <div className="text-sm text-muted-foreground">Workouts</div>
-                <div className="text-lg font-semibold">
+                <div className="text-lg font-semibold" aria-label={`${summary.completed_workouts} of ${summary.total_workouts} workouts completed`}>
                   {summary.completed_workouts} / {summary.total_workouts}
                 </div>
               </div>
               <div>
                 <div className="text-sm text-muted-foreground">Meals</div>
-                <div className="text-lg font-semibold">
+                <div className="text-lg font-semibold" aria-label={`${summary.completed_meals} of ${summary.total_meals} meals completed`}>
                   {summary.completed_meals} / {summary.total_meals}
                 </div>
               </div>
             </div>
 
             {/* Schedule Entries */}
-            <div className="space-y-3">
-              {entries.map((entry) => (
-                <Card key={entry.id} className="border-l-4" style={{
-                  borderLeftColor: entry.entry_type === 'workout' ? '#3b82f6' : '#f97316'
-                }}>
-                  <CardContent className="p-4">
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-start gap-3 flex-1">
-                        {getIcon(entry.entry_type)}
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2">
-                            <h4 className="font-semibold">
-                              {entry.workout?.name || entry.meal?.name || `${entry.entry_type}`}
-                            </h4>
-                            {getStatusBadge(entry.completion_status)}
+            <div className="space-y-3" role="list" aria-label="Today's activities">
+              {entries.map((entry) => {
+                const activityName = entry.workout?.name || entry.meal?.name || entry.entry_type;
+                
+                return (
+                  <Card 
+                    key={entry.id} 
+                    className="border-l-4" 
+                    style={{
+                      borderLeftColor: entry.entry_type === 'workout' ? '#3b82f6' : '#f97316'
+                    }}
+                    role="listitem"
+                    aria-labelledby={`entry-${entry.id}-title`}
+                  >
+                    <CardContent className="p-4">
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-start gap-3 flex-1">
+                          {getIcon(entry.entry_type)}
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2">
+                              <h4 className="font-semibold" id={`entry-${entry.id}-title`}>
+                                {activityName}
+                              </h4>
+                              {getStatusBadge(entry.completion_status)}
+                            </div>
+                            {entry.entry_time && (
+                              <p className="text-sm text-muted-foreground mt-1">
+                                <span className="sr-only">Scheduled time: </span>
+                                {new Date(`2000-01-01T${entry.entry_time}`).toLocaleTimeString('en-US', {
+                                  hour: 'numeric',
+                                  minute: '2-digit',
+                                })}
+                              </p>
+                            )}
+                            {(entry.workout?.description || entry.meal?.description) && (
+                              <p className="text-sm text-muted-foreground mt-2">
+                                {entry.workout?.description || entry.meal?.description}
+                              </p>
+                            )}
+                            {entry.user_notes && (
+                              <p className="text-sm italic text-muted-foreground mt-2">
+                                <span className="sr-only">User note: </span>
+                                Note: {entry.user_notes}
+                              </p>
+                            )}
                           </div>
-                          {entry.entry_time && (
-                            <p className="text-sm text-muted-foreground mt-1">
-                              {new Date(`2000-01-01T${entry.entry_time}`).toLocaleTimeString('en-US', {
-                                hour: 'numeric',
-                                minute: '2-digit',
-                              })}
-                            </p>
-                          )}
-                          {(entry.workout?.description || entry.meal?.description) && (
-                            <p className="text-sm text-muted-foreground mt-2">
-                              {entry.workout?.description || entry.meal?.description}
-                            </p>
-                          )}
-                          {entry.user_notes && (
-                            <p className="text-sm italic text-muted-foreground mt-2">
-                              Note: {entry.user_notes}
-                            </p>
-                          )}
                         </div>
+                        {entry.completion_status === 'scheduled' && (
+                          <div className="flex gap-2" role="group" aria-label={`Actions for ${activityName}`}>
+                            <Button
+                              size="sm"
+                              onClick={() => {
+                                setSelectedEntry(entry);
+                                setShowCompleteDialog(true);
+                              }}
+                              aria-label={`Mark ${activityName} as complete`}
+                            >
+                              Complete
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                setSelectedEntry(entry);
+                                setShowSkipDialog(true);
+                              }}
+                              aria-label={`Skip ${activityName}`}
+                            >
+                              Skip
+                            </Button>
+                          </div>
+                        )}
                       </div>
-                      {entry.completion_status === 'scheduled' && (
-                        <div className="flex gap-2">
-                          <Button
-                            size="sm"
-                            onClick={() => {
-                              setSelectedEntry(entry);
-                              setShowCompleteDialog(true);
-                            }}
-                          >
-                            Complete
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => {
-                              setSelectedEntry(entry);
-                              setShowSkipDialog(true);
-                            }}
-                          >
-                            Skip
-                          </Button>
-                        </div>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+                    </CardContent>
+                  </Card>
+                );
+              })}
             </div>
           </div>
         </CardContent>
@@ -275,30 +296,39 @@ export function DailySchedule() {
 
       {/* Complete Dialog */}
       <Dialog open={showCompleteDialog} onOpenChange={setShowCompleteDialog}>
-        <DialogContent>
+        <DialogContent aria-describedby="complete-dialog-description">
           <DialogHeader>
             <DialogTitle>Mark as Complete</DialogTitle>
-            <DialogDescription>
+            <DialogDescription id="complete-dialog-description">
               Add any notes about this {selectedEntry?.entry_type} (optional)
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <Label htmlFor="notes">Notes</Label>
+              <Label htmlFor="complete-notes">Notes</Label>
               <Textarea
-                id="notes"
+                id="complete-notes"
                 placeholder="How did it go? Any observations?"
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 rows={3}
+                aria-label="Activity completion notes"
               />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowCompleteDialog(false)}>
+            <Button 
+              variant="outline" 
+              onClick={() => setShowCompleteDialog(false)}
+              aria-label="Cancel marking activity as complete"
+            >
               Cancel
             </Button>
-            <Button onClick={handleComplete} disabled={actionLoading}>
+            <Button 
+              onClick={handleComplete} 
+              disabled={actionLoading}
+              aria-label={actionLoading ? 'Saving...' : 'Confirm marking activity as complete'}
+            >
               {actionLoading ? 'Saving...' : 'Complete'}
             </Button>
           </DialogFooter>
@@ -307,31 +337,43 @@ export function DailySchedule() {
 
       {/* Skip Dialog */}
       <Dialog open={showSkipDialog} onOpenChange={setShowSkipDialog}>
-        <DialogContent>
+        <DialogContent aria-describedby="skip-dialog-description">
           <DialogHeader>
             <DialogTitle>Skip Activity</DialogTitle>
-            <DialogDescription>
+            <DialogDescription id="skip-dialog-description">
               Please provide a reason for skipping this {selectedEntry?.entry_type}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <Label htmlFor="reason">Reason</Label>
+              <Label htmlFor="skip-reason">Reason (required)</Label>
               <Textarea
-                id="reason"
+                id="skip-reason"
                 placeholder="e.g., Not feeling well, Time constraints, etc."
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 rows={3}
                 required
+                aria-required="true"
+                aria-label="Reason for skipping activity"
+                aria-invalid={!notes.trim()}
               />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowSkipDialog(false)}>
+            <Button 
+              variant="outline" 
+              onClick={() => setShowSkipDialog(false)}
+              aria-label="Cancel skipping activity"
+            >
               Cancel
             </Button>
-            <Button onClick={handleSkip} disabled={actionLoading || !notes.trim()}>
+            <Button 
+              onClick={handleSkip} 
+              disabled={actionLoading || !notes.trim()}
+              aria-label={actionLoading ? 'Saving...' : 'Confirm skipping activity'}
+              aria-disabled={!notes.trim()}
+            >
               {actionLoading ? 'Saving...' : 'Skip'}
             </Button>
           </DialogFooter>
