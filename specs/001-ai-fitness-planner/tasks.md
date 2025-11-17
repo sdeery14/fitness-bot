@@ -293,9 +293,9 @@
 
 ### Integration & Testing for User Story 3
 
-- [ ] T123 [US3] Write integration test for rescheduling in backend/tests/integration/test_rescheduling.py: create plan → report disruption → verify schedule adjustment → verify timeline extension
-- [ ] T124 [US3] Write unit test for schedule service rescheduling logic in backend/tests/unit/services/test_schedule_service.py with various disruption scenarios
-- [ ] T125 [US3] Write E2E test for disruption handling in frontend/tests/e2e/disruption-handling.spec.ts with Playwright
+- [X] T123 [US3] Write integration test for rescheduling in backend/tests/integration/test_rescheduling.py: create plan → report disruption → verify schedule adjustment → verify timeline extension
+- [X] T124 [US3] Write unit test for schedule service rescheduling logic in backend/tests/unit/services/test_schedule_service.py with various disruption scenarios
+- [X] T125 [US3] Write E2E test for disruption handling in frontend/tests/e2e/disruption-handling.spec.ts with Playwright
 
 **Checkpoint**: User Stories 1, 2, AND 3 complete - System handles unexpected life events gracefully
 
