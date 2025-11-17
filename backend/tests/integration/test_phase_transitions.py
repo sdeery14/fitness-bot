@@ -171,11 +171,12 @@ async def test_phase_completion_detection():
         )
         assert plan_response.status_code == 201
         plan_data = plan_response.json()["data"]
-        fitness_plan_id = plan_data["id"]
 
         # 3. Phase completion should be detected
         # Note: This would require a new API endpoint to check phase status
         # For now, we verify the plan structure is correct
+        assert "id" in plan_data
+        assert plan_data["goal_type"] == "muscle_building"
 
 
 @pytest.mark.asyncio
@@ -244,3 +245,4 @@ async def test_phase_transition_records_history():
 
         # 4. When transitions happen, they should be recorded in plan_snapshot.phase_transitions
         # This will be populated by the transition_to_next_phase method
+
