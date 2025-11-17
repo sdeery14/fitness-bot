@@ -1,16 +1,13 @@
 """Workout API endpoints."""
-from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, HTTPException
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.api.deps import get_current_user, get_db
+from src.api.deps import CurrentUserId, DatabaseSession
 from src.integrations.exercise_database import get_alternative_exercises
-from src.models.user import User
 from src.models.workout import Workout
-from src.schemas import StandardResponse
+from src.schemas import create_success_response
 
 router = APIRouter(prefix="/workouts", tags=["workouts"])
 
@@ -18,9 +15,9 @@ router = APIRouter(prefix="/workouts", tags=["workouts"])
 @router.get("/{workout_id}")
 async def get_workout(
     workout_id: UUID,
-    db: Annotated[AsyncSession, Depends(get_db)],
-    current_user: Annotated[User, Depends(get_current_user)],
-) -> StandardResponse:
+    user_id: CurrentUserId,
+    db: DatabaseSession,
+):
     """Get workout details.
 
     Args:
@@ -41,24 +38,22 @@ async def get_workout(
     if not workout:
         raise HTTPException(status_code=404, detail="Workout not found")
 
-    return StandardResponse(
-        data={
-            "id": str(workout.id),
-            "name": workout.name,
-            "workout_type": workout.workout_type,
-            "duration_minutes": workout.duration_minutes,
-            "difficulty_level": workout.difficulty_level,
-            "workout_details": workout.workout_details,
-        }
-    )
+    return create_success_response({
+        "id": str(workout.id),
+        "name": workout.name,
+        "workout_type": workout.workout_type,
+        "duration_minutes": workout.duration_minutes,
+        "difficulty_level": workout.difficulty_level,
+        "workout_details": workout.workout_details,
+    })
 
 
 @router.get("/{workout_id}/alternatives")
 async def get_workout_alternatives(
     workout_id: UUID,
-    db: Annotated[AsyncSession, Depends(get_db)],
-    current_user: Annotated[User, Depends(get_current_user)],
-) -> StandardResponse:
+    user_id: CurrentUserId,
+    db: DatabaseSession,
+):
     """Get alternative exercises for a workout.
 
     This endpoint analyzes each exercise in a workout and suggests alternatives
@@ -88,14 +83,12 @@ async def get_workout_alternatives(
     exercises = workout_details.get("exercises", [])
 
     if not exercises:
-        return StandardResponse(
-            data={
-                "workout_id": str(workout_id),
-                "workout_name": workout.name,
-                "alternatives": [],
-                "message": "No exercises found in this workout",
-            }
-        )
+        return create_success_response({
+            "workout_id": str(workout_id),
+            "workout_name": workout.name,
+            "alternatives": [],
+            "message": "No exercises found in this workout",
+        })
 
     # Get alternatives for each exercise
     alternatives_list = []
@@ -150,10 +143,8 @@ async def get_workout_alternatives(
             "alternatives": formatted_alts,
         })
 
-    return StandardResponse(
-        data={
-            "workout_id": str(workout_id),
-            "workout_name": workout.name,
-            "alternatives": alternatives_list,
-        }
-    )
+    return create_success_response({
+        "workout_id": str(workout_id),
+        "workout_name": workout.name,
+        "alternatives": alternatives_list,
+    })
