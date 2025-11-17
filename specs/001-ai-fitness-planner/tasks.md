@@ -376,13 +376,13 @@
 
 **Purpose**: Improvements that affect multiple user stories
 
-- [ ] T145 [P] Add comprehensive error logging in backend/src/middleware/logging_middleware.py with request ID tracking
-- [ ] T146 [P] Implement rate limiting in backend/src/middleware/rate_limit_middleware.py (5 req/min for auth, 100 req/min for general per contracts)
-- [ ] T147 [P] Add database query optimization: review all queries, add missing indexes, implement connection pooling tuning
-- [ ] T148 [P] Implement Redis caching strategy: current plan (5 min TTL), upcoming schedule (1 min TTL) per research.md
-- [ ] T149 [P] Add input validation helpers in backend/src/utils/validators.py for common validation patterns
-- [ ] T150 [P] Create date/time utilities in backend/src/utils/date_utils.py for timezone handling, schedule calculations
-- [ ] T151 [P] Implement frontend error boundaries in frontend/src/app/error.tsx and frontend/src/app/global-error.tsx
+- [X] T145 [P] Add comprehensive error logging in backend/src/middleware/logging_middleware.py with request ID tracking
+- [X] T146 [P] Implement rate limiting in backend/src/middleware/rate_limit_middleware.py (5 req/min for auth, 100 req/min for general per contracts)
+- [X] T147 [P] Add database query optimization: review all queries, add missing indexes, implement connection pooling tuning
+- [X] T148 [P] Implement Redis caching strategy: current plan (5 min TTL), upcoming schedule (1 min TTL) per research.md
+- [X] T149 [P] Add input validation helpers in backend/src/utils/validators.py for common validation patterns
+- [X] T150 [P] Create date/time utilities in backend/src/utils/date_utils.py for timezone handling, schedule calculations
+- [X] T151 [P] Implement frontend error boundaries in frontend/src/app/error.tsx and frontend/src/app/global-error.tsx
 - [ ] T152 [P] Add loading states and skeleton screens to all frontend pages for better UX
 - [ ] T153 [P] Implement optimistic UI updates for completion tracking (mark complete immediately, rollback on error)
 - [ ] T154 [P] Add accessibility audit: keyboard navigation, ARIA labels, screen reader support (WCAG 2.1 Level AA per constitution)
