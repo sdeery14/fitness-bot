@@ -9,6 +9,8 @@ from fastapi.responses import JSONResponse
 
 from src.api.v1 import ai_agent, auth, fitness_plans, progress, schedules, users
 from src.config import settings
+from src.middleware.logging_middleware import LoggingMiddleware
+from src.middleware.rate_limit_middleware import RateLimitMiddleware
 from src.schemas import create_error_response
 from src.utils.cache import redis_client
 
@@ -35,7 +37,14 @@ app = FastAPI(
     redirect_slashes=False,  # Disable automatic redirect for trailing slashes
 )
 
-# CORS middleware
+# Middleware stack (executed in reverse order of registration)
+# 1. Logging middleware (outermost - logs all requests)
+app.add_middleware(LoggingMiddleware)
+
+# 2. Rate limiting middleware
+app.add_middleware(RateLimitMiddleware)
+
+# 3. CORS middleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
