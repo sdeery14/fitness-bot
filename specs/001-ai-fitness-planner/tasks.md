@@ -386,9 +386,9 @@
 - [X] T152 [P] Add loading states and skeleton screens to all frontend pages for better UX
 - [X] T153 [P] Implement optimistic UI updates for completion tracking (mark complete immediately, rollback on error)
 - [X] T154 [P] Add accessibility audit: keyboard navigation, ARIA labels, screen reader support (WCAG 2.1 Level AA per constitution)
-- [ ] T155 [P] Create API documentation in docs/api-guide.md based on contracts/api-contracts.md
-- [ ] T156 [P] Create architecture documentation in docs/architecture.md explaining multi-agent design
-- [ ] T157 [P] Create deployment guide in docs/deployment.md for Docker/cloud deployment
+- [X] T155 [P] Create API documentation in docs/api-guide.md based on contracts/api-contracts.md
+- [X] T156 [P] Create architecture documentation in docs/architecture.md explaining multi-agent design
+- [X] T157 [P] Create deployment guide in docs/deployment.md for Docker/cloud deployment
 - [ ] T158 [P] Write unit tests for utility functions in backend/tests/unit/utils/test_validators.py and test_date_utils.py
 - [ ] T159 [P] Write frontend component tests in frontend/tests/components/ for chat-interface.test.tsx, workout-card.test.tsx, schedule-calendar.test.tsx
 - [ ] T160 [P] Add performance monitoring: instrument API endpoints, track AI response times, log slow queries
