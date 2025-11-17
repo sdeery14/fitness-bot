@@ -382,3 +382,227 @@ class ProgressService:
         await self.db.refresh(record)
 
         return record
+
+    async def detect_milestones(
+        self,
+        user_id: UUID,
+        fitness_plan_id: UUID,
+    ) -> list[dict]:
+        """Detect milestone achievements for a user's fitness plan.
+
+        Analyzes progress data to identify if user has reached any milestones:
+        - Streak milestones (7, 14, 30, 60, 90, 180 days)
+        - Total workout milestones (10, 25, 50, 100, 250, 500 workouts)
+        - Weight loss milestones (5 lbs, 10 lbs, 20 lbs, 50 lbs)
+        - Adherence milestones (30 days of 80%+ adherence)
+        - Phase completion milestones
+
+        Args:
+            user_id: User's UUID
+            fitness_plan_id: Fitness plan's UUID
+
+        Returns:
+            List of newly detected milestones with details
+        """
+        milestones_detected = []
+
+        # Check streak milestones
+        current_streak = await self.get_streak(user_id)
+        streak_thresholds = [7, 14, 30, 60, 90, 180, 365]
+
+        for threshold in streak_thresholds:
+            if current_streak >= threshold:
+                # Check if this milestone was already recorded
+                existing_stmt = (
+                    select(ProgressRecord)
+                    .where(
+                        and_(
+                            ProgressRecord.user_id == user_id,
+                            ProgressRecord.fitness_plan_id == fitness_plan_id,
+                            ProgressRecord.milestone_achieved.is_(True),
+                            ProgressRecord.milestone_description.like(f"%{threshold} day streak%"),
+                        )
+                    )
+                    .limit(1)
+                )
+                existing_result = await self.db.execute(existing_stmt)
+                existing = existing_result.scalar_one_or_none()
+
+                if not existing:
+                    milestones_detected.append({
+                        "type": "streak",
+                        "value": threshold,
+                        "description": f"Achieved {threshold} day streak!",
+                        "title": f"{threshold} Day Streak 🔥",
+                        "message": f"You've been consistent for {threshold} consecutive days. Keep it up!",
+                    })
+
+        # Check total workout milestones
+        total_workouts_stmt = select(func.sum(ProgressRecord.workouts_completed_today)).where(
+            and_(
+                ProgressRecord.user_id == user_id,
+                ProgressRecord.fitness_plan_id == fitness_plan_id,
+            )
+        )
+        total_workouts_result = await self.db.execute(total_workouts_stmt)
+        total_workouts = total_workouts_result.scalar() or 0
+
+        workout_thresholds = [10, 25, 50, 100, 250, 500, 1000]
+        for threshold in workout_thresholds:
+            if total_workouts >= threshold:
+                # Check if milestone already recorded
+                existing_stmt = (
+                    select(ProgressRecord)
+                    .where(
+                        and_(
+                            ProgressRecord.user_id == user_id,
+                            ProgressRecord.fitness_plan_id == fitness_plan_id,
+                            ProgressRecord.milestone_achieved.is_(True),
+                            ProgressRecord.milestone_description.like(f"%{threshold} workouts%"),
+                        )
+                    )
+                    .limit(1)
+                )
+                existing_result = await self.db.execute(existing_stmt)
+                existing = existing_result.scalar_one_or_none()
+
+                if not existing:
+                    milestones_detected.append({
+                        "type": "total_workouts",
+                        "value": threshold,
+                        "description": f"Completed {threshold} workouts!",
+                        "title": f"{threshold} Workouts Complete 💪",
+                        "message": f"You've crushed {threshold} workouts. Your dedication is paying off!",
+                    })
+
+        # Check weight loss milestones (if applicable)
+        # Get first and latest measurements
+        first_measurement_stmt = (
+            select(ProgressRecord)
+            .where(
+                and_(
+                    ProgressRecord.user_id == user_id,
+                    ProgressRecord.fitness_plan_id == fitness_plan_id,
+                    ProgressRecord.weight_lbs.isnot(None),
+                )
+            )
+            .order_by(ProgressRecord.record_date.asc())
+            .limit(1)
+        )
+        first_result = await self.db.execute(first_measurement_stmt)
+        first_measurement = first_result.scalar_one_or_none()
+
+        latest_measurement_stmt = (
+            select(ProgressRecord)
+            .where(
+                and_(
+                    ProgressRecord.user_id == user_id,
+                    ProgressRecord.fitness_plan_id == fitness_plan_id,
+                    ProgressRecord.weight_lbs.isnot(None),
+                )
+            )
+            .order_by(ProgressRecord.record_date.desc())
+            .limit(1)
+        )
+        latest_result = await self.db.execute(latest_measurement_stmt)
+        latest_measurement = latest_result.scalar_one_or_none()
+
+        if first_measurement and latest_measurement and first_measurement.weight_lbs and latest_measurement.weight_lbs:
+            weight_lost = float(first_measurement.weight_lbs - latest_measurement.weight_lbs)
+
+            if weight_lost > 0:  # Only for weight loss goals
+                weight_thresholds = [5, 10, 20, 30, 50, 75, 100]
+                for threshold in weight_thresholds:
+                    if weight_lost >= threshold:
+                        existing_stmt = (
+                            select(ProgressRecord)
+                            .where(
+                                and_(
+                                    ProgressRecord.user_id == user_id,
+                                    ProgressRecord.fitness_plan_id == fitness_plan_id,
+                                    ProgressRecord.milestone_achieved.is_(True),
+                                    ProgressRecord.milestone_description.like(f"%{threshold} lbs lost%"),
+                                )
+                            )
+                            .limit(1)
+                        )
+                        existing_result = await self.db.execute(existing_stmt)
+                        existing = existing_result.scalar_one_or_none()
+
+                        if not existing:
+                            milestones_detected.append({
+                                "type": "weight_loss",
+                                "value": threshold,
+                                "description": f"Lost {threshold} lbs!",
+                                "title": f"{threshold} lbs Lost 🎉",
+                                "message": f"You've lost {threshold} pounds! Your hard work is showing results!",
+                            })
+
+        # Check adherence consistency milestone (30 days of 80%+ adherence)
+        thirty_days_adherence = await self.calculate_adherence(
+            user_id=user_id,
+            start_date=date.today() - timedelta(days=30),
+            end_date=date.today(),
+        )
+
+        if thirty_days_adherence["overall_adherence"] >= 80:
+            existing_stmt = (
+                select(ProgressRecord)
+                .where(
+                    and_(
+                        ProgressRecord.user_id == user_id,
+                        ProgressRecord.fitness_plan_id == fitness_plan_id,
+                        ProgressRecord.milestone_achieved.is_(True),
+                        ProgressRecord.milestone_description.like("%30 days of high adherence%"),
+                    )
+                )
+                .order_by(ProgressRecord.record_date.desc())
+                .limit(1)
+            )
+            existing_result = await self.db.execute(existing_stmt)
+            existing = existing_result.scalar_one_or_none()
+
+            # Only record if not achieved in last 30 days
+            if not existing or (existing.record_date < date.today() - timedelta(days=30)):
+                milestones_detected.append({
+                    "type": "adherence_consistency",
+                    "value": 30,
+                    "description": "30 days of 80%+ adherence!",
+                    "title": "Consistency Champion 🏆",
+                    "message": f"You've maintained {thirty_days_adherence['overall_adherence']:.0f}% adherence for 30 days!",
+                })
+
+        return milestones_detected
+
+    async def record_milestone_achievement(
+        self,
+        user_id: UUID,
+        fitness_plan_id: UUID,
+        milestone: dict,
+    ) -> ProgressRecord:
+        """Record a milestone achievement in the progress history.
+
+        Args:
+            user_id: User's UUID
+            fitness_plan_id: Fitness plan's UUID
+            milestone: Milestone details from detect_milestones
+
+        Returns:
+            Created progress record for the milestone
+        """
+        record = ProgressRecord(
+            user_id=user_id,
+            fitness_plan_id=fitness_plan_id,
+            record_date=date.today(),
+            record_type="milestone",
+            milestone_achieved=True,
+            milestone_description=milestone["description"],
+            user_notes=milestone.get("message", ""),
+        )
+
+        self.db.add(record)
+        await self.db.commit()
+        await self.db.refresh(record)
+
+        return record
+

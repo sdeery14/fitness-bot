@@ -635,3 +635,179 @@ class PlanService:
             "recommendations": recommendations,
             "generated_at": datetime.now(UTC).isoformat(),
         }
+
+    async def check_phase_completion(
+        self,
+        fitness_plan_id: UUID,
+    ) -> dict:
+        """Check if current phase objectives are met and if transition is needed.
+
+        Args:
+            fitness_plan_id: Plan's UUID
+
+        Returns:
+            Dictionary with phase completion status and details
+
+        Logic:
+            - Identifies current active phase based on current date
+            - Checks phase objectives completion criteria
+            - Returns transition readiness and next phase details
+        """
+        from datetime import date
+
+        from src.models.fitness_plan import Phase
+
+        # Get plan with phases
+        plan = await self.get_plan(fitness_plan_id)
+        if not plan:
+            raise ValueError(f"Plan {fitness_plan_id} not found")
+
+        # Get all phases ordered by phase_number
+        stmt = (
+            select(Phase)
+            .where(Phase.fitness_plan_id == fitness_plan_id)
+            .order_by(Phase.phase_number)
+        )
+        result = await self.db.execute(stmt)
+        phases = list(result.scalars().all())
+
+        if not phases:
+            return {
+                "has_phases": False,
+                "current_phase": None,
+                "is_complete": False,
+                "should_transition": False,
+            }
+
+        # Determine current phase based on date
+        today = date.today()
+        current_phase = None
+        next_phase = None
+
+        for i, phase in enumerate(phases):
+            phase_start = phase.start_date.date() if phase.start_date else None
+            phase_end = phase.end_date.date() if phase.end_date else None
+
+            if phase_start and phase_end and phase_start <= today <= phase_end:
+                current_phase = phase
+                if i + 1 < len(phases):
+                    next_phase = phases[i + 1]
+                break
+
+        if not current_phase:
+            # Check if we're past all phases
+            last_phase = phases[-1]
+            last_end = last_phase.end_date.date() if last_phase.end_date else None
+            if last_end and today > last_end:
+                return {
+                    "has_phases": True,
+                    "current_phase": None,
+                    "all_phases_complete": True,
+                    "is_complete": True,
+                    "should_transition": False,
+                }
+
+            # Not yet started
+            return {
+                "has_phases": True,
+                "current_phase": None,
+                "is_complete": False,
+                "should_transition": False,
+            }
+
+        # Check if current phase end date is approaching or past
+        phase_end = current_phase.end_date.date()
+        days_until_end = (phase_end - today).days
+
+        # Phase is complete if we're within 2 days of end or past it
+        is_complete = days_until_end <= 2
+        should_transition = is_complete and next_phase is not None
+
+        return {
+            "has_phases": True,
+            "current_phase": {
+                "id": str(current_phase.id),
+                "phase_number": current_phase.phase_number,
+                "name": current_phase.name,
+                "objectives": current_phase.objectives,
+                "start_date": current_phase.start_date.isoformat(),
+                "end_date": current_phase.end_date.isoformat(),
+                "days_remaining": max(0, days_until_end),
+            },
+            "next_phase": {
+                "id": str(next_phase.id),
+                "phase_number": next_phase.phase_number,
+                "name": next_phase.name,
+                "objectives": next_phase.objectives,
+                "start_date": next_phase.start_date.isoformat(),
+                "end_date": next_phase.end_date.isoformat(),
+            } if next_phase else None,
+            "is_complete": is_complete,
+            "should_transition": should_transition,
+        }
+
+    async def transition_to_next_phase(
+        self,
+        fitness_plan_id: UUID,
+        trigger_reason: str = "automatic",
+    ) -> dict:
+        """Transition fitness plan to the next phase.
+
+        Args:
+            fitness_plan_id: Plan's UUID
+            trigger_reason: Reason for transition (automatic, manual, milestone)
+
+        Returns:
+            Dictionary with transition results and new phase details
+
+        Raises:
+            ValueError: If plan not found or no next phase available
+        """
+        # Check phase completion status
+        phase_status = await self.check_phase_completion(fitness_plan_id)
+
+        if not phase_status["has_phases"]:
+            raise ValueError("Plan does not have multiple phases")
+
+        if not phase_status["should_transition"]:
+            if phase_status.get("all_phases_complete"):
+                raise ValueError("All phases are already complete")
+            else:
+                raise ValueError("Current phase is not ready for transition")
+
+        current_phase = phase_status["current_phase"]
+        next_phase = phase_status["next_phase"]
+
+        if not next_phase:
+            raise ValueError("No next phase available for transition")
+
+        # Record transition in plan snapshot
+        plan = await self.get_plan(fitness_plan_id)
+        if plan.plan_snapshot is None:
+            plan.plan_snapshot = {}
+
+        if "phase_transitions" not in plan.plan_snapshot:
+            plan.plan_snapshot["phase_transitions"] = []
+
+        plan.plan_snapshot["phase_transitions"].append({
+            "from_phase": current_phase["phase_number"],
+            "from_phase_name": current_phase["name"],
+            "to_phase": next_phase["phase_number"],
+            "to_phase_name": next_phase["name"],
+            "transitioned_at": datetime.now(UTC).isoformat(),
+            "trigger_reason": trigger_reason,
+        })
+
+        await self.db.commit()
+        await self.db.refresh(plan)
+
+        return {
+            "success": True,
+            "transition": {
+                "from_phase": current_phase,
+                "to_phase": next_phase,
+                "trigger_reason": trigger_reason,
+                "transitioned_at": datetime.now(UTC).isoformat(),
+            },
+            "message": f"Successfully transitioned from {current_phase['name']} to {next_phase['name']}",
+        }

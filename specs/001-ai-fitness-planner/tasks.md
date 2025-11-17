@@ -345,12 +345,12 @@
 
 ### Service Layer for User Story 5
 
-- [ ] T137 [US5] Implement phase transition logic in backend/src/services/plan_service.py with check_phase_completion, transition_to_next_phase methods (FR-036)
-- [ ] T138 [US5] Add milestone tracking in backend/src/services/progress_service.py with detect_milestones, record_milestone_achievement methods (FR-037)
+- [X] T137 [US5] Implement phase transition logic in backend/src/services/plan_service.py with check_phase_completion, transition_to_next_phase methods (FR-036)
+- [X] T138 [US5] Add milestone tracking in backend/src/services/progress_service.py with detect_milestones, record_milestone_achievement methods (FR-037)
 
 ### Background Workers for User Story 5
 
-- [ ] T139 [US5] Create phase transition worker in backend/src/workers/phase_transitions.py as periodic Celery task to check for phase completion and trigger transitions
+- [X] T139 [US5] Create phase transition worker in backend/src/workers/phase_transitions.py as periodic Celery task to check for phase completion and trigger transitions
 
 ### Frontend Components for User Story 5
 
