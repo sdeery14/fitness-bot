@@ -47,3 +47,5 @@ from src.models.fitness_plan import FitnessPlan, Phase  # noqa: E402, F401
 from src.models.workout import WorkoutPlan, Workout, Exercise  # noqa: E402, F401
 from src.models.meal import MealPlan, Meal  # noqa: E402, F401
 from src.models.conversation import Conversation, Message  # noqa: E402, F401
+from src.models.schedule import Schedule, ScheduleEntry  # noqa: E402, F401
+from src.models.progress import ProgressRecord  # noqa: E402, F401

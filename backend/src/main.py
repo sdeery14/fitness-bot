@@ -7,7 +7,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from src.api.v1 import ai_agent, auth, fitness_plans, users
+from src.api.v1 import ai_agent, auth, fitness_plans, progress, schedules, users
 from src.config import settings
 from src.schemas import create_error_response
 from src.utils.cache import redis_client
@@ -126,6 +126,6 @@ app.include_router(auth.router, prefix="/api/v1/auth", tags=["auth"])
 app.include_router(users.router, prefix="/api/v1/users", tags=["users"])
 app.include_router(fitness_plans.router, prefix="/api/v1/fitness-plans", tags=["fitness-plans"])
 app.include_router(ai_agent.router, prefix="/api/v1/ai", tags=["ai"])
-# app.include_router(schedules.router, prefix="/api/v1/schedules", tags=["schedules"])  # User Story 2
-# app.include_router(progress.router, prefix="/api/v1/progress", tags=["progress"])  # User Story 2
+app.include_router(schedules.router, prefix="/api/v1/schedules", tags=["schedules"])  # User Story 2
+app.include_router(progress.router, prefix="/api/v1/progress", tags=["progress"])  # User Story 2
 # app.include_router(workouts.router, prefix="/api/v1/workouts", tags=["workouts"])  # User Story 4

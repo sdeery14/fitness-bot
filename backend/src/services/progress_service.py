@@ -1,0 +1,384 @@
+"""Progress service for tracking adherence, measurements, and milestones."""
+
+from datetime import UTC, date, datetime, timedelta
+from decimal import Decimal
+from uuid import UUID
+
+from sqlalchemy import and_, desc, func, select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from src.models.progress import ProgressRecord
+from src.models.schedule import Schedule, ScheduleEntry
+
+
+class ProgressService:
+    """Service for progress tracking and analytics."""
+
+    def __init__(self, db: AsyncSession) -> None:
+        """Initialize progress service.
+
+        Args:
+            db: Database session for progress queries
+        """
+        self.db = db
+
+    async def calculate_adherence(
+        self,
+        user_id: UUID,
+        start_date: date | None = None,
+        end_date: date | None = None,
+    ) -> dict[str, Decimal]:
+        """Calculate adherence rates for a date range.
+
+        Args:
+            user_id: User's UUID
+            start_date: Start date for calculation (defaults to 7 days ago)
+            end_date: End date for calculation (defaults to today)
+
+        Returns:
+            Dictionary with adherence metrics:
+            - workout_adherence: Percentage of workouts completed
+            - meal_adherence: Percentage of meals completed
+            - overall_adherence: Combined adherence rate
+            - total_scheduled: Total activities scheduled
+            - total_completed: Total activities completed
+        """
+        if start_date is None:
+            start_date = date.today() - timedelta(days=7)
+        if end_date is None:
+            end_date = date.today()
+
+        # Query schedule entries for the date range
+        stmt = (
+            select(
+                ScheduleEntry.entry_type,
+                ScheduleEntry.completion_status,
+                func.count(ScheduleEntry.id).label("count"),
+            )
+            .join(Schedule)
+            .where(
+                and_(
+                    Schedule.user_id == user_id,
+                    ScheduleEntry.entry_date >= start_date,
+                    ScheduleEntry.entry_date <= end_date,
+                )
+            )
+            .group_by(ScheduleEntry.entry_type, ScheduleEntry.completion_status)
+        )
+
+        result = await self.db.execute(stmt)
+        rows = result.all()
+
+        # Calculate adherence by type
+        workouts_scheduled = 0
+        workouts_completed = 0
+        meals_scheduled = 0
+        meals_completed = 0
+
+        for row in rows:
+            entry_type, status, count = row
+            if entry_type == "workout":
+                if status in ["scheduled", "completed", "skipped"]:
+                    workouts_scheduled += count
+                if status == "completed":
+                    workouts_completed += count
+            elif entry_type == "meal":
+                if status in ["scheduled", "completed", "skipped"]:
+                    meals_scheduled += count
+                if status == "completed":
+                    meals_completed += count
+
+        # Calculate percentages
+        workout_adherence = (
+            Decimal(workouts_completed) / Decimal(workouts_scheduled) * 100
+            if workouts_scheduled > 0
+            else Decimal(0)
+        )
+        meal_adherence = (
+            Decimal(meals_completed) / Decimal(meals_scheduled) * 100
+            if meals_scheduled > 0
+            else Decimal(0)
+        )
+
+        total_scheduled = workouts_scheduled + meals_scheduled
+        total_completed = workouts_completed + meals_completed
+        overall_adherence = (
+            Decimal(total_completed) / Decimal(total_scheduled) * 100
+            if total_scheduled > 0
+            else Decimal(0)
+        )
+
+        return {
+            "workout_adherence": workout_adherence.quantize(Decimal("0.01")),
+            "meal_adherence": meal_adherence.quantize(Decimal("0.01")),
+            "overall_adherence": overall_adherence.quantize(Decimal("0.01")),
+            "total_scheduled": total_scheduled,
+            "total_completed": total_completed,
+            "workouts_scheduled": workouts_scheduled,
+            "workouts_completed": workouts_completed,
+            "meals_scheduled": meals_scheduled,
+            "meals_completed": meals_completed,
+        }
+
+    async def get_progress_summary(
+        self,
+        user_id: UUID,
+        fitness_plan_id: UUID | None = None,
+    ) -> dict:
+        """Get comprehensive progress summary for a user.
+
+        Args:
+            user_id: User's UUID
+            fitness_plan_id: Optional fitness plan to filter by
+
+        Returns:
+            Dictionary with progress summary including:
+            - current_streak: Current streak of consecutive active days
+            - weekly_adherence: Adherence rate for the last 7 days
+            - monthly_adherence: Adherence rate for the last 30 days
+            - total_workouts_completed: Total workouts ever completed
+            - total_measurements: Count of body measurements logged
+            - recent_milestones: List of recent milestone achievements
+            - latest_measurements: Most recent body measurements
+        """
+        # Calculate adherence rates
+        weekly = await self.calculate_adherence(
+            user_id=user_id,
+            start_date=date.today() - timedelta(days=7),
+            end_date=date.today(),
+        )
+
+        monthly = await self.calculate_adherence(
+            user_id=user_id,
+            start_date=date.today() - timedelta(days=30),
+            end_date=date.today(),
+        )
+
+        # Get current streak
+        streak = await self.get_streak(user_id)
+
+        # Get recent milestones
+        milestones_stmt = (
+            select(ProgressRecord)
+            .where(
+                and_(
+                    ProgressRecord.user_id == user_id,
+                    ProgressRecord.milestone_achieved.is_(True),
+                )
+            )
+            .order_by(desc(ProgressRecord.record_date))
+            .limit(5)
+        )
+        milestones_result = await self.db.execute(milestones_stmt)
+        milestones = list(milestones_result.scalars().all())
+
+        # Get latest measurements
+        measurements_stmt = (
+            select(ProgressRecord)
+            .where(
+                and_(
+                    ProgressRecord.user_id == user_id,
+                    ProgressRecord.record_type == "measurement",
+                )
+            )
+            .order_by(desc(ProgressRecord.record_date))
+            .limit(1)
+        )
+        measurements_result = await self.db.execute(measurements_stmt)
+        latest_measurement = measurements_result.scalar_one_or_none()
+
+        # Count total workouts (from progress records)
+        total_workouts_stmt = select(func.sum(ProgressRecord.workouts_completed_today)).where(
+            ProgressRecord.user_id == user_id
+        )
+        total_workouts_result = await self.db.execute(total_workouts_stmt)
+        total_workouts = total_workouts_result.scalar() or 0
+
+        return {
+            "current_streak_days": streak,
+            "weekly_adherence": weekly,
+            "monthly_adherence": monthly,
+            "total_workouts_completed": int(total_workouts),
+            "recent_milestones": [
+                {
+                    "date": m.record_date,
+                    "description": m.milestone_description,
+                }
+                for m in milestones
+            ],
+            "latest_measurements": {
+                "date": latest_measurement.record_date if latest_measurement else None,
+                "weight_lbs": float(latest_measurement.weight_lbs) if latest_measurement and latest_measurement.weight_lbs else None,
+                "body_fat_percentage": float(latest_measurement.body_fat_percentage) if latest_measurement and latest_measurement.body_fat_percentage else None,
+                "measurements": latest_measurement.measurements if latest_measurement else None,
+            } if latest_measurement else None,
+        }
+
+    async def record_daily_summary(
+        self,
+        user_id: UUID,
+        fitness_plan_id: UUID | None,
+        record_date: date,
+        workouts_completed: int = 0,
+        meals_completed: int = 0,
+        energy_level: int | None = None,
+        mood: str | None = None,
+        user_notes: str | None = None,
+    ) -> ProgressRecord:
+        """Record a daily progress summary.
+
+        Typically called automatically at end of day or when user reviews their day.
+
+        Args:
+            user_id: User's UUID
+            fitness_plan_id: Optional fitness plan ID
+            record_date: Date of the summary
+            workouts_completed: Number of workouts completed
+            meals_completed: Number of meals completed
+            energy_level: Energy level (1-10)
+            mood: Mood description
+            user_notes: User notes for the day
+
+        Returns:
+            Created progress record
+        """
+        # Calculate adherence for the week leading up to this date
+        weekly_adherence_data = await self.calculate_adherence(
+            user_id=user_id,
+            start_date=record_date - timedelta(days=7),
+            end_date=record_date,
+        )
+
+        # Get total workouts completed so far
+        total_stmt = select(func.sum(ProgressRecord.workouts_completed_today)).where(
+            and_(
+                ProgressRecord.user_id == user_id,
+                ProgressRecord.record_date < record_date,
+            )
+        )
+        total_result = await self.db.execute(total_stmt)
+        total_workouts = total_result.scalar() or 0
+
+        # Calculate current streak
+        streak = await self.get_streak(user_id, as_of_date=record_date)
+
+        # Create progress record
+        record = ProgressRecord(
+            user_id=user_id,
+            fitness_plan_id=fitness_plan_id,
+            record_date=record_date,
+            record_type="daily_summary",
+            workouts_completed_today=workouts_completed,
+            meals_completed_today=meals_completed,
+            weekly_adherence_rate=weekly_adherence_data["overall_adherence"],
+            total_workouts_completed=int(total_workouts) + workouts_completed,
+            current_streak_days=streak,
+            energy_level=energy_level,
+            mood=mood,
+            user_notes=user_notes,
+        )
+
+        self.db.add(record)
+        await self.db.commit()
+        await self.db.refresh(record)
+
+        return record
+
+    async def get_streak(
+        self,
+        user_id: UUID,
+        as_of_date: date | None = None,
+    ) -> int:
+        """Calculate the user's current streak of consecutive active days.
+
+        An "active day" is a day where the user completed at least one workout or meal.
+
+        Args:
+            user_id: User's UUID
+            as_of_date: Date to calculate streak up to (defaults to today)
+
+        Returns:
+            Number of consecutive days with activity
+        """
+        if as_of_date is None:
+            as_of_date = date.today()
+
+        # Get all schedule entries ordered by date (descending)
+        stmt = (
+            select(ScheduleEntry.entry_date, ScheduleEntry.completion_status)
+            .join(Schedule)
+            .where(
+                and_(
+                    Schedule.user_id == user_id,
+                    ScheduleEntry.entry_date <= as_of_date,
+                    ScheduleEntry.completion_status == "completed",
+                )
+            )
+            .order_by(desc(ScheduleEntry.entry_date))
+        )
+
+        result = await self.db.execute(stmt)
+        rows = result.all()
+
+        if not rows:
+            return 0
+
+        # Group completions by date
+        completed_dates = set()
+        for row in rows:
+            completed_dates.add(row[0])
+
+        # Count consecutive days backwards from as_of_date
+        streak = 0
+        current_date = as_of_date
+
+        while current_date in completed_dates:
+            streak += 1
+            current_date -= timedelta(days=1)
+
+        return streak
+
+    async def log_measurement(
+        self,
+        user_id: UUID,
+        fitness_plan_id: UUID | None,
+        weight_lbs: Decimal | None = None,
+        body_fat_percentage: Decimal | None = None,
+        measurements: dict[str, float] | None = None,
+        energy_level: int | None = None,
+        mood: str | None = None,
+        user_notes: str | None = None,
+    ) -> ProgressRecord:
+        """Log body measurements.
+
+        Args:
+            user_id: User's UUID
+            fitness_plan_id: Optional fitness plan ID
+            weight_lbs: Weight in pounds
+            body_fat_percentage: Body fat percentage
+            measurements: Body measurements dict (chest, waist, hips, etc.)
+            energy_level: Energy level (1-10)
+            mood: Mood description
+            user_notes: User notes
+
+        Returns:
+            Created progress record
+        """
+        record = ProgressRecord(
+            user_id=user_id,
+            fitness_plan_id=fitness_plan_id,
+            record_date=date.today(),
+            record_type="measurement",
+            weight_lbs=weight_lbs,
+            body_fat_percentage=body_fat_percentage,
+            measurements=measurements,
+            energy_level=energy_level,
+            mood=mood,
+            user_notes=user_notes,
+        )
+
+        self.db.add(record)
+        await self.db.commit()
+        await self.db.refresh(record)
+
+        return record
