@@ -137,8 +137,12 @@ async def global_exception_handler(request: Request, exc: Exception):
 # Health check
 @app.get("/health")
 async def health_check():
-    """Health check endpoint."""
-    return {"status": "healthy"}
+    """Health check endpoint for monitoring and quickstart validation."""
+    return {
+        "status": "healthy",
+        "version": "1.0.0",
+        "environment": settings.ENVIRONMENT,
+    }
 
 
 # API routers
