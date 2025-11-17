@@ -12,6 +12,7 @@ from src.config import settings
 from src.middleware.logging_middleware import LoggingMiddleware
 from src.middleware.performance_monitoring import PerformanceMonitoringMiddleware
 from src.middleware.rate_limit_middleware import RateLimitMiddleware
+from src.middleware.security_middleware import CSRFProtectionMiddleware, SecurityHeadersMiddleware
 from src.schemas import create_error_response
 from src.utils.cache import redis_client
 
@@ -42,13 +43,19 @@ app = FastAPI(
 # 1. Logging middleware (outermost - logs all requests)
 app.add_middleware(LoggingMiddleware)
 
-# 2. Performance monitoring middleware
+# 2. Security headers middleware
+app.add_middleware(SecurityHeadersMiddleware)
+
+# 3. CSRF protection middleware
+app.add_middleware(CSRFProtectionMiddleware)
+
+# 4. Performance monitoring middleware
 app.add_middleware(PerformanceMonitoringMiddleware, slow_request_threshold=1.0)
 
-# 3. Rate limiting middleware
+# 5. Rate limiting middleware
 app.add_middleware(RateLimitMiddleware)
 
-# 4. CORS middleware
+# 6. CORS middleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
