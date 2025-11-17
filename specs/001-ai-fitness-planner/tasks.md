@@ -354,16 +354,21 @@
 
 ### Frontend Components for User Story 5
 
-- [ ] T140 [P] [US5] Create phase timeline component in frontend/src/components/fitness/phase-timeline.tsx to visualize multi-phase plan structure
-- [ ] T141 [P] [US5] Create milestone celebration component in frontend/src/components/fitness/milestone-celebration.tsx for achievements (FR-037)
-- [ ] T142 [US5] Add phase view to plan page in frontend/src/app/dashboard/plan/page.tsx with current phase indicator
+- [X] T140 [P] [US5] Create phase timeline component in frontend/src/components/fitness/phase-timeline.tsx to visualize multi-phase plan structure
+- [X] T141 [P] [US5] Create milestone celebration component in frontend/src/components/fitness/milestone-celebration.tsx for achievements (FR-037)
+- [X] T142 [US5] Add phase view to plan page in frontend/src/app/dashboard/plan/page.tsx with current phase indicator
 
 ### Integration & Testing for User Story 5
 
-- [ ] T143 [US5] Write integration test for phase transitions in backend/tests/integration/test_phase_transitions.py: create multi-phase plan → complete phase 1 → verify automatic transition → verify phase 2 activation
-- [ ] T144 [US5] Write unit tests for milestone detection in backend/tests/unit/services/test_progress_service.py
+- [X] T143 [US5] Write integration test for phase transitions in backend/tests/integration/test_phase_transitions.py: create multi-phase plan → complete phase 1 → verify automatic transition → verify phase 2 activation
+- [X] T144 [US5] Write unit tests for milestone detection in backend/tests/unit/services/test_progress_service.py
 
-**Checkpoint**: All user stories (1-5) complete - Full feature set implemented
+**Checkpoint**: ✅ All user stories (1-5) complete - Full feature set implemented
+
+**Git Commits**:
+- Backend & Components: 3f46b68 "feat(phase7): implement User Story 5 backend and frontend components (T137-T141)"
+- Plan Page & Tests: 2da0fc7 "feat(phase7): complete User Story 5 with plan page and tests (T142-T144)"
+- Lint Fixes: 65de695 "fix: resolve lint issues in test_phase_transitions.py"
 
 ---
 
