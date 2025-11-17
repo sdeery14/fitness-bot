@@ -132,19 +132,23 @@ export default function ChatPage() {
         throw new Error(data.detail || "Failed to send message");
       }
 
-      // Backend response format: { status, data: { agent_response, ... }, metadata }
+      // Backend response format: { status, data: { assistant_response, ... }, metadata }
       const responseData = data.data || data; // Support both new and old formats
+      
+      console.log("Response data keys:", Object.keys(responseData));
+      console.log("Response data:", responseData);
+      
+      // Extract AI response - check multiple possible keys
+      const aiResponse = responseData.assistant_response || responseData.agent_response || responseData.assistant_message?.content;
 
-      // Replace optimistic message with real messages from backend
+      // Replace optimistic user message with confirmed one and add AI response
       setMessages((prev) => {
-        console.log("Current messages:", prev);
-        console.log("Replacing optimistic message");
-        console.log("Adding AI response:", responseData.agent_response);
+        const withoutTemp = prev.filter((m) => m.id !== tempMessageId);
         
         return [
-          ...prev.filter((m) => m.id !== tempMessageId), // Remove optimistic message
+          ...withoutTemp,
           { 
-            id: Date.now().toString(), 
+            id: responseData.message_id || Date.now().toString(), 
             sender_type: "user", 
             message_content: content,
             created_at: new Date().toISOString(),
@@ -152,7 +156,7 @@ export default function ChatPage() {
           { 
             id: (Date.now() + 1).toString(), 
             sender_type: "ai", 
-            message_content: responseData.agent_response,
+            message_content: aiResponse || "I'm processing your request...",
             created_at: new Date().toISOString(),
           },
         ];

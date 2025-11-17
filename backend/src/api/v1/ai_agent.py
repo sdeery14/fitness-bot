@@ -179,11 +179,14 @@ async def send_message(
         import uuid
         message_id = str(uuid.uuid4())
         
+        # Extract the assistant message content from the result
+        assistant_message_content = result["assistant_message"]["content"] if isinstance(result.get("assistant_message"), dict) else result.get("agent_response", "")
+        
         return create_success_response({
             "message_id": message_id,
             "conversation_id": result["conversation_id"],
             "user_message": result["user_message"],
-            "assistant_response": result["assistant_message"],
+            "assistant_response": assistant_message_content,
         })
 
     except ValueError as e:
@@ -223,9 +226,9 @@ async def get_conversation(
     Raises:
         HTTPException: If conversation not found
     """
-    from src.services.conversation_service import ConversationService
     from src.schemas import create_error_response
-    
+    from src.services.conversation_service import ConversationService
+
     try:
         conv_service = ConversationService(db)
         conversation = await conv_service.get_conversation(conversation_id)

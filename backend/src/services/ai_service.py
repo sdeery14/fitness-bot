@@ -84,7 +84,7 @@ class AIOrchestrationService:
                     for msg in db_conversation.messages
                 ]
                 return {
-                    "conversation_id": session_id,
+                    "conversation_id": str(db_conversation.id),  # Return DB UUID, not session ID
                     "conversation_type": db_conversation.conversation_type,
                     "agent_response": last_message.message_content,
                     "status": db_conversation.status,
@@ -173,7 +173,7 @@ What would you like to achieve?"""
                 })
 
         return {
-            "conversation_id": session_id,
+            "conversation_id": str(db_conversation.id),  # Return DB UUID, not session ID
             "conversation_type": db_conversation.conversation_type,
             "agent_response": agent_response,
             "status": db_conversation.status,

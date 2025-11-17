@@ -130,19 +130,10 @@ class TestSendMessageEndpoint:
         assert user_msg["content"] == payload["message"]
         assert "sent_at" in user_msg
 
-        # Contract: Assistant response details
+        # Contract: Assistant response details (simplified format - just the text content)
         assert "assistant_response" in msg_data
-        assistant_msg = msg_data["assistant_response"]
-        assert "content" in assistant_msg
-        assert "sent_at" in assistant_msg
-
-        # Contract: Optional function calls
-        if "function_calls" in assistant_msg:
-            assert isinstance(assistant_msg["function_calls"], list)
-            if len(assistant_msg["function_calls"]) > 0:
-                func_call = assistant_msg["function_calls"][0]
-                assert "function" in func_call
-                assert "arguments" in func_call
+        assert isinstance(msg_data["assistant_response"], str)
+        assert len(msg_data["assistant_response"]) > 0
 
     @pytest.mark.asyncio
     async def test_send_message_not_found(

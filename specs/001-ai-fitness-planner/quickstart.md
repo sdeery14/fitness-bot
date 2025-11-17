@@ -204,20 +204,31 @@ docker-compose -f docker/docker-compose.yml exec backend pytest --cov=src --cov-
 docker-compose -f docker/docker-compose.yml exec backend pytest tests/unit/services/test_schedule_service.py::test_reschedule_for_missed_workouts
 ```
 
-**Frontend (Vitest)**:
+**Frontend (Vitest)** - Component/Unit tests:
 ```powershell
-# All tests
+# All unit tests (excludes E2E)
+docker-compose -f docker/docker-compose.yml exec frontend npm test -- --run
+
+# Watch mode (for active development)
 docker-compose -f docker/docker-compose.yml exec frontend npm test
 
-# Watch mode
-docker-compose -f docker/docker-compose.yml exec frontend npm test -- --watch
+# Note: Currently no component tests exist (exits with "No test files found").
+# Component tests will be added in future phases. E2E tests use Playwright (see below).
 ```
 
-**E2E (Playwright)** - requires services running:
+**E2E (Playwright)** - Full user flow tests (requires all services running):
 ```powershell
+# From project root - run backend services first
+docker-compose -f docker/docker-compose.yml up -d
+
+# Run E2E tests
 cd frontend
 npm run test:e2e
-npm run test:e2e -- --headed  # See browser
+
+# Options
+npm run test:e2e -- --headed     # See browser
+npm run test:e2e -- --debug      # Debug mode
+npm run test:e2e -- --ui         # Interactive UI mode
 ```
 
 ---
