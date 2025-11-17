@@ -260,31 +260,31 @@
 
 ### Database & Models for User Story 3
 
-- [ ] T111 [P] [US3] Create DisruptionEvent model in backend/src/models/conversation.py with user FK, conversation FK, fitness_plan FK, disruption_type, start_date, end_date, description, severity, workouts/meals affected, resolution_strategy, timeline_extension_days
-- [ ] T112 [US3] Create Alembic migration for User Story 3 models in backend/alembic/versions/003_user_story_3_disruptions.py
-- [ ] T113 [US3] Apply migration with `alembic upgrade head`
+- [X] T111 [P] [US3] Create DisruptionEvent model in backend/src/models/conversation.py with user FK, conversation FK, fitness_plan FK, disruption_type, start_date, end_date, description, severity, workouts/meals affected, resolution_strategy, timeline_extension_days
+- [X] T112 [US3] Create Alembic migration for User Story 3 models in backend/alembic/versions/003_user_story_3_disruptions.py
+- [X] T113 [US3] Apply migration with `alembic upgrade head`
 
 ### Pydantic Schemas for User Story 3
 
-- [ ] T114 [P] [US3] Create DisruptionEvent schemas in backend/src/schemas/conversation.py with DisruptionReportRequest, DisruptionResolutionResponse
+- [X] T114 [P] [US3] Create DisruptionEvent schemas in backend/src/schemas/conversation.py with DisruptionReportRequest, DisruptionResolutionResponse
 
 ### Service Layer for User Story 3
 
-- [ ] T115 [US3] Implement rescheduling logic in backend/src/services/schedule_service.py with reschedule_for_disruption method that intelligently moves workouts, extends timeline, updates plan dates (FR-016, FR-017, FR-018)
-- [ ] T116 [US3] Add inactivity detection method in backend/src/services/user_service.py to check for 14+ day gaps and trigger reassessment (FR-059, FR-060)
+- [X] T115 [US3] Implement rescheduling logic in backend/src/services/schedule_service.py with reschedule_for_disruption method that intelligently moves workouts, extends timeline, updates plan dates (FR-016, FR-017, FR-018)
+- [X] T116 [US3] Add inactivity detection method in backend/src/services/user_service.py to check for 14+ day gaps and trigger reassessment (FR-059, FR-060)
 
 ### AI Tools for User Story 3
 
-- [ ] T117 [P] [US3] Create rescheduling tool in backend/src/ai/tools/schedule_tools.py with reschedule function for disruption handling
-- [ ] T118 [P] [US3] Add rest day suggestion tool in backend/src/ai/tools/schedule_tools.py to prevent overtraining (FR-020)
+- [X] T117 [P] [US3] Create rescheduling tool in backend/src/ai/tools/schedule_tools.py with reschedule function for disruption handling
+- [X] T118 [P] [US3] Add rest day suggestion tool in backend/src/ai/tools/schedule_tools.py to prevent overtraining (FR-020)
 
 ### Background Workers for User Story 3
 
-- [ ] T119 [US3] Implement schedule recalculation worker in backend/src/workers/schedule_recalc.py as Celery task for complex rescheduling operations
+- [X] T119 [US3] Implement schedule recalculation worker in backend/src/workers/schedule_recalc.py as Celery task for complex rescheduling operations
 
 ### API Endpoints for User Story 3
 
-- [ ] T120 [US3] Implement AI reschedule endpoint in backend/src/api/v1/ai_agent.py: POST /reschedule with disruption details (1 endpoint from contracts)
+- [X] T120 [US3] Implement AI reschedule endpoint in backend/src/api/v1/ai_agent.py: POST /reschedule with disruption details (1 endpoint from contracts)
 
 ### Frontend Components for User Story 3
 

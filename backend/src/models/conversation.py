@@ -1,9 +1,9 @@
 """Conversation and message models."""
-from datetime import datetime
+from datetime import date, datetime
 from typing import Optional
 from uuid import UUID
 
-from sqlalchemy import Column, DateTime, Enum, ForeignKey, JSON, String, Text
+from sqlalchemy import Column, Date, DateTime, Enum, ForeignKey, Integer, JSON, String, Text
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import relationship
 
@@ -45,6 +45,7 @@ class Conversation(Base, UUIDMixin, TimestampMixin):
     user = relationship("User", back_populates="conversations")
     fitness_plan = relationship("FitnessPlan", back_populates="conversations")
     messages = relationship("Message", back_populates="conversation", cascade="all, delete-orphan", order_by="Message.created_at")
+    disruption_events = relationship("DisruptionEvent", back_populates="conversation")
 
     def __repr__(self) -> str:
         return f"<Conversation(id={self.id}, user_id={self.user_id}, type={self.conversation_type})>"
@@ -76,3 +77,65 @@ class Message(Base, UUIDMixin, TimestampMixin):
 
     def __repr__(self) -> str:
         return f"<Message(id={self.id}, conversation_id={self.conversation_id}, sender={self.sender_type})>"
+
+
+class DisruptionEvent(Base, UUIDMixin, TimestampMixin):
+    """Disruption event model for tracking schedule disruptions and rescheduling (FR-016, FR-017, FR-018)."""
+
+    __tablename__ = "disruption_events"
+
+    # User and plan associations
+    user_id = Column(PGUUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    conversation_id = Column(PGUUID(as_uuid=True), ForeignKey("conversations.id", ondelete="SET NULL"), nullable=True, index=True)
+    fitness_plan_id = Column(PGUUID(as_uuid=True), ForeignKey("fitness_plans.id", ondelete="CASCADE"), nullable=False, index=True)
+
+    # Disruption details
+    disruption_type = Column(
+        Enum("illness", "injury", "travel", "schedule_conflict", "other", name="disruption_type"),
+        nullable=False,
+    )
+    start_date = Column(Date, nullable=False)
+    end_date = Column(Date, nullable=True)  # null means ongoing
+    description = Column(Text, nullable=False)
+    
+    # Severity assessment (impacts rescheduling strategy)
+    severity = Column(
+        Enum("minor", "moderate", "severe", name="disruption_severity"),
+        nullable=False,
+        default="moderate",
+    )
+
+    # Impact tracking
+    workouts_affected = Column(Integer, nullable=False, default=0)
+    meals_affected = Column(Integer, nullable=False, default=0)
+
+    # Resolution details
+    resolution_strategy = Column(
+        Enum("reschedule", "skip", "extend_timeline", "reassess", name="resolution_strategy"),
+        nullable=False,
+    )
+    timeline_extension_days = Column(Integer, nullable=False, default=0)
+    
+    # Additional metadata
+    resolution_details = Column(JSON, nullable=True)
+    # Structure: {
+    #   "rescheduled_workouts": [...],
+    #   "rescheduled_meals": [...],
+    #   "new_end_date": "...",
+    #   "ai_recommendations": "..."
+    # }
+
+    # Status tracking
+    status = Column(
+        Enum("reported", "processing", "resolved", name="disruption_status"),
+        nullable=False,
+        default="reported",
+    )
+
+    # Relationships
+    user = relationship("User", back_populates="disruption_events")
+    conversation = relationship("Conversation")
+    fitness_plan = relationship("FitnessPlan", back_populates="disruption_events")
+
+    def __repr__(self) -> str:
+        return f"<DisruptionEvent(id={self.id}, type={self.disruption_type}, status={self.status})>"

@@ -48,6 +48,7 @@ class User(Base, UUIDMixin, TimestampMixin):
     conversations = relationship("Conversation", back_populates="user", cascade="all, delete-orphan")
     schedules = relationship("Schedule", back_populates="user", cascade="all, delete-orphan")
     progress_records = relationship("ProgressRecord", back_populates="user", cascade="all, delete-orphan")
+    disruption_events = relationship("DisruptionEvent", back_populates="user", cascade="all, delete-orphan")
 
     def __repr__(self) -> str:
         return f"<User(id={self.id}, email={self.email})>"

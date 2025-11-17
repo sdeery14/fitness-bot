@@ -1,5 +1,5 @@
 """Conversation schemas for API requests and responses."""
-from datetime import datetime
+from datetime import date, datetime
 from typing import Optional
 from uuid import UUID
 
@@ -48,6 +48,60 @@ class ConversationRead(BaseModel):
     status: str = Field(..., description="Status: active, completed, abandoned")
     conversation_context: Optional[dict] = Field(None, description="Conversation context and agent state")
     messages: list[MessageRead] = Field(default_factory=list, description="Conversation messages")
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class DisruptionReportRequest(BaseModel):
+    """Schema for reporting a schedule disruption (FR-016, FR-017, FR-018)."""
+
+    fitness_plan_id: UUID = Field(..., description="Fitness plan affected by disruption")
+    disruption_type: str = Field(
+        ...,
+        pattern="^(illness|injury|travel|schedule_conflict|other)$",
+        description="Type of disruption",
+    )
+    start_date: date = Field(..., description="Date when disruption started")
+    end_date: Optional[date] = Field(None, description="Expected end date (null if ongoing)")
+    description: str = Field(
+        ...,
+        min_length=10,
+        max_length=1000,
+        description="Detailed description of the disruption",
+    )
+    severity: str = Field(
+        "moderate",
+        pattern="^(minor|moderate|severe)$",
+        description="Severity assessment",
+    )
+
+
+class DisruptionResolutionResponse(BaseModel):
+    """Schema for disruption resolution response from AI (FR-016, FR-017, FR-018)."""
+
+    disruption_id: UUID = Field(..., description="ID of the disruption event")
+    resolution_strategy: str = Field(
+        ...,
+        pattern="^(reschedule|skip|extend_timeline|reassess)$",
+        description="Resolution strategy applied",
+    )
+    workouts_affected: int = Field(..., description="Number of workouts affected")
+    meals_affected: int = Field(..., description="Number of meals affected")
+    timeline_extension_days: int = Field(0, description="Days added to plan timeline")
+    new_end_date: Optional[date] = Field(None, description="New plan end date if timeline extended")
+    resolution_details: dict = Field(
+        default_factory=dict,
+        description="Detailed information about rescheduled items and AI recommendations",
+    )
+    ai_message: str = Field(..., description="Human-readable explanation from AI about the resolution")
+    status: str = Field(
+        "resolved",
+        pattern="^(reported|processing|resolved)$",
+        description="Status of the disruption",
+    )
     created_at: datetime
     updated_at: datetime
 

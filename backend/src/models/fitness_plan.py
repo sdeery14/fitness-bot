@@ -45,6 +45,7 @@ class FitnessPlan(Base, UUIDMixin, TimestampMixin):
     conversations = relationship("Conversation", back_populates="fitness_plan", cascade="all, delete-orphan")
     schedule = relationship("Schedule", back_populates="fitness_plan", uselist=False, cascade="all, delete-orphan")
     progress_records = relationship("ProgressRecord", back_populates="fitness_plan", cascade="all, delete-orphan")
+    disruption_events = relationship("DisruptionEvent", back_populates="fitness_plan", cascade="all, delete-orphan")
 
     def __repr__(self) -> str:
         return f"<FitnessPlan(id={self.id}, user_id={self.user_id}, goal={self.goal_type})>"

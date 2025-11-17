@@ -10,8 +10,10 @@ from uuid import UUID
 from agents import function_tool
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.models.conversation import DisruptionEvent
 from src.models.schedule import ScheduleEntry
 from src.services.schedule_service import ScheduleService
+from src.services.user_service import UserService
 
 
 @function_tool
@@ -187,3 +189,152 @@ async def get_next_activities(user_id: str, db: AsyncSession) -> str:
     }
 
     return json.dumps(result, indent=2)
+
+
+@function_tool
+async def reschedule_after_disruption(
+    user_id: str,
+    fitness_plan_id: str,
+    disruption_type: str,
+    start_date: str,
+    end_date: str | None,
+    description: str,
+    severity: str,
+    db: AsyncSession,
+) -> str:
+    """Reschedule user's plan after a disruption (illness, injury, travel, etc.).
+
+    Intelligently rearranges workouts and meals, potentially extending the
+    plan timeline to accommodate the disruption.
+
+    Args:
+        user_id: User's UUID as string
+        fitness_plan_id: FitnessPlan UUID as string
+        disruption_type: Type - 'illness', 'injury', 'travel', 'schedule_conflict', 'other'
+        start_date: Disruption start date (ISO format YYYY-MM-DD)
+        end_date: Disruption end date (ISO format, null if ongoing)
+        description: Detailed description of the disruption
+        severity: Severity level - 'minor', 'moderate', 'severe'
+        db: Database session (injected by agent context)
+
+    Returns:
+        JSON string with rescheduling details and new plan timeline
+    """
+    # Create DisruptionEvent
+    disruption = DisruptionEvent(
+        user_id=UUID(user_id),
+        fitness_plan_id=UUID(fitness_plan_id),
+        disruption_type=disruption_type,
+        start_date=datetime.fromisoformat(start_date).date(),
+        end_date=datetime.fromisoformat(end_date).date() if end_date else None,
+        description=description,
+        severity=severity,
+        resolution_strategy="reschedule",  # Will be updated by service
+        status="processing",
+    )
+    db.add(disruption)
+    await db.flush()  # Get disruption ID
+
+    # Execute rescheduling logic
+    service = ScheduleService(db)
+    result = await service.reschedule_for_disruption(disruption)
+
+    # Update disruption record with results
+    disruption.workouts_affected = result["workouts_affected"]
+    disruption.meals_affected = result["meals_affected"]
+    disruption.timeline_extension_days = result["timeline_extension_days"]
+    disruption.resolution_strategy = result["strategy_applied"]
+    disruption.resolution_details = {
+        "rescheduled_workouts": result["rescheduled_workouts"],
+        "rescheduled_meals": result["rescheduled_meals"],
+        "new_end_date": result["new_end_date"].isoformat() if result["new_end_date"] else None,
+    }
+    disruption.status = "resolved"
+
+    await db.commit()
+
+    # Build AI-friendly response
+    ai_response = {
+        "disruption_id": str(disruption.id),
+        "resolution_strategy": result["strategy_applied"],
+        "workouts_affected": result["workouts_affected"],
+        "meals_affected": result["meals_affected"],
+        "timeline_extension_days": result["timeline_extension_days"],
+        "new_end_date": result["new_end_date"].isoformat() if result["new_end_date"] else None,
+        "message": f"I've rescheduled your plan to accommodate your {disruption_type}. "
+                   f"Affected: {result['workouts_affected']} workouts, {result['meals_affected']} meals. "
+                   + (f"Extended timeline by {result['timeline_extension_days']} days." if result['timeline_extension_days'] > 0 else "No timeline extension needed."),
+    }
+
+    return json.dumps(ai_response, indent=2)
+
+
+@function_tool
+async def suggest_rest_days(
+    user_id: str,
+    fitness_plan_id: str,
+    db: AsyncSession,
+) -> str:
+    """Suggest rest days to prevent overtraining based on activity patterns.
+
+    Analyzes recent workout frequency and completion rates to recommend
+    when the user should take rest days.
+
+    Args:
+        user_id: User's UUID as string
+        fitness_plan_id: FitnessPlan UUID as string
+        db: Database session (injected by agent context)
+
+    Returns:
+        JSON string with rest day recommendations
+    """
+    # Check for inactivity/overtraining patterns
+    user_service = UserService(db)
+    inactivity_check = await user_service.check_inactivity(
+        user_id=UUID(user_id),
+        fitness_plan_id=UUID(fitness_plan_id),
+        inactivity_threshold_days=14,
+    )
+
+    # Get upcoming schedule to analyze workout density
+    schedule_service = ScheduleService(db)
+    upcoming = await schedule_service.get_upcoming_schedule(
+        user_id=UUID(user_id),
+        days=7,
+    )
+
+    # Count workouts in next 7 days
+    workout_count = sum(1 for entry in upcoming if entry.entry_type == "workout" and entry.completion_status in ["scheduled", "rescheduled"])
+
+    # Determine recommendation
+    if inactivity_check["is_inactive"]:
+        recommendation = {
+            "needs_rest": False,
+            "reason": "inactive",
+            "message": f"You've been inactive for {inactivity_check['days_since_last_activity']} days. "
+                       "Focus on gradually resuming activity rather than rest.",
+        }
+    elif workout_count >= 6:
+        recommendation = {
+            "needs_rest": True,
+            "reason": "overtraining_risk",
+            "suggested_rest_days": 2,
+            "message": f"You have {workout_count} workouts scheduled in the next 7 days. "
+                       "Consider taking 1-2 rest days to prevent overtraining and allow recovery.",
+        }
+    elif workout_count >= 4:
+        recommendation = {
+            "needs_rest": False,
+            "reason": "balanced",
+            "message": f"Your schedule looks balanced with {workout_count} workouts in the next 7 days. "
+                       "Continue as planned, but listen to your body.",
+        }
+    else:
+        recommendation = {
+            "needs_rest": False,
+            "reason": "light_schedule",
+            "message": f"You have {workout_count} workouts scheduled. This is a lighter week - "
+                       "you're getting adequate rest.",
+        }
+
+    return json.dumps(recommendation, indent=2)

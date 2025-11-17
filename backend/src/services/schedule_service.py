@@ -7,6 +7,7 @@ from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from src.models.conversation import DisruptionEvent
 from src.models.fitness_plan import FitnessPlan
 from src.models.meal import Meal
 from src.models.schedule import Schedule, ScheduleEntry
@@ -435,3 +436,243 @@ class ScheduleService:
         await self.db.commit()
         await self.db.refresh(schedule)
         return schedule
+
+    async def reschedule_for_disruption(
+        self,
+        disruption: DisruptionEvent,
+    ) -> dict:
+        """Intelligently reschedule around a disruption event (FR-016, FR-017, FR-018).
+
+        Implements different strategies based on disruption type and severity:
+        - Minor disruptions: Reschedule affected items to available slots
+        - Moderate disruptions: Spread items across available days, may extend timeline
+        - Severe disruptions: Extend timeline, possibly transition to next phase
+
+        Args:
+            disruption: DisruptionEvent with type, dates, severity
+
+        Returns:
+            Dictionary with rescheduling details:
+            {
+                'workouts_affected': int,
+                'meals_affected': int,
+                'timeline_extension_days': int,
+                'rescheduled_workouts': [list of rescheduled workout entries],
+                'rescheduled_meals': [list of rescheduled meal entries],
+                'new_end_date': date,
+                'strategy_applied': str
+            }
+
+        Raises:
+            ValueError: If disruption's fitness plan or schedule not found
+        """
+        # Load the schedule for this fitness plan
+        schedule_stmt = (
+            select(Schedule)
+            .where(Schedule.fitness_plan_id == disruption.fitness_plan_id)
+            .options(selectinload(Schedule.fitness_plan))
+        )
+        schedule_result = await self.db.execute(schedule_stmt)
+        schedule = schedule_result.scalar_one_or_none()
+
+        if not schedule:
+            raise ValueError("Schedule not found for fitness plan")
+
+        # Load the fitness plan to get end_date
+        plan_stmt = select(FitnessPlan).where(FitnessPlan.id == disruption.fitness_plan_id)
+        plan_result = await self.db.execute(plan_stmt)
+        plan = plan_result.scalar_one_or_none()
+
+        if not plan:
+            raise ValueError("Fitness plan not found")
+
+        # Calculate disruption duration
+        disruption_days = 0
+        if disruption.end_date:
+            disruption_days = (disruption.end_date - disruption.start_date).days + 1
+        else:
+            # Estimate based on severity if ongoing
+            severity_days_map = {"minor": 3, "moderate": 7, "severe": 14}
+            disruption_days = severity_days_map.get(disruption.severity, 7)
+
+        # Find affected schedule entries (scheduled or rescheduled status only)
+        affected_entries_stmt = (
+            select(ScheduleEntry)
+            .where(
+                and_(
+                    ScheduleEntry.schedule_id == schedule.id,
+                    ScheduleEntry.entry_date >= disruption.start_date,
+                    ScheduleEntry.entry_date <= (disruption.end_date or disruption.start_date + timedelta(days=disruption_days)),
+                    ScheduleEntry.completion_status.in_(["scheduled", "rescheduled"]),
+                )
+            )
+            .options(
+                selectinload(ScheduleEntry.workout),
+                selectinload(ScheduleEntry.meal),
+            )
+        )
+        affected_result = await self.db.execute(affected_entries_stmt)
+        affected_entries = list(affected_result.scalars().all())
+
+        # Count affected items by type
+        affected_workouts = [e for e in affected_entries if e.entry_type == "workout"]
+        affected_meals = [e for e in affected_entries if e.entry_type == "meal"]
+
+        # Determine rescheduling strategy based on disruption type and severity
+        strategy = self._determine_reschedule_strategy(
+            disruption_type=disruption.disruption_type,
+            severity=disruption.severity,
+            disruption_days=disruption_days,
+            workouts_count=len(affected_workouts),
+            meals_count=len(affected_meals),
+        )
+
+        timeline_extension_days = 0
+        rescheduled_workouts = []
+        rescheduled_meals = []
+
+        if strategy == "reschedule":
+            # Move items to nearest available slots after disruption ends
+            resume_date = (disruption.end_date or disruption.start_date + timedelta(days=disruption_days)) + timedelta(days=1)
+
+            # Reschedule workouts
+            current_workout_date = resume_date
+            for entry in affected_workouts:
+                entry.entry_date = current_workout_date
+                entry.completion_status = "rescheduled"
+                rescheduled_workouts.append({
+                    "original_date": str(entry.entry_date - timedelta(days=(current_workout_date - entry.entry_date).days)),
+                    "new_date": str(current_workout_date),
+                    "workout_id": str(entry.workout_id),
+                })
+                current_workout_date += timedelta(days=2)  # Space out workouts
+
+            # Reschedule meals - spread across available days
+            current_meal_date = resume_date
+            for entry in affected_meals:
+                entry.entry_date = current_meal_date
+                entry.completion_status = "rescheduled"
+                rescheduled_meals.append({
+                    "original_date": str(entry.entry_date - timedelta(days=(current_meal_date - entry.entry_date).days)),
+                    "new_date": str(current_meal_date),
+                    "meal_id": str(entry.meal_id),
+                })
+                current_meal_date += timedelta(days=1)
+
+            # Calculate if timeline extension needed
+            last_rescheduled_date = max(
+                current_workout_date if affected_workouts else resume_date,
+                current_meal_date if affected_meals else resume_date,
+            )
+            if last_rescheduled_date > plan.end_date:
+                timeline_extension_days = (last_rescheduled_date - plan.end_date).days
+                plan.end_date = last_rescheduled_date
+
+        elif strategy == "skip":
+            # Mark affected items as skipped
+            for entry in affected_entries:
+                entry.completion_status = "skipped"
+                entry.skipped_reason = f"Disruption: {disruption.disruption_type} ({disruption.severity})"
+                if entry.entry_type == "workout":
+                    rescheduled_workouts.append({
+                        "original_date": str(entry.entry_date),
+                        "status": "skipped",
+                        "workout_id": str(entry.workout_id),
+                    })
+                else:
+                    rescheduled_meals.append({
+                        "original_date": str(entry.entry_date),
+                        "status": "skipped",
+                        "meal_id": str(entry.meal_id),
+                    })
+
+        elif strategy == "extend_timeline":
+            # Extend timeline by disruption duration and shift all future entries
+            timeline_extension_days = disruption_days
+            plan.end_date = plan.end_date + timedelta(days=timeline_extension_days)
+
+            # Shift all entries during and after disruption
+            for entry in affected_entries:
+                entry.entry_date = entry.entry_date + timedelta(days=timeline_extension_days)
+                entry.completion_status = "rescheduled"
+                if entry.entry_type == "workout":
+                    rescheduled_workouts.append({
+                        "original_date": str(entry.entry_date - timedelta(days=timeline_extension_days)),
+                        "new_date": str(entry.entry_date),
+                        "workout_id": str(entry.workout_id),
+                    })
+                else:
+                    rescheduled_meals.append({
+                        "original_date": str(entry.entry_date - timedelta(days=timeline_extension_days)),
+                        "new_date": str(entry.entry_date),
+                        "meal_id": str(entry.meal_id),
+                    })
+
+        # Update schedule metadata
+        schedule.last_recalculated_at = datetime.now(UTC)
+        schedule.recalculation_reason = f"Disruption: {disruption.disruption_type} ({disruption.severity})"
+
+        await self.db.commit()
+
+        return {
+            "workouts_affected": len(affected_workouts),
+            "meals_affected": len(affected_meals),
+            "timeline_extension_days": timeline_extension_days,
+            "rescheduled_workouts": rescheduled_workouts,
+            "rescheduled_meals": rescheduled_meals,
+            "new_end_date": plan.end_date,
+            "strategy_applied": strategy,
+        }
+
+    def _determine_reschedule_strategy(
+        self,
+        disruption_type: str,
+        severity: str,
+        disruption_days: int,
+        workouts_count: int,
+        meals_count: int,
+    ) -> str:
+        """Determine the best rescheduling strategy based on disruption characteristics.
+
+        Args:
+            disruption_type: Type of disruption (illness, injury, travel, etc.)
+            severity: Severity level (minor, moderate, severe)
+            disruption_days: Duration of disruption in days
+            workouts_count: Number of workouts affected
+            meals_count: Number of meals affected
+
+        Returns:
+            Strategy: 'reschedule', 'skip', 'extend_timeline', or 'reassess'
+        """
+        # Injury-specific logic: severe injuries need careful rescheduling
+        if disruption_type == "injury" and severity == "severe":
+            return "reassess"  # May need plan modification
+
+        # Travel disruptions: usually can reschedule workouts, keep meal plans
+        if disruption_type == "travel":
+            if severity == "minor" and disruption_days <= 3:
+                return "reschedule"
+            return "extend_timeline"
+
+        # Illness severity determines strategy
+        if disruption_type == "illness":
+            if severity == "minor" and disruption_days <= 2:
+                return "reschedule"  # Quick recovery, just move items forward
+            elif severity == "moderate" and disruption_days <= 7:
+                return "extend_timeline"  # Need time to recover strength
+            else:
+                return "reassess"  # Severe illness may require plan changes
+
+        # Schedule conflicts: try to reschedule if short duration
+        if disruption_type == "schedule_conflict":
+            if disruption_days <= 5:
+                return "reschedule"
+            return "extend_timeline"
+
+        # Default strategy based on severity and duration
+        if severity == "minor" and disruption_days <= 3:
+            return "reschedule"
+        elif severity == "moderate" or disruption_days <= 7:
+            return "extend_timeline"
+        else:
+            return "reassess"

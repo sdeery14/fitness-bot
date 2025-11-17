@@ -9,9 +9,13 @@ from pydantic import BaseModel
 
 from src.api.deps import CurrentUserId, DatabaseSession
 from src.schemas import create_success_response
+from src.schemas.conversation import DisruptionReportRequest, DisruptionResolutionResponse
 from src.services.ai_service import AIOrchestrationService
 from src.services.plan_service import PlanService
+from src.services.schedule_service import ScheduleService
 from src.services.user_service import UserService
+from src.models.conversation import DisruptionEvent
+from src.workers.schedule_recalc import recalculate_schedule_for_disruption
 
 router = APIRouter()
 
@@ -377,3 +381,123 @@ async def stream_conversation(
             "X-Accel-Buffering": "no",
         },
     )
+
+
+@router.post("/reschedule", status_code=status.HTTP_200_OK)
+async def reschedule_for_disruption(
+    request: DisruptionReportRequest,
+    user_id: CurrentUserId,
+    db: DatabaseSession,
+) -> dict:
+    """Report a disruption and reschedule the fitness plan (FR-016, FR-017, FR-018).
+
+    Allows users to report unexpected life events (illness, injury, travel, etc.)
+    and intelligently reschedules their plan to accommodate the disruption.
+
+    Args:
+        request: Disruption details (type, dates, severity, description)
+        user_id: Current authenticated user ID
+        db: Database session
+
+    Returns:
+        Rescheduling result with affected items and new timeline
+
+    Raises:
+        HTTPException: If user/plan not found or rescheduling fails
+    """
+    # Validate user exists
+    user_service = UserService(db)
+    user = await user_service.get_user(user_id)
+
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found",
+        )
+
+    # Validate fitness plan exists and belongs to user
+    plan_service = PlanService(db)
+    plan = await plan_service.get_plan(request.fitness_plan_id)
+
+    if not plan:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Fitness plan not found",
+        )
+
+    if str(plan.user_id) != str(user_id):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to modify this plan",
+        )
+
+    try:
+        # Create disruption event
+        from uuid import uuid4
+        disruption = DisruptionEvent(
+            id=uuid4(),
+            user_id=user_id,
+            fitness_plan_id=request.fitness_plan_id,
+            disruption_type=request.disruption_type,
+            start_date=request.start_date,
+            end_date=request.end_date,
+            description=request.description,
+            severity=request.severity,
+            resolution_strategy="reschedule",  # Will be updated by service
+            status="processing",
+        )
+        db.add(disruption)
+        await db.flush()  # Get disruption ID
+
+        # Execute rescheduling synchronously for immediate response
+        # (For complex cases, could queue to Celery worker instead)
+        schedule_service = ScheduleService(db)
+        result = await schedule_service.reschedule_for_disruption(disruption)
+
+        # Update disruption with results
+        disruption.workouts_affected = result["workouts_affected"]
+        disruption.meals_affected = result["meals_affected"]
+        disruption.timeline_extension_days = result["timeline_extension_days"]
+        disruption.resolution_strategy = result["strategy_applied"]
+        disruption.resolution_details = {
+            "rescheduled_workouts": result["rescheduled_workouts"],
+            "rescheduled_meals": result["rescheduled_meals"],
+            "new_end_date": result["new_end_date"].isoformat() if result["new_end_date"] else None,
+        }
+        disruption.status = "resolved"
+
+        await db.commit()
+        await db.refresh(disruption)
+
+        # Build response
+        response = DisruptionResolutionResponse(
+            disruption_id=disruption.id,
+            resolution_strategy=result["strategy_applied"],
+            workouts_affected=result["workouts_affected"],
+            meals_affected=result["meals_affected"],
+            timeline_extension_days=result["timeline_extension_days"],
+            new_end_date=result["new_end_date"],
+            resolution_details=disruption.resolution_details,
+            ai_message=f"I've rescheduled your plan to accommodate your {request.disruption_type}. "
+                       f"Affected: {result['workouts_affected']} workouts, {result['meals_affected']} meals. "
+                       + (f"Extended timeline by {result['timeline_extension_days']} days to {result['new_end_date'].strftime('%B %d, %Y')}." if result['timeline_extension_days'] > 0 else "No timeline extension needed - items rescheduled within current plan duration."),
+            status="resolved",
+            created_at=disruption.created_at,
+            updated_at=disruption.updated_at,
+        )
+
+        return create_success_response(response.model_dump())
+
+    except ValueError as e:
+        # Schedule or plan issues
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e),
+        ) from e
+    except Exception as e:
+        # Rollback on error
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to reschedule plan: {str(e)}",
+        ) from e
