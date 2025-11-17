@@ -234,7 +234,7 @@
 - [ ] T107 [US2] Write integration test for schedule workflow in backend/tests/integration/test_schedule_workflow.py: create plan → generate schedule → mark activities complete → verify progress calculation (SKIPPED - complex DB setup)
 - [X] T108 [US2] Write contract tests for schedule endpoints in backend/tests/contract/test_schedule_api.py (5 tests passing)
 - [ ] T109 [US2] Write contract tests for progress endpoints in backend/tests/contract/test_progress_api.py (REMOVED - API response format issues)
-- [ ] T110 [US2] Write E2E test for schedule tracking in frontend/tests/e2e/schedule-tracking.spec.ts with Playwright: view today → complete workout → view progress
+- [X] T110 [US2] Write E2E test for schedule tracking in frontend/tests/e2e/schedule-tracking.spec.ts with Playwright: view today → complete workout → view progress (412 lines, 10 test scenarios)
 
 ### Additional UI Components (shadcn/ui) for User Story 2
 
