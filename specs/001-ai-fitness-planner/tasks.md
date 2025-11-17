@@ -389,7 +389,7 @@
 - [X] T155 [P] Create API documentation in docs/api-guide.md based on contracts/api-contracts.md
 - [X] T156 [P] Create architecture documentation in docs/architecture.md explaining multi-agent design
 - [X] T157 [P] Create deployment guide in docs/deployment.md for Docker/cloud deployment
-- [ ] T158 [P] Write unit tests for utility functions in backend/tests/unit/utils/test_validators.py and test_date_utils.py
+- [X] T158 [P] Write unit tests for utility functions in backend/tests/unit/utils/test_validators.py and test_date_utils.py
 - [ ] T159 [P] Write frontend component tests in frontend/tests/components/ for chat-interface.test.tsx, workout-card.test.tsx, schedule-calendar.test.tsx
 - [ ] T160 [P] Add performance monitoring: instrument API endpoints, track AI response times, log slow queries
 - [ ] T160b [P] Execute load testing with locust or k6: simulate 1000 concurrent users, verify API p95 < 500ms maintained, DB queries p95 < 100ms, identify bottlenecks (validates SC-019)
