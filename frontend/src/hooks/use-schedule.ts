@@ -42,7 +42,7 @@ export function useSchedule() {
     setTodayError(null);
 
     try {
-      const response = await fetch(`${API_BASE}/api/v1/schedules/today`, {
+      const response = await fetch(`${API_BASE}/schedules/upcoming`, {
         credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
@@ -74,7 +74,7 @@ export function useSchedule() {
       setUpcomingError(null);
 
       try {
-        const response = await fetch(`${API_BASE}/api/v1/schedules/upcoming?days=${days}`, {
+        const response = await fetch(`${API_BASE}/schedules/upcoming?days=${days}`, {
           credentials: 'include',
           headers: {
             'Content-Type': 'application/json',
@@ -109,7 +109,7 @@ export function useSchedule() {
       updateEntryStatus(entryId, 'completed', notes);
 
       try {
-        const response = await fetch(`${API_BASE}/api/v1/schedules/entries/${entryId}/complete`, {
+        const response = await fetch(`${API_BASE}/schedules/entries/${entryId}/complete`, {
           method: 'POST',
           credentials: 'include',
           headers: {
@@ -152,7 +152,7 @@ export function useSchedule() {
       updateEntryStatus(entryId, 'skipped', reason);
 
       try {
-        const response = await fetch(`${API_BASE}/api/v1/schedules/entries/${entryId}/skip`, {
+        const response = await fetch(`${API_BASE}/schedules/entries/${entryId}/skip`, {
           method: 'POST',
           credentials: 'include',
           headers: {

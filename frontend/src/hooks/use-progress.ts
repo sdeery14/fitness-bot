@@ -144,7 +144,7 @@ export function useProgress() {
    */
   const logMeasurement = useCallback(async (measurement: MeasurementInput) => {
     try {
-      const response = await fetch(`${API_BASE}/api/v1/progress/measurements`, {
+      const response = await fetch(`${API_BASE}/progress/measurements`, {
         method: 'POST',
         credentials: 'include',
         headers: {
