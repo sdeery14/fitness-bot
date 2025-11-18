@@ -42,10 +42,11 @@ export function useSchedule() {
     setTodayError(null);
 
     try {
-      const response = await fetch(`${API_BASE}/schedules/upcoming`, {
-        credentials: 'include',
+      const token = localStorage.getItem('access_token');
+      const response = await fetch(`${API_BASE}/schedules/today`, {
         headers: {
           'Content-Type': 'application/json',
+          ...(token && { Authorization: `Bearer ${token}` }),
         },
       });
 
@@ -74,10 +75,11 @@ export function useSchedule() {
       setUpcomingError(null);
 
       try {
+        const token = localStorage.getItem('access_token');
         const response = await fetch(`${API_BASE}/schedules/upcoming?days=${days}`, {
-          credentials: 'include',
           headers: {
             'Content-Type': 'application/json',
+            ...(token && { Authorization: `Bearer ${token}` }),
           },
         });
 
@@ -109,11 +111,12 @@ export function useSchedule() {
       updateEntryStatus(entryId, 'completed', notes);
 
       try {
+        const token = localStorage.getItem('access_token');
         const response = await fetch(`${API_BASE}/schedules/entries/${entryId}/complete`, {
           method: 'POST',
-          credentials: 'include',
           headers: {
             'Content-Type': 'application/json',
+            ...(token && { Authorization: `Bearer ${token}` }),
           },
           body: JSON.stringify({ user_notes: notes }),
         });
@@ -152,11 +155,12 @@ export function useSchedule() {
       updateEntryStatus(entryId, 'skipped', reason);
 
       try {
+        const token = localStorage.getItem('access_token');
         const response = await fetch(`${API_BASE}/schedules/entries/${entryId}/skip`, {
           method: 'POST',
-          credentials: 'include',
           headers: {
             'Content-Type': 'application/json',
+            ...(token && { Authorization: `Bearer ${token}` }),
           },
           body: JSON.stringify({ reason }),
         });

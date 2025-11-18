@@ -74,13 +74,14 @@ export function useProgress() {
 
     try {
       const url = fitnessPlanId
-        ? `${API_BASE}/api/v1/progress?fitness_plan_id=${fitnessPlanId}`
-        : `${API_BASE}/api/v1/progress`;
+        ? `${API_BASE}/progress?fitness_plan_id=${fitnessPlanId}`
+        : `${API_BASE}/progress`;
 
+      const token = localStorage.getItem('access_token');
       const response = await fetch(url, {
-        credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
+          ...(token && { Authorization: `Bearer ${token}` }),
         },
       });
 
@@ -114,10 +115,11 @@ export function useProgress() {
         if (recordType) params.append('type', recordType);
         params.append('limit', limit.toString());
 
-        const response = await fetch(`${API_BASE}/api/v1/progress/measurements?${params}`, {
-          credentials: 'include',
+        const token = localStorage.getItem('access_token');
+        const response = await fetch(`${API_BASE}/progress/measurements?${params}`, {
           headers: {
             'Content-Type': 'application/json',
+            ...(token && { Authorization: `Bearer ${token}` }),
           },
         });
 
@@ -144,11 +146,12 @@ export function useProgress() {
    */
   const logMeasurement = useCallback(async (measurement: MeasurementInput) => {
     try {
+      const token = localStorage.getItem('access_token');
       const response = await fetch(`${API_BASE}/progress/measurements`, {
         method: 'POST',
-        credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
+          ...(token && { Authorization: `Bearer ${token}` }),
         },
         body: JSON.stringify(measurement),
       });
