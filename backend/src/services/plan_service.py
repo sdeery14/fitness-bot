@@ -14,6 +14,19 @@ from src.models.workout import WorkoutPlan
 class PlanService:
     """Service for fitness plan operations."""
 
+    async def has_existing_plans(self, user_id: UUID) -> bool:
+        """Check if user has any existing fitness plans.
+
+        Args:
+            user_id: User's UUID
+
+        Returns:
+            True if user has at least one fitness plan (any status), False otherwise
+        """
+        stmt = select(FitnessPlan).where(FitnessPlan.user_id == user_id).limit(1)
+        result = await self.db.execute(stmt)
+        return result.scalar_one_or_none() is not None
+
     def __init__(self, db: AsyncSession) -> None:
         """Initialize plan service.
 

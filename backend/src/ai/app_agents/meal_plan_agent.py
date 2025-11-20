@@ -12,6 +12,7 @@ Uses OpenAI Agents SDK with function tools for USDA API queries.
 from agents import Agent
 
 from src.ai.agent import create_model_settings
+from src.ai.schemas import MealPlanOutput
 from src.ai.tools import meal_tools
 
 
@@ -73,6 +74,7 @@ Use these tools to access accurate nutritional data from USDA FoodData Central."
             meal_tools.get_food_nutrition,
             meal_tools.calculate_meal_macros,
         ],
+        output_type=MealPlanOutput,  # Structured output
     )
 
 

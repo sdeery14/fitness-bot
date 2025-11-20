@@ -104,6 +104,7 @@ class PlanContext(BaseModel):
     plan_id: str | None = None
     requirements: dict[str, Any] = {}
     user_context: UserContext
+    conversation_history: list[dict[str, str]] = []  # List of {"role": "user|assistant", "content": "..."}
 
 
 # Agent registry for managing agent instances

@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.ai.agent import PlanContext, UserContext
 from src.ai.app_agents.conversation_agent import conversation_agent
 from src.ai.app_agents.fitness_plan_agent import create_fitness_plan_agent
+from src.ai.app_agents.intake_specialist_agent import intake_specialist_agent
 from src.ai.app_agents.meal_plan_agent import meal_plan_agent
 from src.ai.app_agents.workout_plan_agent import workout_plan_agent
 from src.models.user import User
@@ -107,6 +108,14 @@ class AIOrchestrationService:
             preferences=user.preferences or {},
         )
 
+        # Check if user has existing fitness plans to determine which agent to use
+        has_plans = await self.plan_service.has_existing_plans(user.id)
+
+        # Select appropriate agent based on user's history
+        # New users (no plans) get the intake specialist for smooth onboarding
+        # Existing users get the conversation agent for plan management
+        selected_agent = conversation_agent if has_plans else intake_specialist_agent
+
         # Create plan context
         plan_context = PlanContext(
             user_context=user_context,
@@ -115,16 +124,24 @@ class AIOrchestrationService:
 
         # If no initial message provided, send AI greeting first
         if not initial_message:
-            agent_response = """Hi there! 👋 I'm your AI Fitness Coach, and I'm excited to help you create a personalized fitness plan that fits your goals and lifestyle.
+            # Customize greeting based on whether user is new or returning
+            if has_plans:
+                agent_response = """Welcome back! I'm your AI fitness coach, ready to help you with your fitness journey.
 
-To get started, could you tell me about your primary fitness goal? For example:
-• Weight loss
-• Muscle gain
-• Improved endurance
-• Overall health and wellness
-• Training for a specific event
+How can I assist you today?
+• Discuss your current plan
+• Make modifications to your workouts or meals
+• Start a fresh plan with a new goal
+• Get advice on your progress
 
-What would you like to achieve?"""
+What would you like to work on?"""
+            else:
+                agent_response = """Welcome! I'm so excited to help you get started on your fitness journey!
+
+To create the perfect plan for you, I'd love to learn about your goals. Could you tell me:
+• What fitness goal would you like to achieve? (For example: lose weight, build muscle, improve endurance, or just feel healthier overall)
+
+What brings you here today?"""
         else:
             # Save user's initial message
             await self.conversation_service.add_message(
@@ -133,9 +150,9 @@ What would you like to achieve?"""
                 message_content=initial_message,
             )
 
-            # Start conversation with conversation agent (no session, manual history management)
+            # Start conversation with selected agent (no session, manual history management)
             result = await Runner.run(
-                starting_agent=conversation_agent,
+                starting_agent=selected_agent,
                 input=initial_message,
                 context=plan_context,
                 session=None,  # Disable session memory, manage history manually
@@ -237,10 +254,11 @@ What would you like to achieve?"""
             preferences=user.preferences or {},
         )
 
-        # Create plan context
+        # Create plan context with conversation history
         plan_context = PlanContext(
             user_context=user_context,
             requirements={},
+            conversation_history=conversation_history,  # Pass full conversation history through context
         )
 
         # Save user's message before processing
@@ -250,12 +268,15 @@ What would you like to achieve?"""
             message_content=user_message,
         )
 
-        # Continue conversation with full message history (no session)
-        # Pass the entire conversation history as a list of messages
+        # Check if user has existing fitness plans to determine which agent to use
+        has_plans = await self.plan_service.has_existing_plans(user.id)
+        selected_agent = conversation_agent if has_plans else intake_specialist_agent
+
+        # Continue conversation with the new user message
+        # The selected agent will use its function tools (build_fitness_plan) to orchestrate
         result = await Runner.run(
-            starting_agent=conversation_agent,
-            input=conversation_history,  # Pass full conversation history
-            context=plan_context,
+            starting_agent=selected_agent,
+            input=user_message,  # Pass only the new message as string
             session=None,  # Disable session memory, manage history manually
         )
 

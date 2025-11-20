@@ -12,6 +12,7 @@ Uses OpenAI Agents SDK with function tools for exercise database queries.
 from agents import Agent
 
 from src.ai.agent import create_model_settings
+from src.ai.schemas import WorkoutPlanOutput
 from src.ai.tools import workout_tools
 
 
@@ -71,6 +72,7 @@ Use these tools to query the curated exercise database and create optimal workou
             workout_tools.get_exercises_by_difficulty,
             workout_tools.get_alternative_exercises,
         ],
+        output_type=WorkoutPlanOutput,  # Structured output
     )
 
 

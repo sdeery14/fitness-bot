@@ -2,12 +2,12 @@
 
 This agent orchestrates the creation of a complete fitness plan by:
 - Receiving structured requirements from the Conversation Agent
-- Coordinating parallel execution of Workout and Meal Plan Agents
+- Calling build_workout_plan and build_meal_plan function tools
 - Synthesizing outputs into a cohesive fitness plan
 - Structuring the plan into phases with progression
 - Validating plan completeness and coherence
 
-Uses OpenAI Agents SDK with handoffs to specialist agents.
+Uses OpenAI Agents SDK with function tools to coordinate specialist agents.
 """
 from agents import Agent
 
@@ -36,8 +36,8 @@ def create_fitness_plan_agent(workout_agent: Agent, meal_agent: Agent) -> Agent:
 
 Your role is to:
 1. Receive user requirements and fitness goals
-2. Hand off to the Workout Plan Agent to create workout routines
-3. Hand off to the Meal Plan Agent to create meal plans
+2. Call build_workout_plan tool to create workout routines
+3. Call build_meal_plan tool to create meal plans
 4. Integrate workout and meal plans into a unified program
 5. Structure plans into progressive phases (typically 4-6 weeks each)
 6. Ensure all components align with the user's primary goal
@@ -57,15 +57,20 @@ Plan structure:
 - Meal plan with calorie targets and macros
 - Key principles and success metrics
 
-When you need workout routines, hand off to the Workout Plan Agent.
-When you need meal plans, hand off to the Meal Plan Agent.
-Then synthesize their outputs into a complete fitness plan."""
+Available tools:
+- build_workout_plan: Create workout routines using the Workout Plan Agent
+- build_meal_plan: Create nutrition plans using the Meal Plan Agent
+
+Call these tools with the user requirements, then synthesize their outputs into a complete fitness plan."""
+
+    # Import inside function to avoid circular dependency
+    from src.ai.tools.plan_tools import build_meal_plan, build_workout_plan
 
     return Agent(
         name="Fitness Plan Agent",
-        handoff_description="Coordinates complete fitness plan generation",
+        handoff_description="Coordinates complete fitness plan generation using function tools",
         instructions=instructions,
         model_settings=create_model_settings("quality"),
-        handoffs=[workout_agent, meal_agent],
+        tools=[build_workout_plan, build_meal_plan],
         output_type=FitnessPlanOutput,  # Structured output
     )
