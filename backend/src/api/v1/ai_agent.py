@@ -210,6 +210,9 @@ async def send_message(
             detail=str(e),
         ) from e
     except Exception as e:
+        import traceback
+        error_details = traceback.format_exc()
+        print(f"ERROR in send_message: {error_details}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to send message: {str(e)}",
