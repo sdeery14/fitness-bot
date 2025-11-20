@@ -4,6 +4,8 @@ These tools enable the conversation agent to orchestrate plan generation
 by calling specialist agents via function tools.
 """
 import json
+from contextvars import ContextVar
+from uuid import UUID
 
 from agents import Runner, function_tool
 from pydantic import BaseModel, Field
@@ -16,6 +18,33 @@ from src.ai.schemas import (
     MealPlanOutput,
     WorkoutPlanOutput,
 )
+
+# Context variables for passing user_id and db_session to function tools
+_user_id_context: ContextVar[UUID | None] = ContextVar("user_id", default=None)
+_db_session_context: ContextVar[object | None] = ContextVar("db_session", default=None)
+
+
+def set_plan_tools_context(user_id: UUID, db_session: object) -> None:
+    """Set the context for plan tools to enable database persistence.
+
+    This should be called by the AI service before invoking agents that use
+    the build_fitness_plan tool.
+
+    Args:
+        user_id: User's UUID for plan ownership
+        db_session: Database session for persistence operations
+    """
+    _user_id_context.set(user_id)
+    _db_session_context.set(db_session)
+
+
+def clear_plan_tools_context() -> None:
+    """Clear the plan tools context after agent execution.
+
+    This ensures context doesn't leak between different user requests.
+    """
+    _user_id_context.set(None)
+    _db_session_context.set(None)
 
 
 class WorkoutPlanInput(BaseModel):
@@ -153,6 +182,9 @@ async def build_fitness_plan(requirements: FitnessPlanInput) -> str:
     to generate a complete fitness plan. It coordinates the specialist agents
     and returns a structured plan as JSON.
 
+    The user_id and db_session are retrieved from context variables set by the
+    AI service before invoking the agent.
+
     Args:
         requirements: FitnessPlanInput with all required parameters
 
@@ -203,9 +235,48 @@ Time per Session: {requirements.time_per_session} minutes
         # Validate plan completeness
         fitness_plan_output.validate_completeness()
 
-        # TODO: Save plan to database here (will be implemented in Phase 4)
-        # For now, return the plan with a placeholder ID
+        # Get user_id and db_session from context
+        user_id = _user_id_context.get()
+        db_session = _db_session_context.get()
+
+        # Save plan to database if user_id and db_session are available
         plan_id = "pending_save"
+        if user_id and db_session:
+            try:
+                from src.services.plan_service import PlanService
+
+                # Create plan service
+                plan_service = PlanService(db_session)
+
+                # Create fitness plan record
+                fitness_plan = await plan_service.create_plan(
+                    user_id=user_id,
+                    goal=requirements.primary_goal,
+                    requirements={
+                        "fitness_level": requirements.fitness_level,
+                        "workout_frequency": requirements.workout_frequency,
+                        "equipment_access": requirements.equipment_access,
+                        "time_per_session": requirements.time_per_session,
+                        "dietary_restrictions": requirements.dietary_restrictions,
+                        "meal_frequency": requirements.meal_frequency,
+                        "injuries_or_conditions": requirements.injuries_or_conditions,
+                    },
+                    duration_weeks=fitness_plan_output.duration_weeks,
+                )
+
+                # Save the complete generated plan data
+                await plan_service.save_generated_plan(
+                    plan_id=fitness_plan.id,
+                    plan_output=fitness_plan_output.model_dump(),
+                )
+
+                plan_id = str(fitness_plan.id)
+
+            except Exception as save_error:
+                # Log the error but don't fail the entire operation
+                # The plan was generated successfully, we just couldn't save it
+                print(f"Warning: Failed to save plan to database: {save_error}")
+                plan_id = f"not_saved_{save_error}"
 
         result_dict = {
             "fitness_plan": fitness_plan_output.model_dump(),
@@ -213,7 +284,7 @@ Time per Session: {requirements.time_per_session} minutes
             "message": f"Successfully created a {fitness_plan_output.duration_weeks}-week fitness plan for {requirements.primary_goal}!",
             "plan_id": plan_id,
         }
-        
+
         return json.dumps(result_dict, indent=2)
 
     except Exception as e:

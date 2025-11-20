@@ -272,13 +272,22 @@ What brings you here today?"""
         has_plans = await self.plan_service.has_existing_plans(user.id)
         selected_agent = conversation_agent if has_plans else intake_specialist_agent
 
-        # Continue conversation with the new user message
-        # The selected agent will use its function tools (build_fitness_plan) to orchestrate
-        result = await Runner.run(
-            starting_agent=selected_agent,
-            input=user_message,  # Pass only the new message as string
-            session=None,  # Disable session memory, manage history manually
-        )
+        # Set context for plan tools (enables database persistence)
+        from src.ai.tools.plan_tools import set_plan_tools_context, clear_plan_tools_context
+
+        set_plan_tools_context(user_id=user.id, db_session=self.db)
+
+        try:
+            # Continue conversation with the new user message
+            # The selected agent will use its function tools (build_fitness_plan) to orchestrate
+            result = await Runner.run(
+                starting_agent=selected_agent,
+                input=user_message,  # Pass only the new message as string
+                session=None,  # Disable session memory, manage history manually
+            )
+        finally:
+            # Always clear context to prevent leakage between requests
+            clear_plan_tools_context()
 
         # Extract response
         agent_response = result.final_output if result.final_output else "I understand. Let me help you with that."
