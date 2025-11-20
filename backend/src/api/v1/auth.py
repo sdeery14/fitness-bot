@@ -18,7 +18,7 @@ class RegisterRequest(BaseModel):
     password: str
     full_name: str
     date_of_birth: str
-    current_fitness_level: str
+    current_fitness_level: str | None = None
 
     @field_validator('password')
     @classmethod
@@ -81,7 +81,7 @@ async def register(
             password=request.password,
             name=request.full_name,
             date_of_birth=request.date_of_birth,
-            fitness_level=request.current_fitness_level,
+            fitness_level=request.current_fitness_level or None,
         )
     except ValueError as e:
         # Check if it's a duplicate email error

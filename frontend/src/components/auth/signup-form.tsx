@@ -15,7 +15,6 @@ interface SignupData {
   password: string;
   confirmPassword: string;
   date_of_birth: string;
-  current_fitness_level: string;
 }
 
 export function SignupForm() {
@@ -26,7 +25,6 @@ export function SignupForm() {
     password: "",
     confirmPassword: "",
     date_of_birth: "",
-    current_fitness_level: "beginner",
   });
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -78,7 +76,6 @@ export function SignupForm() {
           email: formData.email,
           password: formData.password,
           date_of_birth: formData.date_of_birth,
-          current_fitness_level: formData.current_fitness_level,
         }),
       });
 
@@ -217,23 +214,6 @@ export function SignupForm() {
               disabled={isLoading}
               max={new Date().toISOString().split('T')[0]}
             />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="current_fitness_level">Current Fitness Level</Label>
-            <select
-              id="current_fitness_level"
-              name="current_fitness_level"
-              value={formData.current_fitness_level}
-              onChange={(e) => setFormData(prev => ({ ...prev, current_fitness_level: e.target.value }))}
-              required
-              disabled={isLoading}
-              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-            >
-              <option value="beginner">Beginner</option>
-              <option value="intermediate">Intermediate</option>
-              <option value="advanced">Advanced</option>
-            </select>
           </div>
         </CardContent>
 
