@@ -39,8 +39,10 @@ export function DailySchedule() {
   const [showSkipDialog, setShowSkipDialog] = useState(false);
   const [notes, setNotes] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    setMounted(true);
     fetchTodaySchedule();
   }, [fetchTodaySchedule]);
 
@@ -146,7 +148,9 @@ export function DailySchedule() {
       <Card>
         <CardHeader>
           <CardTitle>Today&apos;s Schedule</CardTitle>
-          <CardDescription>{new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</CardDescription>
+          <CardDescription>
+            {mounted ? new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) : ''}
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <p className="text-muted-foreground">No activities scheduled for today. Enjoy your rest day!</p>
@@ -172,12 +176,12 @@ export function DailySchedule() {
             <div>
               <CardTitle id="daily-schedule-title">Today&apos;s Schedule</CardTitle>
               <CardDescription>
-                {new Date(todaySchedule.date).toLocaleDateString('en-US', {
+                {mounted ? new Date(todaySchedule.date).toLocaleDateString('en-US', {
                   weekday: 'long',
                   year: 'numeric',
                   month: 'long',
                   day: 'numeric',
-                })}
+                }) : ''}
               </CardDescription>
             </div>
             <div className="text-right">
