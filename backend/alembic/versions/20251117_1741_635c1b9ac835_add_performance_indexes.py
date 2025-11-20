@@ -20,38 +20,38 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     """Add performance indexes for frequently queried columns."""
-    # Users table indexes
-    op.create_index('ix_users_email', 'users', ['email'], unique=False)
+    # Users table indexes (skip if exists from earlier migration)
+    op.create_index('ix_users_email', 'users', ['email'], unique=False, if_not_exists=True)
 
     # FitnessPlans table indexes
-    op.create_index('ix_fitness_plans_user_id', 'fitness_plans', ['user_id'], unique=False)
-    op.create_index('ix_fitness_plans_status', 'fitness_plans', ['status'], unique=False)
-    op.create_index('ix_fitness_plans_user_status', 'fitness_plans', ['user_id', 'status'], unique=False)
+    op.create_index('ix_fitness_plans_user_id', 'fitness_plans', ['user_id'], unique=False, if_not_exists=True)
+    op.create_index('ix_fitness_plans_status', 'fitness_plans', ['status'], unique=False, if_not_exists=True)
+    op.create_index('ix_fitness_plans_user_status', 'fitness_plans', ['user_id', 'status'], unique=False, if_not_exists=True)
 
     # ScheduleEntries table indexes
-    op.create_index('ix_schedule_entries_schedule_id', 'schedule_entries', ['schedule_id'], unique=False)
-    op.create_index('ix_schedule_entries_entry_date', 'schedule_entries', ['entry_date'], unique=False)
-    op.create_index('ix_schedule_entries_completion_status', 'schedule_entries', ['completion_status'], unique=False)
-    op.create_index('ix_schedule_entries_user_date', 'schedule_entries', ['schedule_id', 'entry_date'], unique=False)
+    op.create_index('ix_schedule_entries_schedule_id', 'schedule_entries', ['schedule_id'], unique=False, if_not_exists=True)
+    op.create_index('ix_schedule_entries_entry_date', 'schedule_entries', ['entry_date'], unique=False, if_not_exists=True)
+    op.create_index('ix_schedule_entries_completion_status', 'schedule_entries', ['completion_status'], unique=False, if_not_exists=True)
+    op.create_index('ix_schedule_entries_user_date', 'schedule_entries', ['schedule_id', 'entry_date'], unique=False, if_not_exists=True)
 
     # ProgressRecords table indexes
-    op.create_index('ix_progress_records_user_id', 'progress_records', ['user_id'], unique=False)
-    op.create_index('ix_progress_records_fitness_plan_id', 'progress_records', ['fitness_plan_id'], unique=False)
-    op.create_index('ix_progress_records_record_date', 'progress_records', ['record_date'], unique=False)
-    op.create_index('ix_progress_records_record_type', 'progress_records', ['record_type'], unique=False)
+    op.create_index('ix_progress_records_user_id', 'progress_records', ['user_id'], unique=False, if_not_exists=True)
+    op.create_index('ix_progress_records_fitness_plan_id', 'progress_records', ['fitness_plan_id'], unique=False, if_not_exists=True)
+    op.create_index('ix_progress_records_record_date', 'progress_records', ['record_date'], unique=False, if_not_exists=True)
+    op.create_index('ix_progress_records_record_type', 'progress_records', ['record_type'], unique=False, if_not_exists=True)
 
     # Conversations table indexes
-    op.create_index('ix_conversations_user_id', 'conversations', ['user_id'], unique=False)
-    op.create_index('ix_conversations_status', 'conversations', ['status'], unique=False)
+    op.create_index('ix_conversations_user_id', 'conversations', ['user_id'], unique=False, if_not_exists=True)
+    op.create_index('ix_conversations_status', 'conversations', ['status'], unique=False, if_not_exists=True)
 
     # Messages table indexes
-    op.create_index('ix_messages_conversation_id', 'messages', ['conversation_id'], unique=False)
-    op.create_index('ix_messages_created_at', 'messages', ['created_at'], unique=False)
+    op.create_index('ix_messages_conversation_id', 'messages', ['conversation_id'], unique=False, if_not_exists=True)
+    op.create_index('ix_messages_created_at', 'messages', ['created_at'], unique=False, if_not_exists=True)
 
     # DisruptionEvents table indexes
-    op.create_index('ix_disruption_events_user_id', 'disruption_events', ['user_id'], unique=False)
-    op.create_index('ix_disruption_events_fitness_plan_id', 'disruption_events', ['fitness_plan_id'], unique=False)
-    op.create_index('ix_disruption_events_start_date', 'disruption_events', ['start_date'], unique=False)
+    op.create_index('ix_disruption_events_user_id', 'disruption_events', ['user_id'], unique=False, if_not_exists=True)
+    op.create_index('ix_disruption_events_fitness_plan_id', 'disruption_events', ['fitness_plan_id'], unique=False, if_not_exists=True)
+    op.create_index('ix_disruption_events_start_date', 'disruption_events', ['start_date'], unique=False, if_not_exists=True)
 
 
 def downgrade() -> None:
