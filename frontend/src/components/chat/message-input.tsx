@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, KeyboardEvent } from "react";
+import { useState, KeyboardEvent, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Send } from "lucide-react";
@@ -17,6 +17,7 @@ export function MessageInput({
   placeholder = "Type your message...",
 }: MessageInputProps) {
   const [input, setInput] = useState("");
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const handleSubmit = (e?: React.FormEvent) => {
     e?.preventDefault();
@@ -26,6 +27,11 @@ export function MessageInput({
 
     onSendMessage(trimmedInput);
     setInput("");
+    
+    // Refocus the textarea after sending message
+    setTimeout(() => {
+      textareaRef.current?.focus();
+    }, 0);
   };
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -41,6 +47,7 @@ export function MessageInput({
       <form onSubmit={handleSubmit} className="max-w-3xl mx-auto px-4" aria-label="Send message form">
         <div className="relative flex items-end gap-2 bg-white border-2 border-gray-300 rounded-2xl shadow-lg focus-within:border-blue-500 focus-within:shadow-xl transition-all">
           <Textarea
+            ref={textareaRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
@@ -50,6 +57,7 @@ export function MessageInput({
             rows={1}
             aria-label="Message input"
             aria-describedby="message-input-help"
+            autoFocus
           />
           <button
             type="submit"
