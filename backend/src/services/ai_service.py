@@ -150,12 +150,15 @@ What brings you here today?"""
                 message_content=initial_message,
             )
 
-            # Start conversation with selected agent (no session, manual history management)
+            # Create session for this conversation to maintain state
+            agent_session = Session(id=str(db_conversation.id))
+            
+            # Start conversation with selected agent
             result = await Runner.run(
                 starting_agent=selected_agent,
                 input=initial_message,
                 context=plan_context,
-                session=None,  # Disable session memory, manage history manually
+                session=agent_session,  # Enable session memory for multi-turn conversations
             )
 
             # Extract response from result
@@ -279,10 +282,11 @@ What brings you here today?"""
 
         try:
             # Continue conversation with the new user message
-            # The selected agent will use its function tools (build_fitness_plan) to orchestrate
+            # Pass conversation history as messages parameter for multi-turn context
             result = await Runner.run(
                 starting_agent=selected_agent,
-                input=user_message,  # Pass only the new message as string
+                input=user_message,  # Current user message
+                messages=conversation_history,  # Full conversation history for context
                 session=None,  # Disable session memory, manage history manually
             )
         finally:
