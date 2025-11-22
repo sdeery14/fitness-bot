@@ -13,11 +13,7 @@ from pydantic import BaseModel, Field
 from src.ai.app_agents.fitness_plan_agent import create_fitness_plan_agent
 from src.ai.app_agents.meal_plan_agent import meal_plan_agent
 from src.ai.app_agents.workout_plan_agent import workout_plan_agent
-from src.ai.schemas import (
-    FitnessPlanOutput,
-    MealPlanOutput,
-    WorkoutPlanOutput,
-)
+from src.ai.schemas import FitnessPlanOutput
 
 # Context variables for passing user_id and db_session to function tools
 _user_id_context: ContextVar[UUID | None] = ContextVar("user_id", default=None)
@@ -119,7 +115,6 @@ Time per session: {requirements.time_per_session} minutes
     result = await Runner.run(
         starting_agent=workout_plan_agent,
         input=prompt,
-        output_type=WorkoutPlanOutput,
         session=None,
     )
 
@@ -163,7 +158,6 @@ Meal Frequency: {requirements.meal_frequency} meals per day
     result = await Runner.run(
         starting_agent=meal_plan_agent,
         input=prompt,
-        output_type=MealPlanOutput,
         session=None,
     )
 
@@ -222,7 +216,6 @@ Time per Session: {requirements.time_per_session} minutes
         result = await Runner.run(
             starting_agent=fitness_agent,
             input=prompt,
-            output_type=FitnessPlanOutput,
             session=None,
         )
 
