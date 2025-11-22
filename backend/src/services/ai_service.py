@@ -236,19 +236,13 @@ What brings you here today?"""
         if not db_conversation:
             raise ValueError(f"Conversation not found: {conversation_id}")
 
-        # Build complete conversation history from database
+        # Build complete conversation history from database messages
         conversation_history = []
         for msg in db_conversation.messages:
             conversation_history.append({
                 "role": "user" if msg.sender_type == "user" else "assistant",
                 "content": msg.message_content,
             })
-
-        # Add the new user message to history
-        conversation_history.append({
-            "role": "user",
-            "content": user_message,
-        })
 
         # Reconstruct user context
         user_context = UserContext(
@@ -282,11 +276,12 @@ What brings you here today?"""
 
         try:
             # Continue conversation with the new user message
-            # Pass conversation history as messages parameter for multi-turn context
+            # Append new user message to conversation history
+            conversation_input = conversation_history + [{"role": "user", "content": user_message}]
+            
             result = await Runner.run(
                 starting_agent=selected_agent,
-                input=user_message,  # Current user message
-                messages=conversation_history,  # Full conversation history for context
+                input=conversation_input,  # Pass full conversation history including new message
                 session=None,  # Disable session memory, manage history manually
             )
         finally:
