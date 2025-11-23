@@ -152,17 +152,15 @@ export default function ChatPage() {
       return;
     }
 
-    // Optimistically add user message to chat immediately
-    const tempMessageId = `temp-${Date.now()}`;
-    setMessages((prev) => [
-      ...prev,
-      {
-        id: tempMessageId,
-        sender_type: "user",
-        message_content: content,
-        created_at: new Date().toISOString(),
-      },
-    ]);
+    // Add user message to chat immediately (optimistic UI)
+    const userMessage: Message = {
+      id: `user-${Date.now()}`,
+      sender_type: "user",
+      message_content: content,
+      created_at: new Date().toISOString(),
+    };
+    
+    setMessages((prev) => [...prev, userMessage]);
 
     try {
       const res = await fetch(`${API_URL}/ai/conversations/${conversationId}/messages`, {
@@ -193,29 +191,19 @@ export default function ChatPage() {
       // Extract AI response - check multiple possible keys
       const aiResponse = responseData.assistant_response || responseData.agent_response || responseData.assistant_message?.content;
 
-      // Replace optimistic user message with confirmed one and add AI response
-      setMessages((prev) => {
-        const withoutTemp = prev.filter((m) => m.id !== tempMessageId);
-        
-        return [
-          ...withoutTemp,
-          { 
-            id: responseData.message_id || Date.now().toString(), 
-            sender_type: "user", 
-            message_content: content,
-            created_at: new Date().toISOString(),
-          },
-          { 
-            id: (Date.now() + 1).toString(), 
-            sender_type: "ai", 
-            message_content: aiResponse || "I'm processing your request...",
-            created_at: new Date().toISOString(),
-          },
-        ];
-      });
+      // Add AI response to chat
+      setMessages((prev) => [
+        ...prev,
+        { 
+          id: (Date.now() + 1).toString(), 
+          sender_type: "ai", 
+          message_content: aiResponse || "I'm processing your request...",
+          created_at: new Date().toISOString(),
+        },
+      ]);
     } catch (err) {
       // Remove optimistic message on error
-      setMessages((prev) => prev.filter((m) => m.id !== tempMessageId));
+      setMessages((prev) => prev.filter((m) => m.id !== userMessage.id));
       setError(err instanceof Error ? err.message : "Failed to send message");
       console.error("Error sending message:", err);
       throw err; // Re-throw to handle in ChatInterface

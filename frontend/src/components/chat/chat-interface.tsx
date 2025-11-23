@@ -34,7 +34,7 @@ export function ChatInterface({
       
       <MessageInput
         onSendMessage={handleSendMessage}
-        disabled={isLoading}
+        isSending={isLoading}
         placeholder="Tell me about your fitness goals, dietary preferences, or ask questions..."
       />
     </div>

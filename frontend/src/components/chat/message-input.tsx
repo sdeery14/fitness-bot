@@ -7,14 +7,14 @@ import { Send } from "lucide-react";
 
 interface MessageInputProps {
   onSendMessage: (content: string) => void;
-  disabled?: boolean;
+  isSending?: boolean;
   placeholder?: string;
 }
 
-export function MessageInput({
-  onSendMessage,
-  disabled = false,
-  placeholder = "Type your message...",
+export function MessageInput({ 
+  onSendMessage, 
+  isSending = false,
+  placeholder = "Type your message..." 
 }: MessageInputProps) {
   const [input, setInput] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -23,7 +23,7 @@ export function MessageInput({
     e?.preventDefault();
     
     const trimmedInput = input.trim();
-    if (!trimmedInput || disabled) return;
+    if (!trimmedInput || isSending) return;
 
     onSendMessage(trimmedInput);
     setInput("");
@@ -52,7 +52,6 @@ export function MessageInput({
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder={placeholder}
-            disabled={disabled}
             className="min-h-[52px] max-h-[200px] resize-none flex-1 bg-transparent border-0 px-4 py-3 text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-0"
             rows={1}
             aria-label="Message input"
@@ -61,12 +60,16 @@ export function MessageInput({
           />
           <button
             type="submit"
-            disabled={disabled || !input.trim()}
+            disabled={isSending || !input.trim()}
             className="flex-shrink-0 m-2 h-10 w-10 inline-flex items-center justify-center text-white rounded-xl transition-all disabled:opacity-40 disabled:cursor-not-allowed bg-blue-600 hover:bg-blue-700 active:bg-blue-800"
             aria-label="Send message"
-            aria-disabled={disabled || !input.trim()}
+            aria-disabled={isSending || !input.trim()}
           >
-            <Send className="h-5 w-5" aria-hidden="true" />
+            {isSending ? (
+              <div className="h-5 w-5 animate-spin rounded-full border-2 border-solid border-current border-r-transparent" aria-hidden="true" />
+            ) : (
+              <Send className="h-5 w-5" aria-hidden="true" />
+            )}
             <span className="sr-only">Send message</span>
           </button>
         </div>
