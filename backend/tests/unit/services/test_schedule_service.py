@@ -5,7 +5,6 @@ from uuid import uuid4
 
 import pytest
 
-from src.models.conversation import DisruptionSeverity, DisruptionType, ResolutionStrategy
 from src.services.schedule_service import ScheduleService
 
 
