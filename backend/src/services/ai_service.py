@@ -391,8 +391,9 @@ What brings you here today?"""
             generated_plan = self._parse_plan_result(result)
 
             # If we got structured output, save it to database
-            if hasattr(result, 'output_data') and result.output_data:
-                plan_data = result.output_data.model_dump()
+            # When agent has output_type defined, final_output contains the structured object
+            if result.final_output and hasattr(result.final_output, 'model_dump'):
+                plan_data = result.final_output.model_dump()
                 await self.plan_service.save_generated_plan(
                     plan_id=plan.id,
                     plan_output=plan_data,
@@ -462,17 +463,23 @@ What brings you here today?"""
             Structured plan data dictionary
         """
         # Check if we have structured output (Pydantic model)
-        if hasattr(result, 'output_data') and result.output_data:
-            return result.output_data.model_dump()
+        # When agent has output_type defined, final_output contains the structured object
+        if result.final_output and hasattr(result.final_output, 'model_dump'):
+            return result.final_output.model_dump()
 
-        # Fallback to raw text output
+        # Fallback to raw text output (if agent didn't have output_type)
         if not result.final_output:
             return {"error": "No plan generated"}
 
-        return {
-            "raw_output": result.final_output,
-            "type": "text",
-        }
+        # If final_output is a string
+        if isinstance(result.final_output, str):
+            return {
+                "raw_output": result.final_output,
+                "type": "text",
+            }
+
+        # If final_output is already a dict or other object
+        return result.final_output
 
     def _is_plan_generated(self, agent_response: str) -> bool:
         """Check if the agent response contains a generated plan.
@@ -592,9 +599,10 @@ What brings you here today?"""
             )
 
             # Extract structured output
-            if hasattr(result, 'output_data') and result.output_data:
+            # When agent has output_type defined, final_output contains the structured object
+            if result.final_output and hasattr(result.final_output, 'model_dump'):
                 # Convert Pydantic model to dict for storage
-                plan_data = result.output_data.model_dump()
+                plan_data = result.final_output.model_dump()
 
                 # Save the complete plan to database
                 await self.plan_service.save_generated_plan(

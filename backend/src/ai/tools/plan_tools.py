@@ -3,6 +3,7 @@
 These tools enable the conversation agent to orchestrate plan generation
 by calling specialist agents via function tools.
 """
+
 import json
 from contextvars import ContextVar
 from uuid import UUID
@@ -45,41 +46,59 @@ def clear_plan_tools_context() -> None:
 
 class WorkoutPlanInput(BaseModel):
     """Input parameters for workout plan generation."""
-    
+
     model_config = {"extra": "forbid"}
-    
-    primary_goal: str = Field(description="Primary fitness goal (e.g., 'muscle_gain', 'weight_loss')")
+
+    primary_goal: str = Field(
+        description="Primary fitness goal (e.g., 'muscle_gain', 'weight_loss')"
+    )
     fitness_level: str = Field(description="Fitness level: beginner, intermediate, or advanced")
     workout_frequency: int = Field(description="Number of workout days per week", ge=2, le=7)
-    equipment_access: str = Field(description="Available equipment: full_gym, home_gym, or bodyweight")
-    time_per_session: int = Field(default=60, description="Time per workout in minutes", ge=20, le=120)
-    injuries_or_conditions: list[str] = Field(default_factory=list, description="Any injuries or health conditions")
+    equipment_access: str = Field(
+        description="Available equipment: full_gym, home_gym, or bodyweight"
+    )
+    time_per_session: int = Field(
+        default=60, description="Time per workout in minutes", ge=20, le=120
+    )
+    injuries_or_conditions: list[str] = Field(
+        default_factory=list, description="Any injuries or health conditions"
+    )
 
 
 class MealPlanInput(BaseModel):
     """Input parameters for meal plan generation."""
-    
+
     model_config = {"extra": "forbid"}
-    
-    primary_goal: str = Field(description="Primary fitness goal (e.g., 'muscle_gain', 'weight_loss', 'maintenance')")
-    dietary_restrictions: list[str] = Field(default_factory=list, description="Dietary restrictions like vegetarian, vegan, gluten_free")
+
+    primary_goal: str = Field(
+        description="Primary fitness goal (e.g., 'muscle_gain', 'weight_loss', 'maintenance')"
+    )
+    dietary_restrictions: list[str] = Field(
+        default_factory=list, description="Dietary restrictions like vegetarian, vegan, gluten_free"
+    )
     meal_frequency: int = Field(default=3, description="Number of meals per day", ge=3, le=6)
     preferences: str = Field(default="", description="Additional dietary preferences")
 
 
 class FitnessPlanInput(BaseModel):
     """Input parameters for complete fitness plan generation."""
-    
+
     model_config = {"extra": "forbid"}
-    
+
     primary_goal: str = Field(description="Primary fitness goal")
     fitness_level: str = Field(description="Fitness level: beginner, intermediate, or advanced")
     workout_frequency: int = Field(description="Workout days per week", ge=2, le=7)
     equipment_access: str = Field(description="Available equipment")
-    time_per_session: int = Field(default=60, description="Time per workout in minutes", ge=20, le=120)
-    dietary_restrictions: list[str] = Field(default_factory=list, description="Dietary restrictions")
+    time_per_session: int = Field(
+        default=60, description="Time per workout in minutes", ge=20, le=120
+    )
+    dietary_restrictions: list[str] = Field(
+        default_factory=list, description="Dietary restrictions"
+    )
     meal_frequency: int = Field(default=3, description="Meals per day", ge=3, le=6)
-    injuries_or_conditions: list[str] = Field(default_factory=list, description="Injuries or health conditions")
+    injuries_or_conditions: list[str] = Field(
+        default_factory=list, description="Injuries or health conditions"
+    )
 
 
 @function_tool
@@ -109,7 +128,9 @@ Time per session: {requirements.time_per_session} minutes
 """
 
     if requirements.injuries_or_conditions:
-        prompt += f"\nInjuries/Conditions to consider: {', '.join(requirements.injuries_or_conditions)}"
+        prompt += (
+            f"\nInjuries/Conditions to consider: {', '.join(requirements.injuries_or_conditions)}"
+        )
 
     # Run workout plan agent with structured output
     result = await Runner.run(
@@ -118,9 +139,11 @@ Time per session: {requirements.time_per_session} minutes
         session=None,
     )
 
-    # Extract structured output and return as JSON string
-    if hasattr(result, "output_data") and result.output_data:
-        return json.dumps(result.output_data.model_dump(), indent=2)
+    # Extract structured output from final_output
+    # When agent has output_type defined, final_output contains the structured object
+    if result.final_output:
+        # final_output is of type WorkoutPlanOutput when workout_plan_agent has output_type=WorkoutPlanOutput
+        return json.dumps(result.final_output.model_dump(), indent=2)
 
     raise ValueError("Workout Plan Agent did not return structured output")
 
@@ -161,9 +184,11 @@ Meal Frequency: {requirements.meal_frequency} meals per day
         session=None,
     )
 
-    # Extract structured output and return as JSON string
-    if hasattr(result, "output_data") and result.output_data:
-        return json.dumps(result.output_data.model_dump(), indent=2)
+    # Extract structured output from final_output
+    # When agent has output_type defined, final_output contains the structured object
+    if result.final_output:
+        # final_output is of type MealPlanOutput when meal_plan_agent has output_type=MealPlanOutput
+        return json.dumps(result.final_output.model_dump(), indent=2)
 
     raise ValueError("Meal Plan Agent did not return structured output")
 
@@ -219,11 +244,13 @@ Time per Session: {requirements.time_per_session} minutes
             session=None,
         )
 
-        # Extract structured output
-        if not (hasattr(result, "output_data") and result.output_data):
+        # Extract structured output from final_output
+        # When agent has output_type defined, final_output contains the structured object
+        if not result.final_output:
             raise ValueError("Fitness Plan Agent did not return structured output")
 
-        fitness_plan_output: FitnessPlanOutput = result.output_data
+        # final_output is of type FitnessPlanOutput when fitness_agent has output_type=FitnessPlanOutput
+        fitness_plan_output: FitnessPlanOutput = result.final_output
 
         # Validate plan completeness
         fitness_plan_output.validate_completeness()
