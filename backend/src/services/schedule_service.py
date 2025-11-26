@@ -248,6 +248,32 @@ class ScheduleService:
 
             current_date += timedelta(days=1)
 
+    async def get_schedule_by_plan(
+        self,
+        fitness_plan_id: UUID,
+    ) -> Schedule | None:
+        """Get schedule for a specific fitness plan.
+
+        Args:
+            fitness_plan_id: Fitness plan UUID
+
+        Returns:
+            Schedule with entries, or None if not found
+        """
+        stmt = (
+            select(Schedule)
+            .where(Schedule.fitness_plan_id == fitness_plan_id)
+            .options(
+                selectinload(Schedule.entries)
+                .selectinload(ScheduleEntry.workout),
+                selectinload(Schedule.entries)
+                .selectinload(ScheduleEntry.meal),
+            )
+        )
+
+        result = await self.db.execute(stmt)
+        return result.scalar_one_or_none()
+
     async def get_today_schedule(
         self,
         user_id: UUID,

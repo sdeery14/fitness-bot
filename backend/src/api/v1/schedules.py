@@ -1,5 +1,5 @@
 """Schedule endpoints for daily workout and meal tracking."""
-from datetime import date
+from datetime import date, timedelta
 from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, status
@@ -16,6 +16,98 @@ from src.schemas.schedule import (
 from src.services.schedule_service import ScheduleService
 
 router = APIRouter()
+
+
+@router.get("/plan/{plan_id}")
+async def get_schedule_by_plan(
+    plan_id: UUID,
+    user_id: CurrentUserId,
+    db: DatabaseSession,
+):
+    """Get schedule for a specific fitness plan.
+
+    Returns the schedule and all entries for the given plan.
+
+    Args:
+        plan_id: Fitness plan UUID
+        user_id: Current authenticated user ID
+        db: Database session
+
+    Returns:
+        Schedule with entries and statistics
+    """
+    from src.services.plan_service import PlanService
+
+    # Verify plan belongs to user
+    plan_service = PlanService(db)
+    plan = await plan_service.get_plan(plan_id)
+
+    if not plan:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=create_error_response(
+                code="NOT_FOUND",
+                message=f"Fitness plan {plan_id} not found"
+            )
+        )
+
+    if plan.user_id != user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=create_error_response(
+                code="FORBIDDEN",
+                message="You don't have permission to access this plan's schedule"
+            )
+        )
+
+    service = ScheduleService(db)
+    schedule = await service.get_schedule_by_plan(fitness_plan_id=plan_id)
+
+    if not schedule:
+        return create_success_response({
+            "schedule": None,
+            "message": "No schedule found for this plan"
+        })
+
+    # Calculate statistics
+    total_entries = len(schedule.entries)
+    completed_count = sum(1 for e in schedule.entries if e.completion_status == "completed")
+    scheduled_count = sum(1 for e in schedule.entries if e.completion_status == "scheduled")
+    skipped_count = sum(1 for e in schedule.entries if e.completion_status == "skipped")
+    workout_count = sum(1 for e in schedule.entries if e.entry_type == "workout")
+    meal_count = sum(1 for e in schedule.entries if e.entry_type == "meal")
+
+    # Get upcoming entries (next 7 days)
+    today = date.today()
+    upcoming_entries = [
+        {
+            "id": str(e.id),
+            "entry_type": e.entry_type,
+            "entry_date": e.entry_date.isoformat(),
+            "entry_time": e.entry_time.isoformat() if e.entry_time else None,
+            "completion_status": e.completion_status,
+            "workout_name": e.workout.name if e.workout else None,
+            "meal_name": e.meal.name if e.meal else None,
+        }
+        for e in schedule.entries
+        if e.entry_date >= today and e.entry_date <= today + timedelta(days=7)
+    ][:20]  # Limit to 20 upcoming
+
+    return create_success_response({
+        "schedule_id": str(schedule.id),
+        "start_date": schedule.start_date.isoformat(),
+        "last_recalculated_at": schedule.last_recalculated_at.isoformat(),
+        "statistics": {
+            "total_entries": total_entries,
+            "completed": completed_count,
+            "scheduled": scheduled_count,
+            "skipped": skipped_count,
+            "total_workouts": workout_count,
+            "total_meals": meal_count,
+            "completion_rate": round(completed_count / total_entries * 100, 1) if total_entries > 0 else 0,
+        },
+        "upcoming_entries": upcoming_entries,
+    })
 
 
 @router.get("/today", response_model=TodayScheduleResponse)

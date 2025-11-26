@@ -56,6 +56,24 @@ interface FitnessPlan {
   updated_at: string;
 }
 
+interface ScheduleStatistics {
+  total_entries: number;
+  completed: number;
+  scheduled: number;
+  skipped: number;
+  total_workouts: number;
+  total_meals: number;
+  completion_rate: number;
+}
+
+interface ScheduleData {
+  schedule_id: string;
+  start_date: string;
+  last_recalculated_at: string;
+  statistics: ScheduleStatistics;
+  upcoming_entries: any[];
+}
+
 interface PhaseStatus {
   has_phases: boolean;
   current_phase: {
@@ -94,6 +112,8 @@ export default function PlanPage() {
   const [activatingPlanId, setActivatingPlanId] = useState<string | null>(null);
   const [showActivateDialog, setShowActivateDialog] = useState(false);
   const [planToActivate, setPlanToActivate] = useState<FitnessPlan | null>(null);
+  const [scheduleData, setScheduleData] = useState<ScheduleData | null>(null);
+  const [loadingSchedule, setLoadingSchedule] = useState(false);
 
   useEffect(() => {
     const token = localStorage.getItem("access_token");
@@ -140,8 +160,36 @@ export default function PlanPage() {
     }
   };
 
+  const fetchScheduleData = async (planId: string, token: string) => {
+    try {
+      setLoadingSchedule(true);
+      const response = await fetch(`${API_URL}/schedules/plan/${planId}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setScheduleData(data.data);
+      } else {
+        setScheduleData(null);
+      }
+    } catch (err) {
+      console.error("Error fetching schedule:", err);
+      setScheduleData(null);
+    } finally {
+      setLoadingSchedule(false);
+    }
+  };
+
   const selectPlan = (plan: FitnessPlan) => {
     setSelectedPlan(plan);
+
+    // Fetch schedule data for this plan
+    if (accessToken) {
+      fetchScheduleData(plan.id, accessToken);
+    }
 
     // Extract phases from plan snapshot if available
     if (plan.plan_snapshot && plan.plan_snapshot.phases) {
@@ -456,69 +504,213 @@ export default function PlanPage() {
               </Card>
             ) : (
               <div className="space-y-6">
-                {/* Plan Overview */}
+                {/* Combined Plan Details */}
                 <Card>
                   <CardHeader>
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <Target className="h-5 w-5 text-blue-600" />
-                        <CardTitle>Plan Overview</CardTitle>
+                        <CardTitle>Plan Details</CardTitle>
                       </div>
                       {getStatusBadge(selectedPlan.current_status)}
                     </div>
                     <CardDescription>
-                      Your personalized fitness journey
+                      Complete overview of your fitness plan and progress
                     </CardDescription>
                   </CardHeader>
-                  <CardContent className="space-y-4">
+                  <CardContent className="space-y-6">
+                    {/* Goal Section */}
                     <div>
-                      <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                      <h3 className="text-lg font-semibold text-gray-900 mb-3">
                         {selectedPlan.goal_description}
                       </h3>
-                      <div className="flex flex-wrap gap-4 text-sm text-gray-600">
-                        <div className="flex items-center gap-2">
-                          <Calendar className="h-4 w-4" />
-                          <span>Started: {formatDate(selectedPlan.start_date)}</span>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div className="flex flex-col gap-1">
+                          <span className="text-xs text-gray-500 uppercase">Goal Type</span>
+                          <span className="text-sm font-medium text-gray-900">
+                            {selectedPlan.goal_type.replace(/_/g, " ")}
+                          </span>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <Target className="h-4 w-4" />
-                          <span>Target: {formatDate(selectedPlan.target_end_date)}</span>
+                        <div className="flex flex-col gap-1">
+                          <span className="text-xs text-gray-500 uppercase">Started</span>
+                          <span className="text-sm font-medium text-gray-900">
+                            {formatDate(selectedPlan.start_date)}
+                          </span>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <Clock className="h-4 w-4" />
-                          <span>Duration: {selectedPlan.duration_weeks} weeks</span>
+                        <div className="flex flex-col gap-1">
+                          <span className="text-xs text-gray-500 uppercase">Target Date</span>
+                          <span className="text-sm font-medium text-gray-900">
+                            {formatDate(selectedPlan.target_end_date)}
+                          </span>
+                        </div>
+                        <div className="flex flex-col gap-1">
+                          <span className="text-xs text-gray-500 uppercase">Duration</span>
+                          <span className="text-sm font-medium text-gray-900">
+                            {selectedPlan.duration_weeks} weeks
+                          </span>
                         </div>
                       </div>
                     </div>
 
-                    {phaseStatus && phaseStatus.current_phase && (
-                      <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
-                        <div className="flex items-center justify-between mb-2">
-                          <h4 className="font-semibold text-blue-900">
-                            Current Phase: {phaseStatus.current_phase.name}
-                          </h4>
-                          <Badge variant="outline" className="bg-white">
-                            Phase {phaseStatus.current_phase.phase_number}
-                          </Badge>
+                    {/* Schedule Statistics */}
+                    {scheduleData && scheduleData.statistics && (
+                      <div className="border-t pt-6">
+                        <h4 className="font-semibold text-gray-900 mb-4">Schedule Progress</h4>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                          <div className="p-4 bg-green-50 rounded-lg border border-green-200">
+                            <div className="text-2xl font-bold text-green-700">
+                              {scheduleData.statistics.completion_rate}%
+                            </div>
+                            <div className="text-xs text-green-600 uppercase mt-1">
+                              Completion Rate
+                            </div>
+                          </div>
+                          <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                            <div className="text-2xl font-bold text-blue-700">
+                              {scheduleData.statistics.completed}
+                            </div>
+                            <div className="text-xs text-blue-600 uppercase mt-1">
+                              Completed
+                            </div>
+                          </div>
+                          <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                            <div className="text-2xl font-bold text-gray-700">
+                              {scheduleData.statistics.scheduled}
+                            </div>
+                            <div className="text-xs text-gray-600 uppercase mt-1">
+                              Scheduled
+                            </div>
+                          </div>
+                          <div className="p-4 bg-orange-50 rounded-lg border border-orange-200">
+                            <div className="text-2xl font-bold text-orange-700">
+                              {scheduleData.statistics.skipped}
+                            </div>
+                            <div className="text-xs text-orange-600 uppercase mt-1">
+                              Skipped
+                            </div>
+                          </div>
                         </div>
-                        <p className="text-sm text-blue-700 mb-3">
-                          {phaseStatus.current_phase.days_remaining} days remaining
-                        </p>
-                        <div>
-                          <p className="text-xs font-semibold text-blue-900 mb-2 uppercase">
-                            Phase Objectives:
-                          </p>
-                          <ul className="space-y-1">
-                            {phaseStatus.current_phase.objectives.map((obj: string, idx: number) => (
-                              <li key={idx} className="text-sm text-blue-800 flex items-start gap-2">
-                                <TrendingUp className="h-4 w-4 flex-shrink-0 mt-0.5" />
-                                <span>{obj}</span>
-                              </li>
-                            ))}
-                          </ul>
+                        <div className="flex gap-4 text-sm text-gray-600">
+                          <span>
+                            <strong>{scheduleData.statistics.total_workouts}</strong> Total Workouts
+                          </span>
+                          <span>•</span>
+                          <span>
+                            <strong>{scheduleData.statistics.total_meals}</strong> Total Meals
+                          </span>
+                          <span>•</span>
+                          <span>
+                            <strong>{scheduleData.statistics.total_entries}</strong> Total Entries
+                          </span>
                         </div>
                       </div>
                     )}
+
+                    {/* Current Phase */}
+                    {phaseStatus && phaseStatus.current_phase && (
+                      <div className="border-t pt-6">
+                        <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                          <div className="flex items-center justify-between mb-2">
+                            <h4 className="font-semibold text-blue-900">
+                              Current Phase: {phaseStatus.current_phase.name}
+                            </h4>
+                            <Badge variant="outline" className="bg-white">
+                              Phase {phaseStatus.current_phase.phase_number}
+                            </Badge>
+                          </div>
+                          <p className="text-sm text-blue-700 mb-3">
+                            {phaseStatus.current_phase.days_remaining} days remaining
+                          </p>
+                          <div>
+                            <p className="text-xs font-semibold text-blue-900 mb-2 uppercase">
+                              Phase Objectives:
+                            </p>
+                            <ul className="space-y-1">
+                              {phaseStatus.current_phase.objectives.map((obj: string, idx: number) => (
+                                <li key={idx} className="text-sm text-blue-800 flex items-start gap-2">
+                                  <TrendingUp className="h-4 w-4 flex-shrink-0 mt-0.5" />
+                                  <span>{obj}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Workouts & Meals */}
+                    {selectedPlan.plan_snapshot && (
+                      <div className="border-t pt-6">
+                        <div className="grid md:grid-cols-2 gap-6">
+                          {/* Workouts */}
+                          {selectedPlan.plan_snapshot.workouts && selectedPlan.plan_snapshot.workouts.length > 0 && (
+                            <div>
+                              <h4 className="font-semibold text-gray-900 mb-3">
+                                Workout Library ({selectedPlan.plan_snapshot.workouts.length})
+                              </h4>
+                              <div className="space-y-2">
+                                {selectedPlan.plan_snapshot.workouts.slice(0, 5).map((workout: any, idx: number) => (
+                                  <div
+                                    key={idx}
+                                    className="p-3 bg-gray-50 rounded-lg border border-gray-200"
+                                  >
+                                    <p className="font-medium text-gray-900 text-sm">{workout.name}</p>
+                                    <p className="text-xs text-gray-600">
+                                      {workout.type} • {workout.duration_minutes || 45} min
+                                    </p>
+                                  </div>
+                                ))}
+                                {selectedPlan.plan_snapshot.workouts.length > 5 && (
+                                  <p className="text-xs text-gray-500 text-center py-2">
+                                    +{selectedPlan.plan_snapshot.workouts.length - 5} more workouts
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Meals */}
+                          {selectedPlan.plan_snapshot.meals && selectedPlan.plan_snapshot.meals.length > 0 && (
+                            <div>
+                              <h4 className="font-semibold text-gray-900 mb-3">
+                                Meal Library ({selectedPlan.plan_snapshot.meals.length})
+                              </h4>
+                              <div className="space-y-2">
+                                {selectedPlan.plan_snapshot.meals.slice(0, 5).map((meal: any, idx: number) => (
+                                  <div
+                                    key={idx}
+                                    className="p-3 bg-gray-50 rounded-lg border border-gray-200"
+                                  >
+                                    <p className="font-medium text-gray-900 text-sm">{meal.name}</p>
+                                    <p className="text-xs text-gray-600">
+                                      {meal.time} • {meal.calories || 0} cal
+                                    </p>
+                                  </div>
+                                ))}
+                                {selectedPlan.plan_snapshot.meals.length > 5 && (
+                                  <p className="text-xs text-gray-500 text-center py-2">
+                                    +{selectedPlan.plan_snapshot.meals.length - 5} more meals
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Plan Metadata */}
+                    <div className="border-t pt-6 text-xs text-gray-500">
+                      <div className="flex justify-between">
+                        <span>Created: {formatDate(selectedPlan.created_at)}</span>
+                        <span>Last updated: {formatDate(selectedPlan.updated_at)}</span>
+                      </div>
+                      {scheduleData && (
+                        <div className="mt-2">
+                          Schedule last recalculated: {formatDate(scheduleData.last_recalculated_at)}
+                        </div>
+                      )}
+                    </div>
                   </CardContent>
                 </Card>
 
@@ -536,73 +728,6 @@ export default function PlanPage() {
                         phases={phases}
                         currentPhaseNumber={phaseStatus?.current_phase?.phase_number || 1}
                       />
-                    </CardContent>
-                  </Card>
-                )}
-
-                {/* Plan Details */}
-                {selectedPlan.plan_snapshot && (
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Plan Details</CardTitle>
-                      <CardDescription>
-                        Generated on {formatDate(selectedPlan.created_at)}
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-4">
-                        {selectedPlan.plan_snapshot.workouts && selectedPlan.plan_snapshot.workouts.length > 0 && (
-                          <div>
-                            <h4 className="font-semibold text-gray-900 mb-2">
-                              Workouts ({selectedPlan.plan_snapshot.workouts.length})
-                            </h4>
-                            <div className="grid gap-2">
-                              {selectedPlan.plan_snapshot.workouts.slice(0, 3).map((workout: any, idx: number) => (
-                                <div
-                                  key={idx}
-                                  className="p-3 bg-gray-50 rounded-lg border border-gray-200"
-                                >
-                                  <p className="font-medium text-gray-900">{workout.name}</p>
-                                  <p className="text-sm text-gray-600">
-                                    {workout.type} • {workout.duration_minutes || 45} minutes
-                                  </p>
-                                </div>
-                              ))}
-                              {selectedPlan.plan_snapshot.workouts.length > 3 && (
-                                <p className="text-sm text-gray-500 text-center">
-                                  +{selectedPlan.plan_snapshot.workouts.length - 3} more workouts
-                                </p>
-                              )}
-                            </div>
-                          </div>
-                        )}
-
-                        {selectedPlan.plan_snapshot.meals && selectedPlan.plan_snapshot.meals.length > 0 && (
-                          <div>
-                            <h4 className="font-semibold text-gray-900 mb-2">
-                              Meals ({selectedPlan.plan_snapshot.meals.length})
-                            </h4>
-                            <div className="grid gap-2">
-                              {selectedPlan.plan_snapshot.meals.slice(0, 3).map((meal: any, idx: number) => (
-                                <div
-                                  key={idx}
-                                  className="p-3 bg-gray-50 rounded-lg border border-gray-200"
-                                >
-                                  <p className="font-medium text-gray-900">{meal.name}</p>
-                                  <p className="text-sm text-gray-600">
-                                    {meal.time} • {meal.calories || 0} calories
-                                  </p>
-                                </div>
-                              ))}
-                              {selectedPlan.plan_snapshot.meals.length > 3 && (
-                                <p className="text-sm text-gray-500 text-center">
-                                  +{selectedPlan.plan_snapshot.meals.length - 3} more meals
-                                </p>
-                              )}
-                            </div>
-                          </div>
-                        )}
-                      </div>
                     </CardContent>
                   </Card>
                 )}
