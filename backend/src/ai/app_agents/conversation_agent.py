@@ -5,6 +5,7 @@ This agent is responsible for:
 - Asking clarifying questions about preferences and constraints
 - Extracting structured requirements for plan generation
 - Calling build_fitness_plan tool when requirements are complete
+- Retrieving user's active plan details for context-aware conversations
 - Maintaining conversational context throughout the interaction
 
 Uses OpenAI Agents SDK with function tools for plan orchestration.
@@ -12,7 +13,7 @@ Uses OpenAI Agents SDK with function tools for plan orchestration.
 from agents import Agent
 
 from src.ai.agent import create_model_settings
-from src.ai.tools.plan_tools import build_fitness_plan
+from src.ai.tools.plan_tools import build_fitness_plan, get_active_fitness_plan
 
 
 def create_conversation_agent() -> Agent:
@@ -60,7 +61,12 @@ Your tone should be:
 - Clear about next steps
 - Ready to help them evolve their fitness journey
 
-Available tool:
+Available tools:
+- get_active_fitness_plan: Call this to retrieve the user's current active plan details. Use this when:
+  * User asks about their current plan, workouts, or meals
+  * User wants to discuss modifications or adjustments
+  * You need context about their existing training schedule
+  * User asks questions like "What's my workout today?" or "What are my macros?"
 - build_fitness_plan: Call this when creating a new plan or making major modifications
 
 Example interactions:
@@ -76,7 +82,7 @@ Continue supporting their journey, then call build_fitness_plan when ready to ge
         name="Conversation Agent",
         instructions=instructions,
         model_settings=create_model_settings("balanced"),
-        tools=[build_fitness_plan],
+        tools=[build_fitness_plan, get_active_fitness_plan],
     )
 
 

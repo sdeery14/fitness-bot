@@ -15,6 +15,7 @@ from src.ai.app_agents.fitness_plan_agent import create_fitness_plan_agent
 from src.ai.app_agents.meal_plan_agent import meal_plan_agent
 from src.ai.app_agents.workout_plan_agent import workout_plan_agent
 from src.ai.schemas import FitnessPlanOutput
+from src.services.plan_service import PlanService
 
 # Context variables for passing user_id and db_session to function tools
 _user_id_context: ContextVar[UUID | None] = ContextVar("user_id", default=None)
@@ -312,5 +313,135 @@ Time per Session: {requirements.time_per_session} minutes
             "status": "error",
             "message": f"Failed to generate fitness plan: {str(e)}",
             "error_details": str(e),
+        }
+        return json.dumps(error_dict, indent=2)
+
+
+@function_tool
+async def get_active_fitness_plan() -> str:
+    """Get the user's current active fitness plan details.
+
+    This function retrieves the complete active fitness plan for the current user,
+    including all training details, nutrition information, phases, and progress.
+    Use this tool when the user asks about their current plan, wants to discuss
+    modifications, or needs information about their training schedule or meals.
+
+    Returns:
+        JSON string containing:
+            - plan_id: str (database ID)
+            - status: str ("success" or "error")
+            - plan_details: dict (complete plan information if found)
+                - goal: str (primary fitness goal)
+                - duration_weeks: int (total plan duration)
+                - start_date: str (when plan started)
+                - end_date: str (target completion date)
+                - current_phase: dict (active phase information)
+                - training_plan: dict (workout schedule and exercises)
+                - nutrition_plan: dict (meal plans and macros)
+                - phases: list (all plan phases)
+                - key_principles: list (important guidelines)
+                - success_metrics: list (progress tracking metrics)
+            - message: str (human-readable result message)
+
+    Raises:
+        ValueError: If user context is not set or plan not found
+    """
+    try:
+        # Get user_id and db_session from context
+        user_id = _user_id_context.get()
+        db_session = _db_session_context.get()
+
+        if not user_id or not db_session:
+            error_dict = {
+                "status": "error",
+                "message": "User context not available. Cannot retrieve fitness plan.",
+                "plan_details": None,
+            }
+            return json.dumps(error_dict, indent=2)
+
+        # Create plan service
+        plan_service = PlanService(db_session)
+
+        # Get active fitness plan
+        active_plan = await plan_service.get_active_plan(user_id)
+
+        if not active_plan:
+            no_plan_dict = {
+                "status": "success",
+                "message": "No active fitness plan found. User may want to create a new plan.",
+                "plan_details": None,
+                "has_active_plan": False,
+            }
+            return json.dumps(no_plan_dict, indent=2)
+
+        # Extract plan details from plan_snapshot
+        plan_snapshot = active_plan.plan_snapshot or {}
+
+        # Build comprehensive plan details
+        plan_details = {
+            "plan_id": str(active_plan.id),
+            "goal": active_plan.goal_description,
+            "goal_type": active_plan.goal_type,
+            "duration_weeks": active_plan.duration_weeks,
+            "start_date": active_plan.start_date.isoformat() if active_plan.start_date else None,
+            "end_date": active_plan.end_date.isoformat() if active_plan.end_date else None,
+            "status": active_plan.status,
+            "created_at": active_plan.created_at.isoformat(),
+        }
+
+        # Add training plan details if available
+        if "workout_plan" in plan_snapshot:
+            workout_plan = plan_snapshot["workout_plan"]
+            plan_details["training_plan"] = {
+                "program_type": workout_plan.get("program_type"),
+                "frequency_per_week": workout_plan.get("frequency_per_week"),
+                "duration_weeks": workout_plan.get("duration_weeks"),
+                "progression_notes": workout_plan.get("progression_notes"),
+                "workouts": workout_plan.get("workouts", []),
+            }
+
+        # Add nutrition plan details if available
+        if "meal_plan" in plan_snapshot:
+            meal_plan = plan_snapshot["meal_plan"]
+            plan_details["nutrition_plan"] = {
+                "daily_calorie_target": meal_plan.get("daily_calorie_target"),
+                "macro_split": meal_plan.get("macro_split"),
+                "meal_frequency": meal_plan.get("meal_frequency"),
+                "dietary_guidelines": meal_plan.get("dietary_guidelines"),
+                "hydration_guidance": meal_plan.get("hydration_guidance"),
+                "sample_days": meal_plan.get("sample_days", []),
+            }
+
+        # Add phase information if available
+        if "phases" in plan_snapshot:
+            plan_details["phases"] = plan_snapshot["phases"]
+
+        # Add key principles if available
+        if "key_principles" in plan_snapshot:
+            plan_details["key_principles"] = plan_snapshot["key_principles"]
+
+        # Add success metrics if available
+        if "success_metrics" in plan_snapshot:
+            plan_details["success_metrics"] = plan_snapshot["success_metrics"]
+
+        # Add important notes if available
+        if "important_notes" in plan_snapshot:
+            plan_details["important_notes"] = plan_snapshot["important_notes"]
+
+        result_dict = {
+            "status": "success",
+            "message": f"Found active fitness plan: {active_plan.goal_description}",
+            "plan_details": plan_details,
+            "has_active_plan": True,
+        }
+
+        return json.dumps(result_dict, indent=2)
+
+    except Exception as e:
+        error_dict = {
+            "status": "error",
+            "message": f"Failed to retrieve active fitness plan: {str(e)}",
+            "error_details": str(e),
+            "plan_details": None,
         }
         return json.dumps(error_dict, indent=2)
