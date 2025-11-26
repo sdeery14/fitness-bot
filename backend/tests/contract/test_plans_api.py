@@ -219,6 +219,79 @@ class TestGetPlanEndpoint:
         assert response.status_code == 401
 
 
+class TestListPlansEndpoint:
+    """Contract tests for GET /api/v1/fitness-plans"""
+
+    @pytest.mark.asyncio
+    async def test_list_plans_success(
+        self,
+        async_client: AsyncClient,
+        auth_headers: dict,
+        test_fitness_plan: FitnessPlan
+    ):
+        """Test successful plan listing returns 200 with correct schema."""
+        response = await async_client.get(
+            "/api/v1/fitness-plans",
+            headers=auth_headers
+        )
+
+        # Contract: 200 OK status
+        assert response.status_code == 200
+
+        data = response.json()
+
+        # Contract: Response has success status
+        assert data["status"] == "success"
+
+        # Contract: Response contains plans array
+        assert "data" in data
+        assert "plans" in data["data"]
+        assert isinstance(data["data"]["plans"], list)
+        assert data["data"]["total"] >= 0
+        assert "limit" in data["data"]
+        assert "offset" in data["data"]
+
+        # Contract: Each plan has correct structure
+        if len(data["data"]["plans"]) > 0:
+            plan = data["data"]["plans"][0]
+            assert "id" in plan
+            assert "goal_description" in plan
+            assert "goal_type" in plan
+            assert "duration_weeks" in plan
+            assert "start_date" in plan
+            assert "target_end_date" in plan
+            assert "current_status" in plan
+            assert "created_at" in plan
+
+    @pytest.mark.asyncio
+    async def test_list_plans_pagination(
+        self, async_client: AsyncClient, auth_headers: dict
+    ):
+        """Test plan listing with pagination parameters."""
+        response = await async_client.get(
+            "/api/v1/fitness-plans?limit=5&offset=0",
+            headers=auth_headers
+        )
+
+        # Contract: 200 OK status
+        assert response.status_code == 200
+
+        data = response.json()
+
+        # Contract: Pagination parameters returned
+        assert data["data"]["limit"] == 5
+        assert data["data"]["offset"] == 0
+        assert len(data["data"]["plans"]) <= 5
+
+    @pytest.mark.asyncio
+    async def test_list_plans_unauthorized(self, async_client: AsyncClient):
+        """Test listing plans without auth returns 401 UNAUTHORIZED."""
+        response = await async_client.get("/api/v1/fitness-plans")
+
+        # Contract: 401 UNAUTHORIZED status
+        assert response.status_code == 401
+
+
 class TestGetActivePlanEndpoint:
     """Contract tests for GET /api/v1/fitness-plans/active"""
 

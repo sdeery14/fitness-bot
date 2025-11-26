@@ -14,7 +14,21 @@ import {
   TrendingUp,
   Clock,
   AlertCircle,
+  CheckCircle2,
+  Pause,
+  Play,
+  Trash2,
 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
 
@@ -69,13 +83,17 @@ interface PhaseStatus {
 export default function PlanPage() {
   const router = useRouter();
   const [accessToken, setAccessToken] = useState<string | null>(null);
-  const [plan, setPlan] = useState<FitnessPlan | null>(null);
+  const [allPlans, setAllPlans] = useState<FitnessPlan[]>([]);
+  const [selectedPlan, setSelectedPlan] = useState<FitnessPlan | null>(null);
   const [phases, setPhases] = useState<Phase[]>([]);
   const [phaseStatus, setPhaseStatus] = useState<PhaseStatus | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showMilestone, setShowMilestone] = useState(false);
   const [currentMilestone, setCurrentMilestone] = useState<any>(null);
+  const [activatingPlanId, setActivatingPlanId] = useState<string | null>(null);
+  const [showActivateDialog, setShowActivateDialog] = useState(false);
+  const [planToActivate, setPlanToActivate] = useState<FitnessPlan | null>(null);
 
   useEffect(() => {
     const token = localStorage.getItem("access_token");
@@ -83,76 +101,179 @@ export default function PlanPage() {
       router.push("/login");
     } else {
       setAccessToken(token);
-      fetchPlanData(token);
+      fetchAllPlans(token);
     }
   }, [router]);
 
-  const fetchPlanData = async (token: string) => {
+  const fetchAllPlans = async (token: string) => {
     try {
       setIsLoading(true);
       setError(null);
 
-      // Fetch active plan
-      const planRes = await fetch(`${API_URL}/fitness-plans/active`, {
+      // Fetch all plans
+      const plansRes = await fetch(`${API_URL}/fitness-plans`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
       });
 
-      if (!planRes.ok) {
-        throw new Error("No active fitness plan found");
+      if (!plansRes.ok) {
+        throw new Error("Failed to load fitness plans");
       }
 
-      const planData = await planRes.json();
-      const activePlan = planData.data || planData;
-      setPlan(activePlan);
+      const plansData = await plansRes.json();
+      const plans = plansData.data?.plans || [];
+      setAllPlans(plans);
 
-      // Extract phases from plan snapshot if available
-      if (activePlan.plan_snapshot && activePlan.plan_snapshot.phases) {
-        setPhases(activePlan.plan_snapshot.phases);
-      }
-
-      // Fetch phase status (this would be a new endpoint)
-      // For now, we'll derive it from the plan data
-      if (activePlan.plan_snapshot && activePlan.plan_snapshot.phases) {
-        const today = new Date();
-        const currentPhase = activePlan.plan_snapshot.phases.find((p: Phase) => {
-          const start = new Date(p.start_date);
-          const end = new Date(p.end_date);
-          return start <= today && today <= end;
-        });
-
-        if (currentPhase) {
-          const endDate = new Date(currentPhase.end_date);
-          const daysRemaining = Math.ceil(
-            (endDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
-          );
-
-          const currentIndex = activePlan.plan_snapshot.phases.findIndex(
-            (p: Phase) => p.id === currentPhase.id
-          );
-          const nextPhase =
-            currentIndex < activePlan.plan_snapshot.phases.length - 1
-              ? activePlan.plan_snapshot.phases[currentIndex + 1]
-              : null;
-
-          setPhaseStatus({
-            has_phases: true,
-            current_phase: {
-              ...currentPhase,
-              days_remaining: daysRemaining,
-            },
-            next_phase: nextPhase,
-            is_complete: daysRemaining <= 2,
-            should_transition: daysRemaining <= 2 && nextPhase !== null,
-          });
-        }
+      // Select the active plan by default, or the most recent plan
+      const activePlan = plans.find((p: FitnessPlan) => p.current_status === "active");
+      const planToSelect = activePlan || plans[0] || null;
+      
+      if (planToSelect) {
+        selectPlan(planToSelect);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load plan data");
-      console.error("Error fetching plan:", err);
+      setError(err instanceof Error ? err.message : "Failed to load plans");
+      console.error("Error fetching plans:", err);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const selectPlan = (plan: FitnessPlan) => {
+    setSelectedPlan(plan);
+
+    // Extract phases from plan snapshot if available
+    if (plan.plan_snapshot && plan.plan_snapshot.phases) {
+      setPhases(plan.plan_snapshot.phases);
+    } else {
+      setPhases([]);
+    }
+
+    // Derive phase status from plan data
+    if (plan.plan_snapshot && plan.plan_snapshot.phases) {
+      const today = new Date();
+      const currentPhase = plan.plan_snapshot.phases.find((p: Phase) => {
+        const start = new Date(p.start_date);
+        const end = new Date(p.end_date);
+        return start <= today && today <= end;
+      });
+
+      if (currentPhase) {
+        const endDate = new Date(currentPhase.end_date);
+        const daysRemaining = Math.ceil(
+          (endDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
+        );
+
+        const currentIndex = plan.plan_snapshot.phases.findIndex(
+          (p: Phase) => p.id === currentPhase.id
+        );
+        const nextPhase =
+          currentIndex < plan.plan_snapshot.phases.length - 1
+            ? plan.plan_snapshot.phases[currentIndex + 1]
+            : null;
+
+        setPhaseStatus({
+          has_phases: true,
+          current_phase: {
+            ...currentPhase,
+            days_remaining: daysRemaining,
+          },
+          next_phase: nextPhase,
+          is_complete: daysRemaining <= 2,
+          should_transition: daysRemaining <= 2 && nextPhase !== null,
+        });
+      } else {
+        setPhaseStatus(null);
+      }
+    } else {
+      setPhaseStatus(null);
+    }
+  };
+
+  const handleActivatePlan = async (plan: FitnessPlan) => {
+    if (!accessToken) return;
+
+    // Check if there's already an active plan
+    const hasActivePlan = allPlans.some(
+      (p) => p.current_status === "active" && p.id !== plan.id
+    );
+
+    if (hasActivePlan) {
+      setPlanToActivate(plan);
+      setShowActivateDialog(true);
+    } else {
+      await activatePlan(plan.id);
+    }
+  };
+
+  const activatePlan = async (planId: string) => {
+    if (!accessToken) return;
+
+    try {
+      setActivatingPlanId(planId);
+
+      // First, deactivate all other plans
+      const activePlans = allPlans.filter((p) => p.current_status === "active");
+      for (const activePlan of activePlans) {
+        await fetch(`${API_URL}/fitness-plans/${activePlan.id}`, {
+          method: "PATCH",
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ current_status: "paused" }),
+        });
+      }
+
+      // Activate the selected plan
+      const response = await fetch(`${API_URL}/fitness-plans/${planId}`, {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ current_status: "active" }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to activate plan");
+      }
+
+      // Refresh plans
+      await fetchAllPlans(accessToken);
+    } catch (err) {
+      console.error("Error activating plan:", err);
+      setError(err instanceof Error ? err.message : "Failed to activate plan");
+    } finally {
+      setActivatingPlanId(null);
+      setShowActivateDialog(false);
+      setPlanToActivate(null);
+    }
+  };
+
+  const handlePausePlan = async (planId: string) => {
+    if (!accessToken) return;
+
+    try {
+      const response = await fetch(`${API_URL}/fitness-plans/${planId}`, {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ current_status: "paused" }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to pause plan");
+      }
+
+      // Refresh plans
+      await fetchAllPlans(accessToken);
+    } catch (err) {
+      console.error("Error pausing plan:", err);
+      setError(err instanceof Error ? err.message : "Failed to pause plan");
     }
   };
 
@@ -176,12 +297,12 @@ export default function PlanPage() {
     );
   }
 
-  if (error || !plan) {
+  if (error && allPlans.length === 0) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center max-w-md">
           <AlertCircle className="h-12 w-12 text-red-600 mx-auto mb-4" />
-          <p className="text-red-600 mb-4">{error || "No active plan found"}</p>
+          <p className="text-red-600 mb-4">{error || "No fitness plans found"}</p>
           <Button onClick={() => router.push("/dashboard")}>
             Go to Dashboard
           </Button>
@@ -189,6 +310,21 @@ export default function PlanPage() {
       </div>
     );
   }
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case "active":
+        return <Badge className="bg-green-600 hover:bg-green-700">Active</Badge>;
+      case "paused":
+        return <Badge variant="secondary">Paused</Badge>;
+      case "completed":
+        return <Badge className="bg-blue-600 hover:bg-blue-700">Completed</Badge>;
+      case "draft":
+        return <Badge variant="outline">Draft</Badge>;
+      default:
+        return <Badge variant="secondary">{status}</Badge>;
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -208,170 +344,292 @@ export default function PlanPage() {
               </Button>
               <div className="h-6 w-px bg-gray-300"></div>
               <h1 className="text-xl font-semibold text-gray-900">
-                Fitness Plan
+                My Fitness Plans
               </h1>
             </div>
-            <Badge
-              variant={plan.current_status === "active" ? "default" : "secondary"}
-            >
-              {plan.current_status}
-            </Badge>
           </div>
         </div>
       </div>
 
       {/* Content */}
       <div className="max-w-7xl mx-auto px-4 py-8">
-        <div className="space-y-6">
-          {/* Plan Overview */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Target className="h-5 w-5 text-blue-600" />
-                Plan Overview
-              </CardTitle>
-              <CardDescription>
-                Your personalized fitness journey
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                  {plan.goal_description}
-                </h3>
-                <div className="flex flex-wrap gap-4 text-sm text-gray-600">
-                  <div className="flex items-center gap-2">
-                    <Calendar className="h-4 w-4" />
-                    <span>Started: {formatDate(plan.start_date)}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Target className="h-4 w-4" />
-                    <span>Target: {formatDate(plan.target_end_date)}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Clock className="h-4 w-4" />
-                    <span>Duration: {plan.duration_weeks} weeks</span>
-                  </div>
-                </div>
-              </div>
-
-              {phaseStatus && phaseStatus.current_phase && (
-                <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
-                  <div className="flex items-center justify-between mb-2">
-                    <h4 className="font-semibold text-blue-900">
-                      Current Phase: {phaseStatus.current_phase.name}
-                    </h4>
-                    <Badge variant="outline" className="bg-white">
-                      Phase {phaseStatus.current_phase.phase_number}
-                    </Badge>
-                  </div>
-                  <p className="text-sm text-blue-700 mb-3">
-                    {phaseStatus.current_phase.days_remaining} days remaining
-                  </p>
-                  <div>
-                    <p className="text-xs font-semibold text-blue-900 mb-2 uppercase">
-                      Phase Objectives:
-                    </p>
-                    <ul className="space-y-1">
-                      {phaseStatus.current_phase.objectives.map((obj: string, idx: number) => (
-                        <li key={idx} className="text-sm text-blue-800 flex items-start gap-2">
-                          <TrendingUp className="h-4 w-4 flex-shrink-0 mt-0.5" />
-                          <span>{obj}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Phase Timeline */}
-          {phases.length > 0 && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Plan List Sidebar */}
+          <div className="lg:col-span-1">
             <Card>
               <CardHeader>
-                <CardTitle>Phase Timeline</CardTitle>
+                <CardTitle className="text-lg">All Plans</CardTitle>
                 <CardDescription>
-                  Track your progress through each phase of your fitness journey
+                  {allPlans.length} {allPlans.length === 1 ? "plan" : "plans"} created
                 </CardDescription>
               </CardHeader>
-              <CardContent>
-                <PhaseTimeline
-                  phases={phases}
-                  currentPhaseNumber={phaseStatus?.current_phase?.phase_number || 1}
-                />
+              <CardContent className="space-y-3">
+                {allPlans.length === 0 ? (
+                  <div className="text-center py-8 text-gray-500">
+                    <p className="text-sm">No plans found</p>
+                    <Button
+                      variant="link"
+                      onClick={() => router.push("/dashboard")}
+                      className="mt-2"
+                    >
+                      Create your first plan
+                    </Button>
+                  </div>
+                ) : (
+                  allPlans.map((plan) => (
+                    <div
+                      key={plan.id}
+                      className={`p-4 rounded-lg border-2 cursor-pointer transition-all ${
+                        selectedPlan?.id === plan.id
+                          ? "border-blue-600 bg-blue-50"
+                          : "border-gray-200 hover:border-gray-300 bg-white"
+                      }`}
+                      onClick={() => selectPlan(plan)}
+                    >
+                      <div className="flex items-start justify-between mb-2">
+                        <h3 className="font-semibold text-sm text-gray-900 line-clamp-2">
+                          {plan.goal_description}
+                        </h3>
+                        {getStatusBadge(plan.current_status)}
+                      </div>
+                      <div className="space-y-1 text-xs text-gray-600">
+                        <div className="flex items-center gap-1">
+                          <Target className="h-3 w-3" />
+                          <span>{plan.goal_type.replace(/_/g, " ")}</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Calendar className="h-3 w-3" />
+                          <span>{formatDate(plan.start_date)}</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Clock className="h-3 w-3" />
+                          <span>{plan.duration_weeks} weeks</span>
+                        </div>
+                      </div>
+                      <div className="mt-3 flex gap-2">
+                        {plan.current_status === "active" ? (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handlePausePlan(plan.id);
+                            }}
+                            className="flex-1 text-xs"
+                          >
+                            <Pause className="h-3 w-3 mr-1" />
+                            Pause
+                          </Button>
+                        ) : (
+                          <Button
+                            size="sm"
+                            variant="default"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleActivatePlan(plan);
+                            }}
+                            disabled={activatingPlanId === plan.id}
+                            className="flex-1 text-xs"
+                          >
+                            <Play className="h-3 w-3 mr-1" />
+                            {activatingPlanId === plan.id ? "Activating..." : "Activate"}
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  ))
+                )}
               </CardContent>
             </Card>
-          )}
+          </div>
 
           {/* Plan Details */}
-          {plan.plan_snapshot && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Plan Details</CardTitle>
-                <CardDescription>
-                  Generated on {formatDate(plan.created_at)}
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {plan.plan_snapshot.workouts && plan.plan_snapshot.workouts.length > 0 && (
+          <div className="lg:col-span-2">
+            {!selectedPlan ? (
+              <Card>
+                <CardContent className="py-12">
+                  <div className="text-center text-gray-500">
+                    <Target className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                    <p>Select a plan to view details</p>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="space-y-6">
+                {/* Plan Overview */}
+                <Card>
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Target className="h-5 w-5 text-blue-600" />
+                        <CardTitle>Plan Overview</CardTitle>
+                      </div>
+                      {getStatusBadge(selectedPlan.current_status)}
+                    </div>
+                    <CardDescription>
+                      Your personalized fitness journey
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
                     <div>
-                      <h4 className="font-semibold text-gray-900 mb-2">
-                        Workouts ({plan.plan_snapshot.workouts.length})
-                      </h4>
-                      <div className="grid gap-2">
-                        {plan.plan_snapshot.workouts.slice(0, 3).map((workout: any, idx: number) => (
-                          <div
-                            key={idx}
-                            className="p-3 bg-gray-50 rounded-lg border border-gray-200"
-                          >
-                            <p className="font-medium text-gray-900">{workout.name}</p>
-                            <p className="text-sm text-gray-600">
-                              {workout.type} • {workout.duration_minutes || 45} minutes
-                            </p>
-                          </div>
-                        ))}
-                        {plan.plan_snapshot.workouts.length > 3 && (
-                          <p className="text-sm text-gray-500 text-center">
-                            +{plan.plan_snapshot.workouts.length - 3} more workouts
-                          </p>
-                        )}
+                      <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                        {selectedPlan.goal_description}
+                      </h3>
+                      <div className="flex flex-wrap gap-4 text-sm text-gray-600">
+                        <div className="flex items-center gap-2">
+                          <Calendar className="h-4 w-4" />
+                          <span>Started: {formatDate(selectedPlan.start_date)}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Target className="h-4 w-4" />
+                          <span>Target: {formatDate(selectedPlan.target_end_date)}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Clock className="h-4 w-4" />
+                          <span>Duration: {selectedPlan.duration_weeks} weeks</span>
+                        </div>
                       </div>
                     </div>
-                  )}
 
-                  {plan.plan_snapshot.meals && plan.plan_snapshot.meals.length > 0 && (
-                    <div>
-                      <h4 className="font-semibold text-gray-900 mb-2">
-                        Meals ({plan.plan_snapshot.meals.length})
-                      </h4>
-                      <div className="grid gap-2">
-                        {plan.plan_snapshot.meals.slice(0, 3).map((meal: any, idx: number) => (
-                          <div
-                            key={idx}
-                            className="p-3 bg-gray-50 rounded-lg border border-gray-200"
-                          >
-                            <p className="font-medium text-gray-900">{meal.name}</p>
-                            <p className="text-sm text-gray-600">
-                              {meal.time} • {meal.calories || 0} calories
-                            </p>
-                          </div>
-                        ))}
-                        {plan.plan_snapshot.meals.length > 3 && (
-                          <p className="text-sm text-gray-500 text-center">
-                            +{plan.plan_snapshot.meals.length - 3} more meals
+                    {phaseStatus && phaseStatus.current_phase && (
+                      <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                        <div className="flex items-center justify-between mb-2">
+                          <h4 className="font-semibold text-blue-900">
+                            Current Phase: {phaseStatus.current_phase.name}
+                          </h4>
+                          <Badge variant="outline" className="bg-white">
+                            Phase {phaseStatus.current_phase.phase_number}
+                          </Badge>
+                        </div>
+                        <p className="text-sm text-blue-700 mb-3">
+                          {phaseStatus.current_phase.days_remaining} days remaining
+                        </p>
+                        <div>
+                          <p className="text-xs font-semibold text-blue-900 mb-2 uppercase">
+                            Phase Objectives:
                           </p>
+                          <ul className="space-y-1">
+                            {phaseStatus.current_phase.objectives.map((obj: string, idx: number) => (
+                              <li key={idx} className="text-sm text-blue-800 flex items-start gap-2">
+                                <TrendingUp className="h-4 w-4 flex-shrink-0 mt-0.5" />
+                                <span>{obj}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* Phase Timeline */}
+                {phases.length > 0 && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Phase Timeline</CardTitle>
+                      <CardDescription>
+                        Track your progress through each phase of your fitness journey
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <PhaseTimeline
+                        phases={phases}
+                        currentPhaseNumber={phaseStatus?.current_phase?.phase_number || 1}
+                      />
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Plan Details */}
+                {selectedPlan.plan_snapshot && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Plan Details</CardTitle>
+                      <CardDescription>
+                        Generated on {formatDate(selectedPlan.created_at)}
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-4">
+                        {selectedPlan.plan_snapshot.workouts && selectedPlan.plan_snapshot.workouts.length > 0 && (
+                          <div>
+                            <h4 className="font-semibold text-gray-900 mb-2">
+                              Workouts ({selectedPlan.plan_snapshot.workouts.length})
+                            </h4>
+                            <div className="grid gap-2">
+                              {selectedPlan.plan_snapshot.workouts.slice(0, 3).map((workout: any, idx: number) => (
+                                <div
+                                  key={idx}
+                                  className="p-3 bg-gray-50 rounded-lg border border-gray-200"
+                                >
+                                  <p className="font-medium text-gray-900">{workout.name}</p>
+                                  <p className="text-sm text-gray-600">
+                                    {workout.type} • {workout.duration_minutes || 45} minutes
+                                  </p>
+                                </div>
+                              ))}
+                              {selectedPlan.plan_snapshot.workouts.length > 3 && (
+                                <p className="text-sm text-gray-500 text-center">
+                                  +{selectedPlan.plan_snapshot.workouts.length - 3} more workouts
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                        {selectedPlan.plan_snapshot.meals && selectedPlan.plan_snapshot.meals.length > 0 && (
+                          <div>
+                            <h4 className="font-semibold text-gray-900 mb-2">
+                              Meals ({selectedPlan.plan_snapshot.meals.length})
+                            </h4>
+                            <div className="grid gap-2">
+                              {selectedPlan.plan_snapshot.meals.slice(0, 3).map((meal: any, idx: number) => (
+                                <div
+                                  key={idx}
+                                  className="p-3 bg-gray-50 rounded-lg border border-gray-200"
+                                >
+                                  <p className="font-medium text-gray-900">{meal.name}</p>
+                                  <p className="text-sm text-gray-600">
+                                    {meal.time} • {meal.calories || 0} calories
+                                  </p>
+                                </div>
+                              ))}
+                              {selectedPlan.plan_snapshot.meals.length > 3 && (
+                                <p className="text-sm text-gray-500 text-center">
+                                  +{selectedPlan.plan_snapshot.meals.length - 3} more meals
+                                </p>
+                              )}
+                            </div>
+                          </div>
                         )}
                       </div>
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          )}
+                    </CardContent>
+                  </Card>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </div>
+
+      {/* Activate Plan Confirmation Dialog */}
+      <AlertDialog open={showActivateDialog} onOpenChange={setShowActivateDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Activate this plan?</AlertDialogTitle>
+            <AlertDialogDescription>
+              You already have an active fitness plan. Activating this plan will pause your
+              current active plan. You can switch between plans at any time.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={() => planToActivate && activatePlan(planToActivate.id)}>
+              Activate Plan
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Milestone Celebration Dialog */}
       <MilestoneCelebration

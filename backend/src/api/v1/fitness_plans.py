@@ -163,6 +163,79 @@ async def create_plan(
         ) from e
 
 
+@router.get("")
+@router.get("/")
+async def list_plans(
+    user_id: CurrentUserId,
+    db: DatabaseSession,
+    limit: int = 100,
+    offset: int = 0,
+):
+    """List all fitness plans for the current user.
+
+    Args:
+        user_id: Current authenticated user ID
+        db: Database session
+        limit: Maximum number of plans to return (default: 100)
+        offset: Number of plans to skip (default: 0)
+
+    Returns:
+        List of all user's fitness plans ordered by creation date
+    """
+    plan_service = PlanService(db)
+
+    try:
+        plans = await plan_service.get_user_plans(
+            user_id=user_id,
+            limit=limit,
+            offset=offset,
+        )
+
+        plans_data = []
+        for plan in plans:
+            # Format dates
+            start_date_str = None
+            if plan.start_date:
+                if plan.start_date.time().replace(tzinfo=None) == datetime.min.time():
+                    start_date_str = plan.start_date.date().isoformat()
+                else:
+                    start_date_str = plan.start_date.isoformat()
+
+            target_end_date_str = None
+            if plan.end_date:
+                if plan.end_date.time().replace(tzinfo=None) == datetime.min.time():
+                    target_end_date_str = plan.end_date.date().isoformat()
+                else:
+                    target_end_date_str = plan.end_date.isoformat()
+
+            plans_data.append({
+                "id": str(plan.id),
+                "user_id": str(plan.user_id),
+                "goal_description": plan.goal_description,
+                "goal_type": plan.goal_type,
+                "duration_weeks": plan.duration_weeks,
+                "start_date": start_date_str,
+                "target_end_date": target_end_date_str,
+                "current_status": plan.status,
+                "plan_snapshot": plan.plan_snapshot,
+                "created_at": plan.created_at.isoformat(),
+                "updated_at": plan.updated_at.isoformat(),
+            })
+
+        return create_success_response({
+            "plans": plans_data,
+            "total": len(plans_data),
+            "limit": limit,
+            "offset": offset,
+        })
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to retrieve plans: {str(e)}"
+        ) from e
+
+
 @router.get("/active")
 async def get_active_plan(
     user_id: CurrentUserId,
