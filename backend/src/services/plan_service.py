@@ -394,6 +394,32 @@ class PlanService:
         await self.db.commit()
         await self.db.refresh(plan)
 
+        # Automatically create schedule for the entire plan duration
+        # This ensures the user's schedule reflects the complete fitness plan
+        from src.services.schedule_service import ScheduleService
+
+        schedule_service = ScheduleService(self.db)
+        
+        # Check if a schedule already exists for this plan
+        from src.models.schedule import Schedule
+        from sqlalchemy import select
+        
+        existing_schedule_stmt = select(Schedule).where(Schedule.fitness_plan_id == plan_id)
+        existing_schedule_result = await self.db.execute(existing_schedule_stmt)
+        existing_schedule = existing_schedule_result.scalar_one_or_none()
+        
+        if not existing_schedule:
+            # Create schedule starting from plan start_date, covering entire duration
+            try:
+                await schedule_service.create_schedule(
+                    user_id=plan.user_id,
+                    fitness_plan_id=plan_id,
+                    start_date=plan.start_date,
+                )
+            except Exception as schedule_error:
+                # Log the error but don't fail the plan save operation
+                print(f"Warning: Failed to auto-create schedule for plan {plan_id}: {schedule_error}")
+
         return plan
 
     async def analyze_progress_for_suggestions(

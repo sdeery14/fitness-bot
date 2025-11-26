@@ -125,9 +125,10 @@ class ScheduleService:
         start_date: date,
         duration_weeks: int,
     ) -> None:
-        """Generate schedule entries for workouts.
+        """Generate schedule entries for workouts spanning the entire plan duration.
 
         Distributes workouts across the week based on their phase assignment.
+        Creates entries up to the plan's end date to ensure complete coverage.
 
         Args:
             schedule: Schedule to add entries to
@@ -135,6 +136,9 @@ class ScheduleService:
             start_date: Schedule start date
             duration_weeks: Total plan duration in weeks
         """
+        # Calculate plan end date to ensure complete coverage
+        plan_end_date = start_date + timedelta(weeks=duration_weeks)
+        
         # Group workouts by phase
         workouts_by_phase: dict[UUID | None, list[Workout]] = {}
         for workout in workouts:
@@ -150,10 +154,10 @@ class ScheduleService:
 
             # Default to full plan duration if no phase info
             phase_start = start_date
-            phase_weeks = duration_weeks
+            phase_end = plan_end_date
 
             # If phase exists, use its dates (would need to load phase info)
-            # For now, distribute evenly across entire plan
+            # For now, distribute evenly across entire plan duration
 
             # Schedule each workout type on different days of the week
             days_between_workouts = 2  # Default spacing
@@ -161,11 +165,11 @@ class ScheduleService:
                 # Calculate which day of the week this workout should occur
                 day_offset = idx * days_between_workouts
 
-                # Repeat weekly throughout the phase
+                # Repeat weekly throughout the entire phase duration (up to plan end)
                 current_date = phase_start + timedelta(days=day_offset)
-                end_date = phase_start + timedelta(weeks=phase_weeks)
 
-                while current_date < end_date:
+                # Generate entries up to and including the plan end date
+                while current_date <= phase_end:
                     entry = ScheduleEntry(
                         schedule_id=schedule.id,
                         entry_type="workout",
@@ -185,9 +189,10 @@ class ScheduleService:
         start_date: date,
         duration_weeks: int,
     ) -> None:
-        """Generate schedule entries for meals.
+        """Generate schedule entries for meals spanning the entire plan duration.
 
-        Creates daily meal entries for the entire plan duration.
+        Creates daily meal entries for the complete plan duration, including
+        any recovery period or post-goal maintenance days.
 
         Args:
             schedule: Schedule to add entries to
@@ -195,7 +200,8 @@ class ScheduleService:
             start_date: Schedule start date
             duration_weeks: Total plan duration in weeks
         """
-        end_date = start_date + timedelta(weeks=duration_weeks)
+        # Calculate plan end date to ensure complete coverage
+        plan_end_date = start_date + timedelta(weeks=duration_weeks)
 
         # Meal timing defaults
         meal_times = {
@@ -213,11 +219,12 @@ class ScheduleService:
                 meals_by_type[meal_type] = []
             meals_by_type[meal_type].append(meal)
 
-        # Create daily entries for each meal type
+        # Create daily entries for each meal type through entire plan duration
         current_date = start_date
         meal_rotation_index = {meal_type: 0 for meal_type in meals_by_type}
 
-        while current_date < end_date:
+        # Generate entries up to and including the plan end date
+        while current_date <= plan_end_date:
             for meal_type, meal_list in meals_by_type.items():
                 if not meal_list:
                     continue
