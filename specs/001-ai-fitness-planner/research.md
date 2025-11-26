@@ -784,6 +784,48 @@ const { data: plan } = useQuery(['plan', userId], fetchPlan, {
 
 ---
 
+## 14. AI Testing Strategy: MLflow + Manual Testing
+
+### Decision
+Use **MLflow** for comprehensive AI agent testing and evaluation, with manual testing during active development.
+
+### Rationale
+- **MLflow Integration**: Purpose-built for LLM/agent evaluation with prompt tracking, response logging, and metrics
+- **Deferred Testing**: AI agent unit tests are deferred until MLflow setup phase to avoid test duplication
+- **Manual Validation**: During development, AI agents and tools are manually tested through conversation UI
+- **Production Metrics**: MLflow enables proper evaluation of conversation quality, tool usage, and plan generation accuracy
+- **Cost Efficiency**: Avoid writing throwaway unit tests that don't reflect real-world agent behavior
+
+### Testing Approach
+```text
+Development Phase (Current):
+- Manual testing via conversation UI
+- Verify tool registration and availability
+- Test basic agent routing and responses
+- Validate database integration
+
+MLflow Phase (Later):
+- Systematic prompt evaluation
+- Tool usage pattern analysis
+- Conversation flow testing
+- A/B testing different instructions
+- Response quality metrics
+- Cost and latency tracking
+```
+
+### Scope
+- **Manual Testing**: All AI agent tools and conversations during development
+- **Integration Tests**: Database operations, API endpoints, schedule logic
+- **MLflow Tests**: Agent behavior, prompt effectiveness, conversation quality, tool selection accuracy
+
+### Constitution Alignment
+- Pragmatic testing approach that focuses resources where they provide most value
+- Avoid premature optimization of test infrastructure
+- Use production-grade tools (MLflow) for AI evaluation rather than basic unit tests
+- Manual testing during development ensures rapid iteration
+
+---
+
 ## Open Questions & Future Considerations
 
 ### Resolved for MVP
