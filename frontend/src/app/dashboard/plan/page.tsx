@@ -638,63 +638,280 @@ export default function PlanPage() {
                       </div>
                     )}
 
-                    {/* Workouts & Meals */}
-                    {selectedPlan.plan_snapshot && (
+                    {/* Training Plan Details */}
+                    {selectedPlan.plan_snapshot?.workout_plan && (
                       <div className="border-t pt-6">
-                        <div className="grid md:grid-cols-2 gap-6">
-                          {/* Workouts */}
-                          {selectedPlan.plan_snapshot.workouts && selectedPlan.plan_snapshot.workouts.length > 0 && (
+                        <h4 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                          <TrendingUp className="h-5 w-5 text-blue-600" />
+                          Training Plan
+                        </h4>
+                        <div className="space-y-4">
+                          {/* Training Overview */}
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
                             <div>
-                              <h4 className="font-semibold text-gray-900 mb-3">
-                                Workout Library ({selectedPlan.plan_snapshot.workouts.length})
-                              </h4>
-                              <div className="space-y-2">
-                                {selectedPlan.plan_snapshot.workouts.slice(0, 5).map((workout: any, idx: number) => (
-                                  <div
-                                    key={idx}
-                                    className="p-3 bg-gray-50 rounded-lg border border-gray-200"
-                                  >
-                                    <p className="font-medium text-gray-900 text-sm">{workout.name}</p>
-                                    <p className="text-xs text-gray-600">
-                                      {workout.type} • {workout.duration_minutes || 45} min
-                                    </p>
-                                  </div>
-                                ))}
-                                {selectedPlan.plan_snapshot.workouts.length > 5 && (
-                                  <p className="text-xs text-gray-500 text-center py-2">
-                                    +{selectedPlan.plan_snapshot.workouts.length - 5} more workouts
-                                  </p>
-                                )}
-                              </div>
+                              <span className="text-xs text-blue-600 uppercase block mb-1">Program Type</span>
+                              <span className="text-sm font-medium text-blue-900">
+                                {selectedPlan.plan_snapshot.workout_plan.program_type}
+                              </span>
+                            </div>
+                            <div>
+                              <span className="text-xs text-blue-600 uppercase block mb-1">Frequency</span>
+                              <span className="text-sm font-medium text-blue-900">
+                                {selectedPlan.plan_snapshot.workout_plan.frequency_per_week} days/week
+                              </span>
+                            </div>
+                            <div>
+                              <span className="text-xs text-blue-600 uppercase block mb-1">Duration</span>
+                              <span className="text-sm font-medium text-blue-900">
+                                {selectedPlan.plan_snapshot.workout_plan.duration_weeks} weeks
+                              </span>
+                            </div>
+                            <div>
+                              <span className="text-xs text-blue-600 uppercase block mb-1">Workouts</span>
+                              <span className="text-sm font-medium text-blue-900">
+                                {selectedPlan.plan_snapshot.workout_plan.workouts?.length || 0} total
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Progression Notes */}
+                          {selectedPlan.plan_snapshot.workout_plan.progression_notes && (
+                            <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
+                              <span className="text-xs font-semibold text-gray-700 uppercase block mb-1">
+                                Progression Strategy
+                              </span>
+                              <p className="text-sm text-gray-900">
+                                {selectedPlan.plan_snapshot.workout_plan.progression_notes}
+                              </p>
                             </div>
                           )}
 
-                          {/* Meals */}
-                          {selectedPlan.plan_snapshot.meals && selectedPlan.plan_snapshot.meals.length > 0 && (
+                          {/* Workout Days */}
+                          {selectedPlan.plan_snapshot.workout_plan.workouts && selectedPlan.plan_snapshot.workout_plan.workouts.length > 0 && (
                             <div>
-                              <h4 className="font-semibold text-gray-900 mb-3">
-                                Meal Library ({selectedPlan.plan_snapshot.meals.length})
-                              </h4>
-                              <div className="space-y-2">
-                                {selectedPlan.plan_snapshot.meals.slice(0, 5).map((meal: any, idx: number) => (
-                                  <div
-                                    key={idx}
-                                    className="p-3 bg-gray-50 rounded-lg border border-gray-200"
-                                  >
-                                    <p className="font-medium text-gray-900 text-sm">{meal.name}</p>
-                                    <p className="text-xs text-gray-600">
-                                      {meal.time} • {meal.calories || 0} cal
-                                    </p>
-                                  </div>
+                              <h5 className="font-medium text-gray-900 mb-3">Workout Schedule</h5>
+                              <div className="space-y-3">
+                                {selectedPlan.plan_snapshot.workout_plan.workouts.map((workout: any, idx: number) => (
+                                  <details key={idx} className="group">
+                                    <summary className="p-3 bg-gray-50 rounded-lg border border-gray-200 cursor-pointer hover:bg-gray-100 transition-colors">
+                                      <div className="flex items-center justify-between">
+                                        <div>
+                                          <p className="font-medium text-gray-900 text-sm">{workout.day_name}</p>
+                                          <p className="text-xs text-gray-600">
+                                            {workout.focus} • {workout.duration_minutes} min • {workout.exercises?.length || 0} exercises
+                                          </p>
+                                        </div>
+                                        <CheckCircle2 className="h-4 w-4 text-gray-400 group-open:rotate-90 transition-transform" />
+                                      </div>
+                                    </summary>
+                                    <div className="mt-2 p-4 bg-white rounded-lg border border-gray-200 space-y-3">
+                                      {workout.warmup && (
+                                        <div>
+                                          <p className="text-xs font-semibold text-gray-700 uppercase mb-1">Warmup</p>
+                                          <p className="text-sm text-gray-600">{workout.warmup}</p>
+                                        </div>
+                                      )}
+                                      {workout.exercises && workout.exercises.length > 0 && (
+                                        <div>
+                                          <p className="text-xs font-semibold text-gray-700 uppercase mb-2">Exercises</p>
+                                          <div className="space-y-2">
+                                            {workout.exercises.map((ex: any, exIdx: number) => (
+                                              <div key={exIdx} className="flex justify-between items-start p-2 bg-gray-50 rounded">
+                                                <div className="flex-1">
+                                                  <p className="text-sm font-medium text-gray-900">{ex.name}</p>
+                                                  {ex.notes && <p className="text-xs text-gray-500 mt-1">{ex.notes}</p>}
+                                                </div>
+                                                <div className="text-right ml-4">
+                                                  <p className="text-xs text-gray-600">{ex.sets} × {ex.reps}</p>
+                                                  <p className="text-xs text-gray-500">{ex.rest_seconds}s rest</p>
+                                                </div>
+                                              </div>
+                                            ))}
+                                          </div>
+                                        </div>
+                                      )}
+                                      {workout.cooldown && (
+                                        <div>
+                                          <p className="text-xs font-semibold text-gray-700 uppercase mb-1">Cooldown</p>
+                                          <p className="text-sm text-gray-600">{workout.cooldown}</p>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </details>
                                 ))}
-                                {selectedPlan.plan_snapshot.meals.length > 5 && (
-                                  <p className="text-xs text-gray-500 text-center py-2">
-                                    +{selectedPlan.plan_snapshot.meals.length - 5} more meals
-                                  </p>
-                                )}
                               </div>
                             </div>
                           )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Meal Plan Details */}
+                    {selectedPlan.plan_snapshot?.meal_plan && (
+                      <div className="border-t pt-6">
+                        <h4 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                          <Target className="h-5 w-5 text-green-600" />
+                          Nutrition Plan
+                        </h4>
+                        <div className="space-y-4">
+                          {/* Nutrition Overview */}
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-green-50 rounded-lg border border-green-200">
+                            <div>
+                              <span className="text-xs text-green-600 uppercase block mb-1">Daily Calories</span>
+                              <span className="text-sm font-medium text-green-900">
+                                {selectedPlan.plan_snapshot.meal_plan.daily_calorie_target} kcal
+                              </span>
+                            </div>
+                            <div>
+                              <span className="text-xs text-green-600 uppercase block mb-1">Macro Split</span>
+                              <span className="text-sm font-medium text-green-900">
+                                {selectedPlan.plan_snapshot.meal_plan.macro_split}
+                              </span>
+                            </div>
+                            <div>
+                              <span className="text-xs text-green-600 uppercase block mb-1">Meal Frequency</span>
+                              <span className="text-sm font-medium text-green-900">
+                                {selectedPlan.plan_snapshot.meal_plan.meal_frequency} meals/day
+                              </span>
+                            </div>
+                            <div>
+                              <span className="text-xs text-green-600 uppercase block mb-1">Sample Days</span>
+                              <span className="text-sm font-medium text-green-900">
+                                {selectedPlan.plan_snapshot.meal_plan.sample_days?.length || 0} variations
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Dietary Notes */}
+                          {selectedPlan.plan_snapshot.meal_plan.dietary_notes && (
+                            <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
+                              <span className="text-xs font-semibold text-gray-700 uppercase block mb-1">
+                                Dietary Guidelines
+                              </span>
+                              <p className="text-sm text-gray-900">
+                                {selectedPlan.plan_snapshot.meal_plan.dietary_notes}
+                              </p>
+                            </div>
+                          )}
+
+                          {/* Hydration */}
+                          {selectedPlan.plan_snapshot.meal_plan.hydration_guidance && (
+                            <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
+                              <span className="text-xs font-semibold text-blue-700 uppercase block mb-1">
+                                Hydration
+                              </span>
+                              <p className="text-sm text-blue-900">
+                                {selectedPlan.plan_snapshot.meal_plan.hydration_guidance}
+                              </p>
+                            </div>
+                          )}
+
+                          {/* Sample Meal Days */}
+                          {selectedPlan.plan_snapshot.meal_plan.sample_days && selectedPlan.plan_snapshot.meal_plan.sample_days.length > 0 && (
+                            <div>
+                              <h5 className="font-medium text-gray-900 mb-3">Sample Meal Plans</h5>
+                              <div className="space-y-3">
+                                {selectedPlan.plan_snapshot.meal_plan.sample_days.map((day: any, idx: number) => (
+                                  <details key={idx} className="group">
+                                    <summary className="p-3 bg-gray-50 rounded-lg border border-gray-200 cursor-pointer hover:bg-gray-100 transition-colors">
+                                      <div className="flex items-center justify-between">
+                                        <div>
+                                          <p className="font-medium text-gray-900 text-sm">{day.day_name}</p>
+                                          <p className="text-xs text-gray-600">
+                                            {day.target_calories} kcal • P: {day.target_protein_g}g • C: {day.target_carbs_g}g • F: {day.target_fat_g}g
+                                          </p>
+                                        </div>
+                                        <CheckCircle2 className="h-4 w-4 text-gray-400 group-open:rotate-90 transition-transform" />
+                                      </div>
+                                    </summary>
+                                    <div className="mt-2 p-4 bg-white rounded-lg border border-gray-200 space-y-3">
+                                      {day.meals && day.meals.map((meal: any, mealIdx: number) => (
+                                        <div key={mealIdx} className="border-l-2 border-green-500 pl-3">
+                                          <div className="flex justify-between items-start mb-2">
+                                            <div>
+                                              <p className="text-sm font-semibold text-gray-900">{meal.meal_name}</p>
+                                              <p className="text-xs text-gray-500">{meal.time}</p>
+                                            </div>
+                                            <span className="text-xs font-medium text-gray-700 bg-gray-100 px-2 py-1 rounded">
+                                              {meal.total_calories} kcal
+                                            </span>
+                                          </div>
+                                          {meal.foods && meal.foods.length > 0 && (
+                                            <div className="space-y-1">
+                                              {meal.foods.map((food: any, foodIdx: number) => (
+                                                <div key={foodIdx} className="flex justify-between text-xs">
+                                                  <span className="text-gray-700">
+                                                    {food.name} ({food.portion})
+                                                  </span>
+                                                  <span className="text-gray-500">
+                                                    {food.calories} kcal • P:{food.protein_g}g C:{food.carbs_g}g F:{food.fat_g}g
+                                                  </span>
+                                                </div>
+                                              ))}
+                                            </div>
+                                          )}
+                                          {meal.notes && (
+                                            <p className="text-xs text-gray-500 italic mt-2">{meal.notes}</p>
+                                          )}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </details>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Key Principles & Success Metrics */}
+                    {(selectedPlan.plan_snapshot?.key_principles || selectedPlan.plan_snapshot?.success_metrics) && (
+                      <div className="border-t pt-6">
+                        <div className="grid md:grid-cols-2 gap-6">
+                          {selectedPlan.plan_snapshot.key_principles && selectedPlan.plan_snapshot.key_principles.length > 0 && (
+                            <div>
+                              <h5 className="font-medium text-gray-900 mb-3">Key Principles for Success</h5>
+                              <ul className="space-y-2">
+                                {selectedPlan.plan_snapshot.key_principles.map((principle: string, idx: number) => (
+                                  <li key={idx} className="flex items-start gap-2 text-sm text-gray-700">
+                                    <CheckCircle2 className="h-4 w-4 text-green-600 flex-shrink-0 mt-0.5" />
+                                    <span>{principle}</span>
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+                          {selectedPlan.plan_snapshot.success_metrics && selectedPlan.plan_snapshot.success_metrics.length > 0 && (
+                            <div>
+                              <h5 className="font-medium text-gray-900 mb-3">Success Metrics</h5>
+                              <ul className="space-y-2">
+                                {selectedPlan.plan_snapshot.success_metrics.map((metric: string, idx: number) => (
+                                  <li key={idx} className="flex items-start gap-2 text-sm text-gray-700">
+                                    <Target className="h-4 w-4 text-blue-600 flex-shrink-0 mt-0.5" />
+                                    <span>{metric}</span>
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Important Notes */}
+                    {selectedPlan.plan_snapshot?.important_notes && (
+                      <div className="border-t pt-6">
+                        <div className="p-4 bg-yellow-50 rounded-lg border border-yellow-200">
+                          <div className="flex gap-2">
+                            <AlertCircle className="h-5 w-5 text-yellow-600 flex-shrink-0" />
+                            <div>
+                              <h5 className="font-medium text-yellow-900 mb-1">Important Notes</h5>
+                              <p className="text-sm text-yellow-800">
+                                {selectedPlan.plan_snapshot.important_notes}
+                              </p>
+                            </div>
+                          </div>
                         </div>
                       </div>
                     )}
