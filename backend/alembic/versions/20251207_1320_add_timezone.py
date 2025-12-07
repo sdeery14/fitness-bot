@@ -1,7 +1,7 @@
 """add timezone field to users table
 
 Revision ID: 20251207_1320_add_timezone
-Revises: 20251117_0924
+Revises: 635c1b9ac835
 Create Date: 2025-12-07 13:20:00.000000
 
 """
@@ -11,7 +11,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision = '20251207_1320_add_timezone'
-down_revision = '20251117_0924'  # Update this to your latest migration
+down_revision = '635c1b9ac835'  # References the performance indexes migration
 branch_labels = None
 depends_on = None
 

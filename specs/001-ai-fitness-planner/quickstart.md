@@ -289,7 +289,7 @@ docker-compose -f docker/docker-compose.yml exec postgres psql -U fitness_user -
 **Reset Database** (deletes all data):
 ```powershell
 docker-compose -f docker/docker-compose.yml down -v
-docker-compose -f docker/docker-compose.yml up -d postgres redis
+docker-compose -f docker/docker-compose.yml up -d postgres redis backend
 docker-compose -f docker/docker-compose.yml exec backend alembic upgrade head
 ```
 
