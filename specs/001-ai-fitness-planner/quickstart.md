@@ -293,6 +293,34 @@ docker-compose -f docker/docker-compose.yml up -d postgres redis
 docker-compose -f docker/docker-compose.yml exec backend alembic upgrade head
 ```
 
+**Clear User Data for Testing Intake Agent** (preserves user account):
+
+Useful for testing the intake specialist without needing to sign up again:
+
+```powershell
+# Get your user email (replace with yours)
+$userEmail = "dev@example.com"
+
+# Clear fitness plans, schedules, and conversation history (keeps account)
+docker-compose -f docker/docker-compose.yml exec -T postgres psql -U fitness_user -d fitness_bot -c "
+DELETE FROM schedule_entries WHERE schedule_id IN (SELECT id FROM schedules WHERE user_id = (SELECT id FROM users WHERE email = '$userEmail'));
+DELETE FROM schedules WHERE user_id = (SELECT id FROM users WHERE email = '$userEmail');
+DELETE FROM workouts WHERE workout_plan_id IN (SELECT id FROM workout_plans WHERE fitness_plan_id IN (SELECT id FROM fitness_plans WHERE user_id = (SELECT id FROM users WHERE email = '$userEmail')));
+DELETE FROM workout_plans WHERE fitness_plan_id IN (SELECT id FROM fitness_plans WHERE user_id = (SELECT id FROM users WHERE email = '$userEmail'));
+DELETE FROM meals WHERE meal_plan_id IN (SELECT id FROM meal_plans WHERE fitness_plan_id IN (SELECT id FROM fitness_plans WHERE user_id = (SELECT id FROM users WHERE email = '$userEmail')));
+DELETE FROM meal_plans WHERE fitness_plan_id IN (SELECT id FROM fitness_plans WHERE user_id = (SELECT id FROM users WHERE email = '$userEmail'));
+DELETE FROM phases WHERE fitness_plan_id IN (SELECT id FROM fitness_plans WHERE user_id = (SELECT id FROM users WHERE email = '$userEmail'));
+DELETE FROM fitness_plans WHERE user_id = (SELECT id FROM users WHERE email = '$userEmail');
+DELETE FROM conversations WHERE user_id = (SELECT id FROM users WHERE email = '$userEmail');
+DELETE FROM progress_records WHERE user_id = (SELECT id FROM users WHERE email = '$userEmail');
+"
+
+# Verify user still exists
+docker-compose -f docker/docker-compose.yml exec -T postgres psql -U fitness_user -d fitness_bot -c "SELECT email, full_name, current_fitness_level FROM users WHERE email = '$userEmail';"
+```
+
+Now you can test the intake specialist from a fresh state without creating a new account!
+
 **Redis Access**:
 ```powershell
 # Redis CLI
