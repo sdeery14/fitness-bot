@@ -7,6 +7,7 @@ from agents import Runner
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.ai.agent import PlanContext, UserContext
+from src.config import settings
 from src.ai.app_agents.conversation_agent import conversation_agent
 from src.ai.app_agents.fitness_plan_agent import create_fitness_plan_agent
 from src.ai.app_agents.intake_specialist_agent import intake_specialist_agent
@@ -166,7 +167,7 @@ What brings you here today?"""
             conversation_id=db_conversation.id,
             sender_type="assistant",
             message_content=agent_response,
-            model_used="gpt-4",
+            model_used=settings.MODEL_NAME,
         )
 
         # Re-fetch conversation with messages to get proper IDs and timestamps
@@ -293,7 +294,7 @@ What brings you here today?"""
             conversation_id=db_conversation.id,
             sender_type="assistant",
             message_content=agent_response,
-            model_used="gpt-4",
+            model_used=settings.MODEL_NAME,
         )
 
         # Check if agent has generated a structured plan

@@ -18,7 +18,7 @@ class Settings(BaseSettings):
     
     # OpenAI
     OPENAI_API_KEY: str
-    MODEL_NAME: str = "gpt-4o"  # Default model, can be overridden via env
+    MODEL_NAME: str = "gpt-5.1"  # Default model, can be overridden via env
     
     # JWT Authentication
     JWT_SECRET: str  # Used by AuthService
