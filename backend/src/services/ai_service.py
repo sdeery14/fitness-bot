@@ -3,11 +3,14 @@
 Coordinates the conversation flow between user and AI agents, manages
 handoffs between specialist agents, and handles session persistence.
 """
+from datetime import datetime
+
 from agents import Runner
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.ai.agent import PlanContext, UserContext
 from src.config import settings
+from src.utils.date_utils import get_current_datetime
 from src.ai.app_agents.conversation_agent import conversation_agent
 from src.ai.app_agents.fitness_plan_agent import create_fitness_plan_agent
 from src.ai.app_agents.intake_specialist_agent import intake_specialist_agent
@@ -102,6 +105,10 @@ class AIOrchestrationService:
                 conversation_type="plan_creation",
             )
 
+        # Get current datetime in user's timezone
+        user_timezone = user.timezone or "UTC"
+        current_dt = get_current_datetime(user_timezone)
+        
         # Create user context
         user_context = UserContext(
             user_id=str(user.id),
@@ -151,10 +158,14 @@ What brings you here today?"""
                 message_content=initial_message,
             )
 
+            # Build context-aware input with datetime information
+            contextual_input = f"""Current Date and Time: {current_dt.strftime('%A, %B %d, %Y at %I:%M %p')} ({user_timezone})
+User Message: {initial_message}"""
+            
             # Start conversation with selected agent
             result = await Runner.run(
                 starting_agent=selected_agent,
-                input=initial_message,
+                input=contextual_input,
                 context=plan_context,
                 session=None,  # Disable session memory, manage history manually
             )
@@ -242,6 +253,10 @@ What brings you here today?"""
                 "content": msg.message_content,
             })
 
+        # Get current datetime in user's timezone
+        user_timezone = user.timezone or "UTC"
+        current_dt = get_current_datetime(user_timezone)
+        
         # Reconstruct user context
         user_context = UserContext(
             user_id=str(user.id),
@@ -274,8 +289,12 @@ What brings you here today?"""
 
         try:
             # Continue conversation with the new user message
-            # Append new user message to conversation history
-            conversation_input = conversation_history + [{"role": "user", "content": user_message}]
+            # Build context-aware input with datetime information
+            contextual_message = f"""Current Date and Time: {current_dt.strftime('%A, %B %d, %Y at %I:%M %p')} ({user_timezone})
+User Message: {user_message}"""
+            
+            # Append contextual user message to conversation history
+            conversation_input = conversation_history + [{"role": "user", "content": contextual_message}]
             
             result = await Runner.run(
                 starting_agent=selected_agent,

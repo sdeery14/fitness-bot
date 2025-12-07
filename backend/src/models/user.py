@@ -40,6 +40,9 @@ class User(Base, UUIDMixin, TimestampMixin):
     # User preferences (FR-043)
     preferences = Column(JSON, nullable=True)  # {"workout_duration_preference": 45, "meals_per_day": 3, "workout_days_per_week": 4, etc.}
 
+    # Settings
+    timezone = Column(String(50), nullable=False, default="UTC")  # IANA timezone string (e.g., "America/New_York", "Europe/London")
+
     # Relationships
     fitness_plans = relationship("FitnessPlan", back_populates="user", cascade="all, delete-orphan")
     conversations = relationship("Conversation", back_populates="user", cascade="all, delete-orphan")
