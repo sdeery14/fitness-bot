@@ -160,6 +160,37 @@ class FitnessPlanOutput(BaseModel):
         return True
 
 
+class SchedulePreferences(BaseModel):
+    """User's schedule preferences for workout and meal planning."""
+    
+    model_config = {"extra": "allow"}  # Allow additional fields for flexibility
+
+    split_type: str = Field(
+        default="weekly_fixed",
+        description="Training split type: 'weekly_fixed' (same days each week) or 'rolling' (e.g., 4-day cycle repeats regardless of calendar week)"
+    )
+    preferred_workout_days: list[str] | None = Field(
+        default=None,
+        description="Preferred days for workouts (e.g., ['Monday', 'Wednesday', 'Friday', 'Saturday']) for weekly_fixed. Leave None for rolling splits."
+    )
+    rest_days: list[str] | None = Field(
+        default=None,
+        description="Mandatory rest days (e.g., ['Sunday']) for weekly_fixed schedules"
+    )
+    preferred_time: str | None = Field(
+        default=None,
+        description="Preferred workout time: 'morning' (6-10am), 'afternoon' (12-4pm), 'evening' (5-9pm), or specific time like '6:00 AM'"
+    )
+    avoid_dates: list[str] | None = Field(
+        default=None,
+        description="Specific dates to avoid scheduling workouts (e.g., ['2025-12-25', '2026-01-01'] for holidays, travel, events). Format: YYYY-MM-DD"
+    )
+    notes: str | None = Field(
+        default=None,
+        description="Additional scheduling notes, constraints, or preferences"
+    )
+
+
 class ConversationRequirements(BaseModel):
     """Structured requirements extracted from conversation."""
     
@@ -172,5 +203,9 @@ class ConversationRequirements(BaseModel):
     time_per_session: int = Field(description="Available time per workout in minutes", ge=20, le=120)
     dietary_restrictions: list[str] = Field(default_factory=list, description="Dietary restrictions")
     injuries_or_conditions: list[str] = Field(default_factory=list, description="Injuries or health conditions")
+    schedule_preferences: SchedulePreferences = Field(
+        default_factory=SchedulePreferences,
+        description="User's scheduling preferences and constraints"
+    )
     additional_preferences: dict[str, str] = Field(default_factory=dict, description="Other preferences")
 

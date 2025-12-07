@@ -30,16 +30,25 @@ class ScheduleService:
         user_id: UUID,
         fitness_plan_id: UUID,
         start_date: date | None = None,
+        schedule_preferences: dict | None = None,
     ) -> Schedule:
-        """Create a new schedule for a fitness plan.
+        """Create a new schedule for a fitness plan with user preferences.
 
         Generates schedule entries for all workouts and meals in the plan,
-        distributed across the plan duration.
+        distributed according to user's scheduling preferences (weekly fixed
+        vs rolling split, preferred days, rest days, avoid dates, etc.).
 
         Args:
             user_id: User's UUID
             fitness_plan_id: FitnessPlan's UUID
             start_date: Optional start date (defaults to today)
+            schedule_preferences: User's scheduling preferences dict with:
+                - split_type: 'weekly_fixed' or 'rolling'
+                - preferred_workout_days: list of day names for weekly_fixed
+                - rest_days: list of mandatory rest day names
+                - preferred_time: workout time preference
+                - avoid_dates: list of dates to skip (YYYY-MM-DD format)
+                - notes: additional scheduling notes
 
         Returns:
             Created schedule with entries
@@ -54,7 +63,6 @@ class ScheduleService:
             raise ValueError("Schedule already exists for this plan")
 
         # Load the fitness plan with related workouts and meals
-        # Note: FitnessPlan has workout_plans and meal_plans (plural) relationships
         stmt = (
             select(FitnessPlan)
             .where(FitnessPlan.id == fitness_plan_id)
@@ -71,6 +79,9 @@ class ScheduleService:
         # Create schedule
         if start_date is None:
             start_date = date.today()
+        
+        if schedule_preferences is None:
+            schedule_preferences = {}
 
         schedule = Schedule(
             user_id=user_id,
@@ -96,14 +107,26 @@ class ScheduleService:
         meals_result = await self.db.execute(meals_stmt)
         meals = list(meals_result.scalars().all())
 
-        # Generate schedule entries for workouts
+        # Generate schedule entries for workouts based on split type
         if workouts:
-            await self._generate_workout_entries(
-                schedule=schedule,
-                workouts=workouts,
-                start_date=start_date,
-                duration_weeks=plan.duration_weeks,
-            )
+            split_type = schedule_preferences.get("split_type", "weekly_fixed")
+            
+            if split_type == "rolling":
+                await self._generate_rolling_split_entries(
+                    schedule=schedule,
+                    workouts=workouts,
+                    start_date=start_date,
+                    duration_weeks=plan.duration_weeks,
+                    preferences=schedule_preferences,
+                )
+            else:
+                await self._generate_weekly_fixed_entries(
+                    schedule=schedule,
+                    workouts=workouts,
+                    start_date=start_date,
+                    duration_weeks=plan.duration_weeks,
+                    preferences=schedule_preferences,
+                )
 
         # Generate schedule entries for meals
         if meals:
@@ -118,69 +141,182 @@ class ScheduleService:
         await self.db.refresh(schedule)
         return schedule
 
-    async def _generate_workout_entries(
+    async def _generate_weekly_fixed_entries(
         self,
         schedule: Schedule,
         workouts: list[Workout],
         start_date: date,
         duration_weeks: int,
+        preferences: dict | None,
     ) -> None:
-        """Generate schedule entries for workouts spanning the entire plan duration.
-
-        Distributes workouts across the week based on their phase assignment.
-        Creates entries up to the plan's end date to ensure complete coverage.
-
+        """Generate weekly fixed schedule (same days each week).
+        
+        Assigns each workout to specific days of the week based on user preferences.
+        Workouts repeat on the same day each week throughout the plan duration.
+        
         Args:
             schedule: Schedule to add entries to
             workouts: List of workouts from the plan
             start_date: Schedule start date
             duration_weeks: Total plan duration in weeks
+            preferences: User scheduling preferences dict
         """
-        # Calculate plan end date to ensure complete coverage
+        # Calculate plan end date
         plan_end_date = start_date + timedelta(weeks=duration_weeks)
         
-        # Group workouts by phase
-        workouts_by_phase: dict[UUID | None, list[Workout]] = {}
+        # Get user preferences
+        preferred_days = preferences.get("preferred_workout_days", []) if preferences else []
+        rest_days = preferences.get("rest_days", []) if preferences else []
+        avoid_dates = preferences.get("avoid_dates", []) if preferences else []
+        preferred_time = self._parse_preferred_time(preferences)
+        
+        # Day name to weekday offset mapping
+        day_name_to_offset = {
+            "monday": 0, "tuesday": 1, "wednesday": 2, "thursday": 3,
+            "friday": 4, "saturday": 5, "sunday": 6
+        }
+        
+        # Create workout-to-day mapping
+        workout_schedule = {}
+        if preferred_days:
+            # User specified preferred days - assign workouts to these days
+            for i, workout in enumerate(workouts):
+                day_name = preferred_days[i % len(preferred_days)]
+                workout_schedule[workout.id] = day_name_to_offset.get(day_name.lower(), i % 7)
+        else:
+            # Auto-distribute workouts evenly across the week
+            num_workouts = len(workouts)
+            if num_workouts > 0:
+                days_between = 7 // num_workouts if num_workouts <= 7 else 1
+                for i, workout in enumerate(workouts):
+                    workout_schedule[workout.id] = (i * days_between) % 7
+        
+        # Generate entries for each workout on its assigned day
         for workout in workouts:
-            phase_id = workout.phase_id
-            if phase_id not in workouts_by_phase:
-                workouts_by_phase[phase_id] = []
-            workouts_by_phase[phase_id].append(workout)
-
-        # For each phase, schedule workouts evenly throughout the phase duration
-        for _phase_id, phase_workouts in workouts_by_phase.items():
-            if not phase_workouts:
-                continue
-
-            # Default to full plan duration if no phase info
-            phase_start = start_date
-            phase_end = plan_end_date
-
-            # If phase exists, use its dates (would need to load phase info)
-            # For now, distribute evenly across entire plan duration
-
-            # Schedule each workout type on different days of the week
-            days_between_workouts = 2  # Default spacing
-            for idx, workout in enumerate(phase_workouts):
-                # Calculate which day of the week this workout should occur
-                day_offset = idx * days_between_workouts
-
-                # Repeat weekly throughout the entire phase duration (up to plan end)
-                current_date = phase_start + timedelta(days=day_offset)
-
-                # Generate entries up to and including the plan end date
-                while current_date <= phase_end:
+            day_offset = workout_schedule[workout.id]
+            
+            # Find first occurrence of this day of week
+            current_date = start_date
+            while current_date.weekday() != day_offset:
+                current_date += timedelta(days=1)
+            
+            # Repeat weekly until plan end
+            while current_date <= plan_end_date:
+                # Skip if it's a rest day or avoid date
+                day_name = current_date.strftime("%A").lower()
+                date_str = current_date.isoformat()
+                
+                if day_name not in [d.lower() for d in rest_days] and date_str not in avoid_dates:
                     entry = ScheduleEntry(
                         schedule_id=schedule.id,
                         entry_type="workout",
                         entry_date=current_date,
-                        entry_time=None,  # User can set their preferred time
+                        entry_time=preferred_time,
                         workout_id=workout.id,
                         meal_id=None,
                         completion_status="scheduled",
                     )
                     self.db.add(entry)
-                    current_date += timedelta(weeks=1)  # Repeat weekly
+                
+                current_date += timedelta(weeks=1)
+    
+    async def _generate_rolling_split_entries(
+        self,
+        schedule: Schedule,
+        workouts: list[Workout],
+        start_date: date,
+        duration_weeks: int,
+        preferences: dict | None,
+    ) -> None:
+        """Generate rolling split schedule (e.g., 4-day cycle repeats regardless of week).
+        
+        Workouts cycle through in order, independent of calendar weeks.
+        For example, a 4-day split continues: Day1, Day2, Day3, Day4, Day1, Day2...
+        This is useful for powerlifting programs or when weekly structure isn't needed.
+        
+        Args:
+            schedule: Schedule to add entries to
+            workouts: List of workouts from the plan
+            start_date: Schedule start date
+            duration_weeks: Total plan duration in weeks
+            preferences: User scheduling preferences dict
+        """
+        # Calculate plan end date
+        plan_end_date = start_date + timedelta(weeks=duration_weeks)
+        
+        # Get user preferences
+        rest_days_of_week = preferences.get("rest_days", []) if preferences else []
+        avoid_dates = preferences.get("avoid_dates", []) if preferences else []
+        preferred_time = self._parse_preferred_time(preferences)
+        
+        # Start rolling through workouts
+        current_date = start_date
+        workout_idx = 0
+        
+        while current_date <= plan_end_date:
+            # Check if current date should be skipped
+            day_name = current_date.strftime("%A").lower()
+            date_str = current_date.isoformat()
+            
+            # Skip rest days and avoid dates
+            if day_name in [d.lower() for d in rest_days_of_week] or date_str in avoid_dates:
+                current_date += timedelta(days=1)
+                continue
+            
+            # Assign next workout in rotation
+            workout = workouts[workout_idx % len(workouts)]
+            
+            entry = ScheduleEntry(
+                schedule_id=schedule.id,
+                entry_type="workout",
+                entry_date=current_date,
+                entry_time=preferred_time,
+                workout_id=workout.id,
+                meal_id=None,
+                completion_status="scheduled",
+            )
+            self.db.add(entry)
+            
+            # Move to next workout and next day
+            workout_idx += 1
+            current_date += timedelta(days=1)
+    
+    def _parse_preferred_time(self, preferences: dict | None) -> time | None:
+        """Parse preferred workout time from preferences.
+        
+        Args:
+            preferences: User preferences dict with 'preferred_time' field
+            
+        Returns:
+            time object or None if no preference
+        """
+        if not preferences:
+            return None
+        
+        preferred_time_str = preferences.get("preferred_time", "")
+        if not preferred_time_str:
+            return None
+        
+        # Handle named time slots
+        time_mappings = {
+            "morning": time(7, 0),
+            "afternoon": time(14, 0),
+            "evening": time(18, 0),
+        }
+        
+        if preferred_time_str.lower() in time_mappings:
+            return time_mappings[preferred_time_str.lower()]
+        
+        # Try to parse specific time like "6:00 AM" or "18:30"
+        try:
+            # Simple parsing for "HH:MM" or "HH:MM AM/PM"
+            time_str = preferred_time_str.strip().upper()
+            if "AM" in time_str or "PM" in time_str:
+                return datetime.strptime(time_str, "%I:%M %p").time()
+            else:
+                return datetime.strptime(time_str, "%H:%M").time()
+        except (ValueError, AttributeError):
+            return None
 
     async def _generate_meal_entries(
         self,

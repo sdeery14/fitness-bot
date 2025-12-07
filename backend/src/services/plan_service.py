@@ -324,8 +324,37 @@ class PlanService:
         plan.plan_snapshot = plan_output
         plan.status = "active"
 
-        # Extract workout plan data
-        workout_plan_data = plan_output.get("workout_plan", {})
+        # Create a default phase if plan doesn't have phases yet
+        # This is needed because Workout and Meal require phase_id
+        from src.models.fitness_plan import Phase
+        from datetime import timedelta
+        
+        stmt_phases = select(Phase).where(Phase.fitness_plan_id == plan_id)
+        result_phases = await self.db.execute(stmt_phases)
+        existing_phases = result_phases.scalars().all()
+        
+        if not existing_phases:
+            # Create a single phase spanning the entire plan duration
+            default_phase = Phase(
+                fitness_plan_id=plan_id,
+                phase_number=1,
+                name="Complete Program",
+                objectives=["Follow the complete training and nutrition program"],
+                start_date=plan.start_date,
+                end_date=plan.end_date or (plan.start_date + timedelta(weeks=plan.duration_weeks)),
+                phase_details={"type": "complete_program"},
+            )
+            self.db.add(default_phase)
+            await self.db.flush()  # Flush to get the phase ID
+            default_phase_id = default_phase.id
+        else:
+            # Use first existing phase
+            default_phase_id = existing_phases[0].id
+
+        # Extract workout plan data from nested structure
+        workout_plan_output = plan_output.get("workout_plan_output", {})
+        workout_plan_data = workout_plan_output.get("workout_plan", {})
+        
         if workout_plan_data:
             # Create a WorkoutPlan record for the entire program
             workout_plan = WorkoutPlan(
@@ -335,13 +364,37 @@ class PlanService:
                 workout_plan_details={
                     "program_type": workout_plan_data.get("program_type", "General"),
                     "duration_weeks": workout_plan_data.get("duration_weeks", plan.duration_weeks),
-                    "workouts": workout_plan_data.get("workouts", []),
+                    "goal": workout_plan_data.get("goal", "General Fitness"),
                 },
             )
             self.db.add(workout_plan)
+            await self.db.flush()  # Flush to get the workout_plan ID
+            
+            # Create individual Workout records from workouts array
+            from src.models.workout import Workout
+            workouts_list = workout_plan_data.get("workouts", [])
+            
+            for workout_data in workouts_list:
+                workout = Workout(
+                    workout_plan_id=workout_plan.id,
+                    phase_id=default_phase_id,
+                    name=workout_data.get("day_name", "Workout"),
+                    workout_type="strength",  # Default type
+                    duration_minutes=workout_data.get("duration_minutes", 60),
+                    intensity_level="moderate",  # Default intensity
+                    workout_structure={
+                        "warmup": workout_data.get("warmup", "5-10 minutes of light cardio"),
+                        "cooldown": workout_data.get("cooldown", "5-10 minutes of stretching"),
+                        "focus": workout_data.get("focus", "General"),
+                        "exercises": workout_data.get("exercises", []),
+                    },
+                )
+                self.db.add(workout)
 
-        # Extract meal plan data
-        meal_plan_data = plan_output.get("meal_plan", {})
+        # Extract meal plan data from nested structure
+        meal_plan_output = plan_output.get("meal_plan_output", {})
+        meal_plan_data = meal_plan_output.get("meal_plan", {})
+        
         if meal_plan_data:
             # Parse macro split to calculate individual macro targets
             daily_calories = meal_plan_data.get("daily_calorie_target", 2000)
@@ -389,6 +442,41 @@ class PlanService:
                 meals_per_day=meal_plan_data.get("meal_frequency", 3),
             )
             self.db.add(meal_plan)
+            await self.db.flush()  # Flush to get the meal_plan ID
+            
+            # Create individual Meal records from sample_days array
+            from src.models.meal import Meal
+            sample_days = meal_plan_data.get("sample_days", [])
+            
+            for day_idx, day_plan in enumerate(sample_days):
+                meals_list = day_plan.get("meals", [])
+                
+                for meal_data in meals_list:
+                    # Calculate meal macros from food items
+                    foods = meal_data.get("foods", [])
+                    meal_protein = sum(food.get("protein_g", 0) for food in foods)
+                    meal_carbs = sum(food.get("carbs_g", 0) for food in foods)
+                    meal_fat = sum(food.get("fat_g", 0) for food in foods)
+                    meal_calories = meal_data.get("total_calories", 0)
+                    
+                    meal = Meal(
+                        meal_plan_id=meal_plan.id,
+                        phase_id=default_phase_id,
+                        name=meal_data.get("meal_name", "Meal"),
+                        meal_type=meal_data.get("meal_name", "Meal").lower(),
+                        day_of_week=day_idx + 1,  # 1-7 for each sample day
+                        calories=meal_calories,
+                        protein_grams=meal_protein,
+                        carbs_grams=meal_carbs,
+                        fats_grams=meal_fat,
+                        fiber_grams=0,  # Not provided in current schema
+                        meal_details={
+                            "time": meal_data.get("time", ""),
+                            "foods": foods,
+                            "notes": meal_data.get("notes", ""),
+                        },
+                    )
+                    self.db.add(meal)
 
         # Commit all changes
         await self.db.commit()
@@ -409,12 +497,17 @@ class PlanService:
         existing_schedule = existing_schedule_result.scalar_one_or_none()
         
         if not existing_schedule:
+            # Extract schedule preferences from plan requirements
+            requirements = plan_output.get("requirements", {})
+            schedule_preferences = requirements.get("schedule_preferences", {})
+            
             # Create schedule starting from plan start_date, covering entire duration
             try:
                 await schedule_service.create_schedule(
                     user_id=plan.user_id,
                     fitness_plan_id=plan_id,
                     start_date=plan.start_date,
+                    schedule_preferences=schedule_preferences,
                 )
             except Exception as schedule_error:
                 # Log the error but don't fail the plan save operation

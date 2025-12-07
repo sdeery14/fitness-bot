@@ -100,6 +100,10 @@ class FitnessPlanInput(BaseModel):
     injuries_or_conditions: list[str] = Field(
         default_factory=list, description="Injuries or health conditions"
     )
+    schedule_preferences: dict = Field(
+        default_factory=dict,
+        description="User's scheduling preferences: split_type (weekly_fixed|rolling), preferred_workout_days, rest_days, preferred_time, avoid_dates, notes"
+    )
 
 
 @function_tool
@@ -269,26 +273,34 @@ Time per Session: {requirements.time_per_session} minutes
                 # Create plan service
                 plan_service = PlanService(db_session)
 
+                # Prepare requirements dict
+                requirements_dict = {
+                    "fitness_level": requirements.fitness_level,
+                    "workout_frequency": requirements.workout_frequency,
+                    "equipment_access": requirements.equipment_access,
+                    "time_per_session": requirements.time_per_session,
+                    "dietary_restrictions": requirements.dietary_restrictions,
+                    "meal_frequency": requirements.meal_frequency,
+                    "injuries_or_conditions": requirements.injuries_or_conditions,
+                    "schedule_preferences": requirements.schedule_preferences,
+                }
+                
                 # Create fitness plan record
                 fitness_plan = await plan_service.create_plan(
                     user_id=user_id,
                     goal=requirements.primary_goal,
-                    requirements={
-                        "fitness_level": requirements.fitness_level,
-                        "workout_frequency": requirements.workout_frequency,
-                        "equipment_access": requirements.equipment_access,
-                        "time_per_session": requirements.time_per_session,
-                        "dietary_restrictions": requirements.dietary_restrictions,
-                        "meal_frequency": requirements.meal_frequency,
-                        "injuries_or_conditions": requirements.injuries_or_conditions,
-                    },
+                    requirements=requirements_dict,
                     duration_weeks=fitness_plan_output.duration_weeks,
                 )
 
+                # Prepare plan output with requirements included
+                plan_output_dict = fitness_plan_output.model_dump()
+                plan_output_dict["requirements"] = requirements_dict
+                
                 # Save the complete generated plan data
                 await plan_service.save_generated_plan(
                     plan_id=fitness_plan.id,
-                    plan_output=fitness_plan_output.model_dump(),
+                    plan_output=plan_output_dict,
                 )
 
                 plan_id = str(fitness_plan.id)
