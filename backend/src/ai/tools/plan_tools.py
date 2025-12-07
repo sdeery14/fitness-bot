@@ -14,7 +14,7 @@ from pydantic import BaseModel, Field
 from src.ai.app_agents.fitness_plan_agent import create_fitness_plan_agent
 from src.ai.app_agents.meal_plan_agent import meal_plan_agent
 from src.ai.app_agents.workout_plan_agent import workout_plan_agent
-from src.ai.schemas import FitnessPlanOutput
+from src.ai.schemas import FitnessPlanOutput, SchedulePreferences
 from src.services.plan_service import PlanService
 
 # Context variables for passing user_id and db_session to function tools
@@ -100,8 +100,8 @@ class FitnessPlanInput(BaseModel):
     injuries_or_conditions: list[str] = Field(
         default_factory=list, description="Injuries or health conditions"
     )
-    schedule_preferences: dict = Field(
-        default_factory=dict,
+    schedule_preferences: SchedulePreferences = Field(
+        default_factory=SchedulePreferences,
         description="User's scheduling preferences: split_type (weekly_fixed|rolling), preferred_workout_days, rest_days, preferred_time, avoid_dates, notes"
     )
 

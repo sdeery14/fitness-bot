@@ -163,7 +163,7 @@ class FitnessPlanOutput(BaseModel):
 class SchedulePreferences(BaseModel):
     """User's schedule preferences for workout and meal planning."""
     
-    model_config = {"extra": "allow"}  # Allow additional fields for flexibility
+    model_config = {"extra": "forbid"}  # Strict schema for agents SDK
 
     split_type: str = Field(
         default="weekly_fixed",
@@ -207,5 +207,5 @@ class ConversationRequirements(BaseModel):
         default_factory=SchedulePreferences,
         description="User's scheduling preferences and constraints"
     )
-    additional_preferences: dict[str, str] = Field(default_factory=dict, description="Other preferences")
+    preferences: str | None = Field(default=None, description="Other preferences or notes")
 
