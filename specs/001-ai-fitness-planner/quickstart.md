@@ -405,6 +405,47 @@ Using the shorthand `$dc = "docker-compose -f docker/docker-compose.yml"`:
 
 ---
 
+## Timezone Detection & Handling
+
+The application automatically detects and uses the client's timezone for all AI interactions:
+
+**How It Works**:
+- Frontend detects browser timezone using `Intl.DateTimeFormat().resolvedOptions().timeZone`
+- Timezone is sent during registration and login (IANA format: "America/New_York", "Europe/London", etc.)
+- User's timezone is stored in the `users.timezone` database field
+- All AI agents receive datetime context in user's local timezone:
+  ```
+  Current Date and Time: Saturday, December 07, 2025 at 01:20 PM (America/New_York)
+  User Message: [user's message]
+  ```
+
+**Updating Timezone**:
+```powershell
+# PATCH /api/v1/users/me with timezone field
+curl -X PATCH http://localhost:8000/api/v1/users/me \
+  -H "Authorization: Bearer $token" \
+  -H "Content-Type: application/json" \
+  -d '{"timezone": "Asia/Tokyo"}'
+```
+
+**Per-Message Timezone Override** (optional):
+```powershell
+# Include timezone in message request to override user's stored timezone
+curl -X POST http://localhost:8000/api/v1/ai/conversations/$conversationId/messages \
+  -H "Authorization: Bearer $token" \
+  -H "Content-Type: application/json" \
+  -d '{"message": "What should I eat for breakfast?", "timezone": "Europe/Paris"}'
+```
+
+**Implementation Files**:
+- `frontend/src/lib/timezone.ts` - Browser timezone detection utilities
+- `backend/src/models/user.py` - User model with timezone field
+- `backend/src/services/ai_service.py` - Datetime context formatting
+- `backend/src/api/v1/auth.py` - Registration/login with timezone
+- `backend/src/api/v1/users.py` - Timezone update endpoint
+
+---
+
 ## Next Steps & Resources
 
 **Explore**:

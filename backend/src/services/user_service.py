@@ -51,6 +51,7 @@ class UserService:
         user_id: UUID,
         name: str | None = None,
         email: str | None = None,
+        timezone: str | None = None,
     ) -> User | None:
         """Update user profile information.
 
@@ -58,6 +59,7 @@ class UserService:
             user_id: User's UUID
             name: Optional new name
             email: Optional new email
+            timezone: Optional IANA timezone string (e.g., "America/New_York")
 
         Returns:
             Updated user instance if found, None otherwise
@@ -74,6 +76,8 @@ class UserService:
             if existing and existing.id != user_id:
                 raise ValueError("Email already in use")
             user.email = email
+        if timezone is not None:
+            user.timezone = timezone
 
         await self.db.commit()
         await self.db.refresh(user)

@@ -216,6 +216,7 @@ User Message: {initial_message}"""
         user: User,
         conversation_id: str,
         user_message: str,
+        timezone_override: str | None = None,
     ) -> dict:
         """Continue an existing conversation.
 
@@ -223,6 +224,7 @@ User Message: {initial_message}"""
             user: User in the conversation
             conversation_id: Session ID from previous interaction
             user_message: User's message
+            timezone_override: Optional timezone to override user's stored timezone for this message
 
         Returns:
             Dict with agent_response, status, and updated context
@@ -253,8 +255,8 @@ User Message: {initial_message}"""
                 "content": msg.message_content,
             })
 
-        # Get current datetime in user's timezone
-        user_timezone = user.timezone or "UTC"
+        # Get current datetime in user's timezone (use override if provided)
+        user_timezone = timezone_override or user.timezone or "UTC"
         current_dt = get_current_datetime(user_timezone)
         
         # Reconstruct user context

@@ -102,7 +102,7 @@ class FitnessPlanInput(BaseModel):
     )
     schedule_preferences: SchedulePreferences = Field(
         default_factory=SchedulePreferences,
-        description="User's scheduling preferences: split_type (weekly_fixed|rolling), preferred_workout_days, rest_days, preferred_time, avoid_dates, notes"
+        description="User's scheduling preferences: split_type (weekly_fixed|rolling), preferred_workout_days, rest_days, preferred_time, avoid_dates, notes",
     )
 
 
@@ -284,7 +284,7 @@ Time per Session: {requirements.time_per_session} minutes
                     "injuries_or_conditions": requirements.injuries_or_conditions,
                     "schedule_preferences": requirements.schedule_preferences,
                 }
-                
+
                 # Create fitness plan record
                 fitness_plan = await plan_service.create_plan(
                     user_id=user_id,
@@ -296,7 +296,7 @@ Time per Session: {requirements.time_per_session} minutes
                 # Prepare plan output with requirements included
                 plan_output_dict = fitness_plan_output.model_dump()
                 plan_output_dict["requirements"] = requirements_dict
-                
+
                 # Save the complete generated plan data
                 await plan_service.save_generated_plan(
                     plan_id=fitness_plan.id,

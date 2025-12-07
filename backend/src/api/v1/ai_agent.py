@@ -50,6 +50,7 @@ class SendMessageRequest(BaseModel):
     """Send message request."""
 
     message: str
+    timezone: str | None = None  # Optional: override user's stored timezone for this message
 
 
 class MessageResponse(BaseModel):
@@ -182,6 +183,7 @@ async def send_message(
             user=user,
             conversation_id=conversation_id,
             user_message=request.message,
+            timezone_override=request.timezone,
         )
 
         # Generate a message_id (could use UUID from database message in future)

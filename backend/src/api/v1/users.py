@@ -29,6 +29,7 @@ class UpdateUserRequest(BaseModel):
     name: str | None = None
     email: EmailStr | None = None
     preferences: dict | None = None
+    timezone: str | None = None  # IANA timezone (e.g., "America/New_York")
 
 
 @router.get("/me")
@@ -89,11 +90,12 @@ async def update_current_user(
 
     try:
         # Update profile fields
-        if request.name is not None or request.email is not None:
+        if request.name is not None or request.email is not None or request.timezone is not None:
             user = await user_service.update_user(
                 user_id=user_id,
                 name=request.name,
                 email=request.email,
+                timezone=request.timezone,
             )
         else:
             user = await user_service.get_user(user_id)

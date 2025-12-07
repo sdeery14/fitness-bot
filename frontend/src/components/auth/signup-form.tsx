@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { getBrowserTimezone } from "@/lib/timezone";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
 
@@ -76,6 +77,7 @@ export function SignupForm() {
           email: formData.email,
           password: formData.password,
           date_of_birth: formData.date_of_birth,
+          timezone: getBrowserTimezone(),
         }),
       });
 

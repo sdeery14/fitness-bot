@@ -135,6 +135,7 @@ class AuthService:
         name: str,
         date_of_birth: str | None = None,
         fitness_level: str | None = None,
+        timezone: str = "UTC",
     ) -> User:
         """Register a new user.
 
@@ -144,6 +145,7 @@ class AuthService:
             name: User's full name
             date_of_birth: User's date of birth (ISO format YYYY-MM-DD)
             fitness_level: User's fitness level (beginner, intermediate, advanced)
+            timezone: IANA timezone string (e.g., "America/New_York")
 
         Returns:
             Created user instance
@@ -176,6 +178,7 @@ class AuthService:
             name=name,
             date_of_birth=dob_datetime,
             fitness_level=fitness_level,
+            timezone=timezone,
             preferences={},  # Empty preferences initially
         )
 
@@ -185,12 +188,13 @@ class AuthService:
 
         return user
 
-    async def login(self, email: str, password: str) -> tuple[User, str, str] | None:
+    async def login(self, email: str, password: str, timezone: str | None = None) -> tuple[User, str, str] | None:
         """Authenticate a user and generate tokens.
 
         Args:
             email: User email
             password: Plain text password
+            timezone: Optional IANA timezone to update user's timezone
 
         Returns:
             Tuple of (user, access_token, refresh_token) if successful, None if failed
@@ -202,6 +206,12 @@ class AuthService:
 
         if not user or not self.verify_password(password, user.password_hash):
             return None
+
+        # Update timezone if provided (user may have moved or changed devices)
+        if timezone:
+            user.timezone = timezone
+            await self.db.commit()
+            await self.db.refresh(user)
 
         # Generate tokens
         access_token = self.create_access_token(data={"sub": str(user.id)})

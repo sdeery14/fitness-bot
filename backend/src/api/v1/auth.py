@@ -19,6 +19,7 @@ class RegisterRequest(BaseModel):
     full_name: str
     date_of_birth: str
     current_fitness_level: str | None = None
+    timezone: str | None = None  # IANA timezone (e.g., "America/New_York")
 
     @field_validator('password')
     @classmethod
@@ -40,6 +41,7 @@ class LoginRequest(BaseModel):
 
     email: EmailStr
     password: str
+    timezone: str | None = None  # Optional: update timezone on login
 
 
 class TokenResponse(BaseModel):
@@ -82,6 +84,7 @@ async def register(
             name=request.full_name,
             date_of_birth=request.date_of_birth,
             fitness_level=request.current_fitness_level or None,
+            timezone=request.timezone or "UTC",
         )
     except ValueError as e:
         # Check if it's a duplicate email error
@@ -143,6 +146,7 @@ async def login(
     result = await auth_service.login(
         email=request.email,
         password=request.password,
+        timezone=request.timezone,
     )
 
     if not result:
