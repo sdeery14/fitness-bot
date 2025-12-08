@@ -13,10 +13,17 @@ class Conversation(Base, UUIDMixin, TimestampMixin):
     __tablename__ = "conversations"
 
     # User association
-    user_id = Column(PGUUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id = Column(
+        PGUUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
 
     # Optional fitness plan association (conversations can happen before plan creation)
-    fitness_plan_id = Column(PGUUID(as_uuid=True), ForeignKey("fitness_plans.id", ondelete="CASCADE"), nullable=True, index=True)
+    fitness_plan_id = Column(
+        PGUUID(as_uuid=True),
+        ForeignKey("fitness_plans.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+    )
 
     # Conversation metadata
     conversation_type = Column(
@@ -41,11 +48,18 @@ class Conversation(Base, UUIDMixin, TimestampMixin):
     # Relationships
     user = relationship("User", back_populates="conversations")
     fitness_plan = relationship("FitnessPlan", back_populates="conversations")
-    messages = relationship("Message", back_populates="conversation", cascade="all, delete-orphan", order_by="Message.created_at")
+    messages = relationship(
+        "Message",
+        back_populates="conversation",
+        cascade="all, delete-orphan",
+        order_by="Message.created_at",
+    )
     disruption_events = relationship("DisruptionEvent", back_populates="conversation")
 
     def __repr__(self) -> str:
-        return f"<Conversation(id={self.id}, user_id={self.user_id}, type={self.conversation_type})>"
+        return (
+            f"<Conversation(id={self.id}, user_id={self.user_id}, type={self.conversation_type})>"
+        )
 
 
 class Message(Base, UUIDMixin, TimestampMixin):
@@ -54,7 +68,12 @@ class Message(Base, UUIDMixin, TimestampMixin):
     __tablename__ = "messages"
 
     # Conversation association
-    conversation_id = Column(PGUUID(as_uuid=True), ForeignKey("conversations.id", ondelete="CASCADE"), nullable=False, index=True)
+    conversation_id = Column(
+        PGUUID(as_uuid=True),
+        ForeignKey("conversations.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
 
     # Message metadata
     sender_type = Column(
@@ -82,9 +101,21 @@ class DisruptionEvent(Base, UUIDMixin, TimestampMixin):
     __tablename__ = "disruption_events"
 
     # User and plan associations
-    user_id = Column(PGUUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
-    conversation_id = Column(PGUUID(as_uuid=True), ForeignKey("conversations.id", ondelete="SET NULL"), nullable=True, index=True)
-    fitness_plan_id = Column(PGUUID(as_uuid=True), ForeignKey("fitness_plans.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id = Column(
+        PGUUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    conversation_id = Column(
+        PGUUID(as_uuid=True),
+        ForeignKey("conversations.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    fitness_plan_id = Column(
+        PGUUID(as_uuid=True),
+        ForeignKey("fitness_plans.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
 
     # Disruption details
     disruption_type = Column(
@@ -94,7 +125,7 @@ class DisruptionEvent(Base, UUIDMixin, TimestampMixin):
     start_date = Column(Date, nullable=False)
     end_date = Column(Date, nullable=True)  # null means ongoing
     description = Column(Text, nullable=False)
-    
+
     # Severity assessment (impacts rescheduling strategy)
     severity = Column(
         Enum("minor", "moderate", "severe", name="disruption_severity"),
@@ -112,7 +143,7 @@ class DisruptionEvent(Base, UUIDMixin, TimestampMixin):
         nullable=False,
     )
     timeline_extension_days = Column(Integer, nullable=False, default=0)
-    
+
     # Additional metadata
     resolution_details = Column(JSON, nullable=True)
     # Structure: {
