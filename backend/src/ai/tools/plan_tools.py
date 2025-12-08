@@ -11,10 +11,9 @@ from uuid import UUID
 from agents import Runner, function_tool
 from pydantic import BaseModel, Field
 
-from src.ai.app_agents.fitness_plan_agent import create_fitness_plan_agent
 from src.ai.app_agents.meal_plan_agent import meal_plan_agent
 from src.ai.app_agents.workout_plan_agent import workout_plan_agent
-from src.ai.schemas import FitnessPlanOutput, SchedulePreferences
+from src.ai.schemas import SchedulePreferences
 from src.services.plan_service import PlanService
 
 # Context variables for passing user_id and db_session to function tools
@@ -200,11 +199,12 @@ Meal Frequency: {requirements.meal_frequency} meals per day
 
 @function_tool
 async def build_fitness_plan(requirements: FitnessPlanInput) -> str:
-    """Build a complete fitness plan by orchestrating workout and meal plan agents.
+    """Build a complete fitness plan by directly calling workout and meal plan tools.
 
     This is the main function tool that the conversation agent calls when ready
-    to generate a complete fitness plan. It coordinates the specialist agents
-    and returns a structured plan as JSON.
+    to generate a complete fitness plan. It directly calls build_workout_plan
+    and build_meal_plan functions, then combines their results into a unified
+    fitness plan.
 
     The user_id and db_session are retrieved from context variables set by the
     AI service before invoking the agent.
@@ -220,43 +220,69 @@ async def build_fitness_plan(requirements: FitnessPlanInput) -> str:
             - plan_id: str (database ID once saved)
 
     Raises:
-        ValueError: If agents fail to generate plan
+        ValueError: If plan generation fails
     """
     try:
-        # Create fitness plan agent (it will use build_workout_plan and build_meal_plan tools)
-        fitness_agent = create_fitness_plan_agent(workout_plan_agent, meal_plan_agent)
-
-        # Build prompt from requirements
-        prompt = f"""Create a complete fitness plan for a user with these requirements:
-
-Primary Goal: {requirements.primary_goal}
-Fitness Level: {requirements.fitness_level}
-Workout Frequency: {requirements.workout_frequency} days per week
-Equipment Access: {requirements.equipment_access}
-Time per Session: {requirements.time_per_session} minutes
-"""
-
-        if requirements.dietary_restrictions:
-            prompt += f"Dietary Restrictions: {', '.join(requirements.dietary_restrictions)}\n"
-
-        if requirements.injuries_or_conditions:
-            prompt += f"Injuries/Conditions: {', '.join(requirements.injuries_or_conditions)}\n"
-
-        # Run fitness plan agent - it will call build_workout_plan and build_meal_plan internally
-        result = await Runner.run(
-            starting_agent=fitness_agent,
-            input=prompt,
-            session=None,
+        # Build workout plan by calling build_workout_plan directly
+        workout_input = WorkoutPlanInput(
+            primary_goal=requirements.primary_goal,
+            fitness_level=requirements.fitness_level,
+            workout_frequency=requirements.workout_frequency,
+            equipment_access=requirements.equipment_access,
+            time_per_session=requirements.time_per_session,
+            injuries_or_conditions=requirements.injuries_or_conditions,
         )
+        
+        workout_plan_json = await build_workout_plan(workout_input)
+        workout_plan_dict = json.loads(workout_plan_json)
+        
+        # Build meal plan by calling build_meal_plan directly
+        meal_input = MealPlanInput(
+            primary_goal=requirements.primary_goal,
+            dietary_restrictions=requirements.dietary_restrictions,
+            meal_frequency=requirements.meal_frequency,
+            preferences="",
+        )
+        
+        meal_plan_json = await build_meal_plan(meal_input)
+        meal_plan_dict = json.loads(meal_plan_json)
 
-        # Extract structured output from final_output
-        # When agent has output_type defined, final_output contains the structured object
-        if not result.final_output:
-            raise ValueError("Fitness Plan Agent did not return structured output")
+        # Import schemas to create structured output
+        from src.ai.schemas import FitnessPlanOutput, MealPlanOutput, WorkoutPlanOutput
 
-        # final_output is of type FitnessPlanOutput when fitness_agent has output_type=FitnessPlanOutput
-        fitness_plan_output: FitnessPlanOutput = result.final_output
-
+        # Create WorkoutPlanOutput from the workout plan result
+        workout_plan_output = WorkoutPlanOutput(**workout_plan_dict)
+        
+        # Create MealPlanOutput from the meal plan result
+        meal_plan_output = MealPlanOutput(**meal_plan_dict)
+        
+        # Determine duration based on workout plan
+        duration_weeks = workout_plan_output.workout_plan.duration_weeks
+        
+        # Create comprehensive fitness plan output
+        fitness_plan_output = FitnessPlanOutput(
+            goal_summary=f"Complete {duration_weeks}-week fitness plan for {requirements.primary_goal}",
+            duration_weeks=duration_weeks,
+            fitness_level=requirements.fitness_level,
+            workout_plan_output=workout_plan_output,
+            meal_plan_output=meal_plan_output,
+            key_principles=[
+                "Progressive overload: Gradually increase intensity over time",
+                "Consistency: Follow the plan regularly for best results",
+                "Recovery: Prioritize sleep (7-9 hours) and rest days",
+                "Nutrition: Fuel your body according to the meal plan",
+                "Adaptation: Adjust based on progress and how you feel",
+            ],
+            success_metrics=[
+                "Track workout performance (weight, reps, or time improvements)",
+                "Monitor body measurements weekly (weight, body fat, measurements)",
+                "Assess energy levels and recovery quality",
+                "Check adherence rate (aim for 80%+ consistency)",
+                "Evaluate how you feel overall (mood, strength, confidence)",
+            ],
+            important_notes=f"This {duration_weeks}-week plan is designed for {requirements.fitness_level} level. Adjust weights and intensity based on your progress. Listen to your body and take extra rest if needed. Stay hydrated and consistent.",
+        )
+        
         # Validate plan completeness
         fitness_plan_output.validate_completeness()
 

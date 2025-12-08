@@ -3,22 +3,20 @@
 Coordinates the conversation flow between user and AI agents, manages
 handoffs between specialist agents, and handles session persistence.
 """
+import json
 from datetime import datetime
 
 from agents import Runner
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.ai.agent import PlanContext, UserContext
-from src.config import settings
-from src.utils.date_utils import get_current_datetime
 from src.ai.app_agents.conversation_agent import conversation_agent
-from src.ai.app_agents.fitness_plan_agent import create_fitness_plan_agent
 from src.ai.app_agents.intake_specialist_agent import intake_specialist_agent
-from src.ai.app_agents.meal_plan_agent import meal_plan_agent
-from src.ai.app_agents.workout_plan_agent import workout_plan_agent
+from src.config import settings
 from src.models.user import User
 from src.services.conversation_service import ConversationService
 from src.services.plan_service import PlanService
+from src.utils.date_utils import get_current_datetime
 
 
 class AIOrchestrationService:
@@ -33,12 +31,6 @@ class AIOrchestrationService:
         self.db = db
         self.plan_service = PlanService(db)
         self.conversation_service = ConversationService(db)
-
-        # Create fitness plan agent with specialist handoffs
-        self.fitness_plan_agent = create_fitness_plan_agent(
-            workout_agent=workout_plan_agent,
-            meal_agent=meal_plan_agent,
-        )
 
     async def start_conversation(
         self,
@@ -371,6 +363,10 @@ User Message: {user_message}"""
     ) -> dict:
         """Generate a complete fitness plan from gathered requirements.
 
+        DEPRECATED: This method is deprecated in favor of the tool-based approach
+        where conversation_agent calls build_fitness_plan tool directly. This method
+        is kept for backward compatibility with existing API endpoints.
+
         Args:
             user: User requesting the plan
             conversation_id: Session ID with conversation history
@@ -387,51 +383,45 @@ User Message: {user_message}"""
             duration_weeks=requirements.get("duration_weeks", 12),
         )
 
-        # Create plan context
-        user_context = UserContext(
-            user_id=str(user.id),
-            email=user.email,
-            preferences=user.preferences or {},
-        )
-
-        plan_context = PlanContext(
-            plan_id=str(plan.id),
-            user_context=user_context,
-            requirements=requirements,
-        )
-
         try:
-            # Hand off to fitness plan agent for generation
-            result = await Runner.run(
-                starting_agent=self.fitness_plan_agent,
-                input=f"Generate a complete fitness plan based on these requirements: {requirements}",
-                context=plan_context,
-                session=None,  # No session needed for plan generation
+            # Use the build_fitness_plan tool directly instead of fitness_plan_agent
+            from src.ai.tools.plan_tools import FitnessPlanInput, build_fitness_plan, set_plan_tools_context
+
+            # Set context for plan tools
+            set_plan_tools_context(user_id=user.id, db_session=self.db)
+
+            # Build FitnessPlanInput from requirements
+            plan_input = FitnessPlanInput(
+                primary_goal=requirements.get("primary_goal", requirements.get("goal", "general fitness")),
+                fitness_level=requirements.get("fitness_level", "beginner"),
+                workout_frequency=requirements.get("workout_frequency", 3),
+                equipment_access=requirements.get("equipment_access", "full_gym"),
+                time_per_session=requirements.get("time_per_session", 60),
+                dietary_restrictions=requirements.get("dietary_restrictions", []),
+                meal_frequency=requirements.get("meal_frequency", 3),
+                injuries_or_conditions=requirements.get("injuries_or_conditions", []),
             )
 
-            # Parse generated plan and save to database
-            generated_plan = self._parse_plan_result(result)
+            # Generate plan using build_fitness_plan tool
+            result_json = await build_fitness_plan(plan_input)
+            result_data = json.loads(result_json)
 
-            # If we got structured output, save it to database
-            # When agent has output_type defined, final_output contains the structured object
-            if result.final_output and hasattr(result.final_output, 'model_dump'):
-                plan_data = result.final_output.model_dump()
+            if result_data.get("status") == "success":
+                plan_data = result_data.get("fitness_plan")
+                
+                # Save plan to database
                 await self.plan_service.save_generated_plan(
                     plan_id=plan.id,
                     plan_output=plan_data,
                 )
-            else:
-                # Even if no structured output, mark as active
-                await self.plan_service.update_plan_status(
-                    plan_id=plan.id,
-                    status="active",
-                )
 
-            return {
-                "plan_id": str(plan.id),
-                "status": "completed",
-                "plan_data": generated_plan,
-            }
+                return {
+                    "plan_id": str(plan.id),
+                    "status": "completed",
+                    "plan_data": plan_data,
+                }
+            else:
+                raise ValueError(result_data.get("message", "Plan generation failed"))
 
         except Exception as e:
             # Update plan status to failed
@@ -583,6 +573,9 @@ User Message: {user_message}"""
     async def _generate_structured_plan(self, user: User, requirements: dict) -> dict | None:
         """Generate and save a structured fitness plan.
 
+        DEPRECATED: This method is deprecated in favor of the tool-based approach
+        where conversation_agent calls build_fitness_plan tool directly.
+
         Args:
             user: User requesting the plan
             requirements: Extracted requirements from conversation
@@ -599,34 +592,32 @@ User Message: {user_message}"""
                 duration_weeks=requirements.get("duration_weeks", 12),
             )
 
-            # Create plan context
-            user_context = UserContext(
-                user_id=str(user.id),
-                email=user.email,
-                preferences=user.preferences or {},
+            # Use the build_fitness_plan tool directly
+            from src.ai.tools.plan_tools import FitnessPlanInput, build_fitness_plan, set_plan_tools_context
+
+            # Set context for plan tools
+            set_plan_tools_context(user_id=user.id, db_session=self.db)
+
+            # Build FitnessPlanInput from requirements
+            plan_input = FitnessPlanInput(
+                primary_goal=requirements.get("primary_goal", requirements.get("goal", "general_fitness")),
+                fitness_level=requirements.get("fitness_level", "beginner"),
+                workout_frequency=requirements.get("workout_frequency", 3),
+                equipment_access=requirements.get("equipment_access", "full_gym"),
+                time_per_session=requirements.get("time_per_session", 60),
+                dietary_restrictions=requirements.get("dietary_restrictions", []),
+                meal_frequency=requirements.get("meal_frequency", 3),
+                injuries_or_conditions=requirements.get("injuries_or_conditions", []),
             )
 
-            plan_context = PlanContext(
-                plan_id=str(plan.id),
-                user_context=user_context,
-                requirements=requirements,
-            )
+            # Generate plan using build_fitness_plan tool
+            result_json = await build_fitness_plan(plan_input)
+            result_data = json.loads(result_json)
 
-            # Generate structured plan using fitness plan agent
-            result = await Runner.run(
-                starting_agent=self.fitness_plan_agent,
-                input=f"Generate a structured fitness plan for: {requirements}",
-                context=plan_context,
-                session=None,
-            )
-
-            # Extract structured output
-            # When agent has output_type defined, final_output contains the structured object
-            if result.final_output and hasattr(result.final_output, 'model_dump'):
-                # Convert Pydantic model to dict for storage
-                plan_data = result.final_output.model_dump()
-
-                # Save the complete plan to database
+            if result_data.get("status") == "success":
+                plan_data = result_data.get("fitness_plan")
+                
+                # Save plan to database
                 await self.plan_service.save_generated_plan(
                     plan_id=plan.id,
                     plan_output=plan_data,
@@ -637,17 +628,17 @@ User Message: {user_message}"""
                     "status": "completed",
                     "plan_data": plan_data,
                 }
+            else:
+                # Mark as active even if generation had issues
+                await self.plan_service.update_plan_status(
+                    plan_id=plan.id,
+                    status="active",
+                )
 
-            # If no structured output, mark as active with text only
-            await self.plan_service.update_plan_status(
-                plan_id=plan.id,
-                status="active",
-            )
-
-            return {
-                "plan_id": str(plan.id),
-                "status": "completed_text_only",
-            }
+                return {
+                    "plan_id": str(plan.id),
+                    "status": "completed_text_only",
+                }
 
         except Exception as e:
             print(f"Error generating structured plan: {e}")
