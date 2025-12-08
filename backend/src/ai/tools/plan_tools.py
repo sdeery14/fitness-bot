@@ -105,11 +105,10 @@ class FitnessPlanInput(BaseModel):
     )
 
 
-@function_tool
 async def build_workout_plan(requirements: WorkoutPlanInput) -> str:
     """Build a workout plan using the Workout Plan Agent.
 
-    This function tool calls the Workout Plan Agent with user requirements
+    This function calls the Workout Plan Agent with user requirements
     and returns a structured workout plan as JSON.
 
     Args:
@@ -152,11 +151,10 @@ Time per session: {requirements.time_per_session} minutes
     raise ValueError("Workout Plan Agent did not return structured output")
 
 
-@function_tool
 async def build_meal_plan(requirements: MealPlanInput) -> str:
     """Build a meal plan using the Meal Plan Agent.
 
-    This function tool calls the Meal Plan Agent with user requirements
+    This function calls the Meal Plan Agent with user requirements
     and returns a structured meal plan as JSON.
 
     Args:
@@ -223,7 +221,7 @@ async def build_fitness_plan(requirements: FitnessPlanInput) -> str:
         ValueError: If plan generation fails
     """
     try:
-        # Build workout plan by calling build_workout_plan directly
+        # Build workout plan by calling the underlying function
         workout_input = WorkoutPlanInput(
             primary_goal=requirements.primary_goal,
             fitness_level=requirements.fitness_level,
@@ -232,18 +230,20 @@ async def build_fitness_plan(requirements: FitnessPlanInput) -> str:
             time_per_session=requirements.time_per_session,
             injuries_or_conditions=requirements.injuries_or_conditions,
         )
-        
+
+        # Call build_workout_plan directly
         workout_plan_json = await build_workout_plan(workout_input)
         workout_plan_dict = json.loads(workout_plan_json)
-        
-        # Build meal plan by calling build_meal_plan directly
+
+        # Build meal plan input
         meal_input = MealPlanInput(
             primary_goal=requirements.primary_goal,
             dietary_restrictions=requirements.dietary_restrictions,
             meal_frequency=requirements.meal_frequency,
             preferences="",
         )
-        
+
+        # Call build_meal_plan directly
         meal_plan_json = await build_meal_plan(meal_input)
         meal_plan_dict = json.loads(meal_plan_json)
 
@@ -252,13 +252,13 @@ async def build_fitness_plan(requirements: FitnessPlanInput) -> str:
 
         # Create WorkoutPlanOutput from the workout plan result
         workout_plan_output = WorkoutPlanOutput(**workout_plan_dict)
-        
+
         # Create MealPlanOutput from the meal plan result
         meal_plan_output = MealPlanOutput(**meal_plan_dict)
-        
+
         # Determine duration based on workout plan
         duration_weeks = workout_plan_output.workout_plan.duration_weeks
-        
+
         # Create comprehensive fitness plan output
         fitness_plan_output = FitnessPlanOutput(
             goal_summary=f"Complete {duration_weeks}-week fitness plan for {requirements.primary_goal}",
@@ -282,7 +282,7 @@ async def build_fitness_plan(requirements: FitnessPlanInput) -> str:
             ],
             important_notes=f"This {duration_weeks}-week plan is designed for {requirements.fitness_level} level. Adjust weights and intensity based on your progress. Listen to your body and take extra rest if needed. Stay hydrated and consistent.",
         )
-        
+
         # Validate plan completeness
         fitness_plan_output.validate_completeness()
 
