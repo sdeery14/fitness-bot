@@ -310,27 +310,9 @@ User Message: {user_message}"""
             model_used=settings.MODEL_NAME,
         )
 
-        # Check if agent has generated a structured plan
-        plan_id = None
-        if self._is_plan_generated(agent_response):
-            # Extract requirements from conversation history
-            requirements = await self._extract_requirements_from_conversation(db_conversation)
-
-            # Attempt to trigger structured plan generation
-            try:
-                plan_result = await self._generate_structured_plan(user, requirements)
-                if plan_result and "plan_id" in plan_result:
-                    plan_id = plan_result["plan_id"]
-                    # Associate plan with conversation
-                    await self.conversation_service.update_conversation_status(
-                        conversation_id=db_conversation.id,
-                        status="completed",
-                        context={"plan_id": plan_id, "requirements": requirements},
-                    )
-            except Exception as e:
-                print(f"Warning: Could not generate structured plan: {e}")
-                # Continue without failing - user still has text plan
-
+        # Note: Plan generation is now handled directly by the conversation_agent
+        # via the build_fitness_plan tool. No need for post-processing.
+        
         # Check if requirements are complete (agent indicates readiness to generate plan)
         requirements_complete = self._check_requirements_complete(result)
 
@@ -342,9 +324,8 @@ User Message: {user_message}"""
         return {
             "conversation_id": str(db_conversation.id),
             "agent_response": agent_response,
-            "status": "plan_generated" if plan_id else ("ready_for_plan" if requirements_complete else "conversation"),
+            "status": "ready_for_plan" if requirements_complete else "conversation",
             "context": plan_context.model_dump(),
-            "plan_id": plan_id,
             "user_message": {
                 "content": user_message,
                 "sent_at": user_message_time,
@@ -354,88 +335,6 @@ User Message: {user_message}"""
                 "sent_at": assistant_message_time,
             },
         }
-
-    async def generate_plan(
-        self,
-        user: User,
-        conversation_id: str,
-        requirements: dict,
-    ) -> dict:
-        """Generate a complete fitness plan from gathered requirements.
-
-        DEPRECATED: This method is deprecated in favor of the tool-based approach
-        where conversation_agent calls build_fitness_plan tool directly. This method
-        is kept for backward compatibility with existing API endpoints.
-
-        Args:
-            user: User requesting the plan
-            conversation_id: Session ID with conversation history
-            requirements: Gathered user requirements
-
-        Returns:
-            Dict with plan_id, status, and initial plan data
-        """
-        # Create plan record in database
-        plan = await self.plan_service.create_plan(
-            user_id=user.id,
-            goal=requirements.get("goal", "general fitness"),
-            requirements=requirements,
-            duration_weeks=requirements.get("duration_weeks", 12),
-        )
-
-        try:
-            # Use the build_fitness_plan tool directly instead of fitness_plan_agent
-            from src.ai.tools.plan_tools import FitnessPlanInput, build_fitness_plan, set_plan_tools_context
-
-            # Set context for plan tools
-            set_plan_tools_context(user_id=user.id, db_session=self.db)
-
-            # Build FitnessPlanInput from requirements
-            plan_input = FitnessPlanInput(
-                primary_goal=requirements.get("primary_goal", requirements.get("goal", "general fitness")),
-                fitness_level=requirements.get("fitness_level", "beginner"),
-                workout_frequency=requirements.get("workout_frequency", 3),
-                equipment_access=requirements.get("equipment_access", "full_gym"),
-                time_per_session=requirements.get("time_per_session", 60),
-                dietary_restrictions=requirements.get("dietary_restrictions", []),
-                meal_frequency=requirements.get("meal_frequency", 3),
-                injuries_or_conditions=requirements.get("injuries_or_conditions", []),
-            )
-
-            # Generate plan using build_fitness_plan tool
-            result_json = await build_fitness_plan(plan_input)
-            result_data = json.loads(result_json)
-
-            if result_data.get("status") == "success":
-                plan_data = result_data.get("fitness_plan")
-                
-                # Save plan to database
-                await self.plan_service.save_generated_plan(
-                    plan_id=plan.id,
-                    plan_output=plan_data,
-                )
-
-                return {
-                    "plan_id": str(plan.id),
-                    "status": "completed",
-                    "plan_data": plan_data,
-                }
-            else:
-                raise ValueError(result_data.get("message", "Plan generation failed"))
-
-        except Exception as e:
-            # Update plan status to failed
-            await self.plan_service.update_plan_status(
-                plan_id=plan.id,
-                status="abandoned",
-                error_message=str(e),
-            )
-
-            return {
-                "plan_id": str(plan.id),
-                "status": "failed",
-                "error": str(e),
-            }
 
     def _check_requirements_complete(self, result) -> bool:
         """Check if conversation agent has gathered sufficient requirements.
@@ -492,155 +391,3 @@ User Message: {user_message}"""
 
         # If final_output is already a dict or other object
         return result.final_output
-
-    def _is_plan_generated(self, agent_response: str) -> bool:
-        """Check if the agent response contains a generated plan.
-
-        Args:
-            agent_response: AI agent's response text
-
-        Returns:
-            True if response contains a plan, False otherwise
-        """
-        # Check for plan indicators in the response
-        plan_indicators = [
-            "weekly split",
-            "day 1:",
-            "workout structure",
-            "meal plan",
-            "here's your",
-            "personalized plan",
-            "fitness plan",
-        ]
-
-        content_lower = agent_response.lower()
-        return any(indicator in content_lower for indicator in plan_indicators) and len(agent_response) > 500
-
-    async def _extract_requirements_from_conversation(self, conversation) -> dict:
-        """Extract user requirements from conversation messages.
-
-        Args:
-            conversation: Conversation object with messages
-
-        Returns:
-            Dict of extracted requirements
-        """
-        # Analyze conversation to extract key information
-        requirements = {
-            "goal": "general fitness",
-            "fitness_level": "beginner",
-            "frequency_per_week": 3,
-            "duration_weeks": 12,
-        }
-
-        # Parse messages for requirements
-        for msg in conversation.messages:
-            if msg.sender_type == "user":
-                content = msg.message_content.lower()
-
-                # Extract goal
-                if "muscle" in content or "build" in content:
-                    requirements["goal"] = "muscle_gain"
-                elif "lose" in content or "weight loss" in content or "fat" in content:
-                    requirements["goal"] = "weight_loss"
-                elif "endurance" in content or "cardio" in content:
-                    requirements["goal"] = "endurance"
-
-                # Extract fitness level
-                if "beginner" in content:
-                    requirements["fitness_level"] = "beginner"
-                elif "intermediate" in content:
-                    requirements["fitness_level"] = "intermediate"
-                elif "advanced" in content:
-                    requirements["fitness_level"] = "advanced"
-
-                # Extract frequency
-                for i in range(2, 8):
-                    if f"{i} day" in content or f"{i} time" in content:
-                        requirements["frequency_per_week"] = i
-                        break
-
-                # Extract equipment access
-                if "gym" in content:
-                    requirements["equipment_access"] = "full_gym"
-                elif "home" in content and ("dumbbell" in content or "equipment" in content):
-                    requirements["equipment_access"] = "home_gym"
-                elif "bodyweight" in content or "no equipment" in content:
-                    requirements["equipment_access"] = "bodyweight"
-
-        return requirements
-
-    async def _generate_structured_plan(self, user: User, requirements: dict) -> dict | None:
-        """Generate and save a structured fitness plan.
-
-        DEPRECATED: This method is deprecated in favor of the tool-based approach
-        where conversation_agent calls build_fitness_plan tool directly.
-
-        Args:
-            user: User requesting the plan
-            requirements: Extracted requirements from conversation
-
-        Returns:
-            Dict with plan_id and status, or None if generation fails
-        """
-        try:
-            # Create plan record
-            plan = await self.plan_service.create_plan(
-                user_id=user.id,
-                goal=requirements.get("goal", "general_fitness"),
-                requirements=requirements,
-                duration_weeks=requirements.get("duration_weeks", 12),
-            )
-
-            # Use the build_fitness_plan tool directly
-            from src.ai.tools.plan_tools import FitnessPlanInput, build_fitness_plan, set_plan_tools_context
-
-            # Set context for plan tools
-            set_plan_tools_context(user_id=user.id, db_session=self.db)
-
-            # Build FitnessPlanInput from requirements
-            plan_input = FitnessPlanInput(
-                primary_goal=requirements.get("primary_goal", requirements.get("goal", "general_fitness")),
-                fitness_level=requirements.get("fitness_level", "beginner"),
-                workout_frequency=requirements.get("workout_frequency", 3),
-                equipment_access=requirements.get("equipment_access", "full_gym"),
-                time_per_session=requirements.get("time_per_session", 60),
-                dietary_restrictions=requirements.get("dietary_restrictions", []),
-                meal_frequency=requirements.get("meal_frequency", 3),
-                injuries_or_conditions=requirements.get("injuries_or_conditions", []),
-            )
-
-            # Generate plan using build_fitness_plan tool
-            result_json = await build_fitness_plan(plan_input)
-            result_data = json.loads(result_json)
-
-            if result_data.get("status") == "success":
-                plan_data = result_data.get("fitness_plan")
-                
-                # Save plan to database
-                await self.plan_service.save_generated_plan(
-                    plan_id=plan.id,
-                    plan_output=plan_data,
-                )
-
-                return {
-                    "plan_id": str(plan.id),
-                    "status": "completed",
-                    "plan_data": plan_data,
-                }
-            else:
-                # Mark as active even if generation had issues
-                await self.plan_service.update_plan_status(
-                    plan_id=plan.id,
-                    status="active",
-                )
-
-                return {
-                    "plan_id": str(plan.id),
-                    "status": "completed_text_only",
-                }
-
-        except Exception as e:
-            print(f"Error generating structured plan: {e}")
-            return None
-

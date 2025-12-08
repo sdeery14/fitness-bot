@@ -61,21 +61,6 @@ class MessageResponse(BaseModel):
     context: dict
 
 
-class GeneratePlanRequest(BaseModel):
-    """Generate plan request."""
-
-    requirements: dict
-
-
-class GeneratePlanResponse(BaseModel):
-    """Generate plan response."""
-
-    plan_id: str
-    status: str  # "completed" or "failed"
-    plan_data: dict | None = None
-    error: str | None = None
-
-
 @router.post("/conversations", status_code=status.HTTP_201_CREATED)
 async def start_conversation(
     request: StartConversationRequest,
@@ -277,55 +262,6 @@ async def get_conversation(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to retrieve conversation: {str(e)}"
-        ) from e
-
-
-@router.post("/conversations/{conversation_id}/generate-plan", response_model=GeneratePlanResponse)
-async def generate_plan(
-    conversation_id: str,
-    request: GeneratePlanRequest,
-    user_id: CurrentUserId,
-    db: DatabaseSession,
-) -> GeneratePlanResponse:
-    """Generate a fitness plan from conversation requirements.
-
-    Args:
-        conversation_id: Conversation ID
-        request: Gathered requirements
-        user_id: Current authenticated user ID
-        db: Database session
-
-    Returns:
-        Generated plan ID and status
-
-    Raises:
-        HTTPException: If generation fails
-    """
-    user_service = UserService(db)
-    user = await user_service.get_user(user_id)
-
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found",
-        )
-
-    plan_service = PlanService(db)
-    ai_service = AIOrchestrationService(db, plan_service)
-
-    try:
-        result = await ai_service.generate_plan(
-            user=user,
-            conversation_id=conversation_id,
-            requirements=request.requirements,
-        )
-
-        return GeneratePlanResponse(**result)
-
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to generate plan: {str(e)}",
         ) from e
 
 
