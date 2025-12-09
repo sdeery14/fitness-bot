@@ -3,11 +3,28 @@
 These tools wrap the exercise database functions for use by AI agents.
 All tools return JSON strings as required by OpenAI Agents SDK.
 """
+import asyncio
 import json
 
 from agents import function_tool
+from sentence_transformers import SentenceTransformer
+from sqlalchemy import select, text
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.database import async_session_factory
 from src.integrations import exercise_database
+from src.models.workout import Exercise, Workout
+
+# Load sentence transformer model for semantic search
+_embedding_model = None
+
+
+def get_embedding_model() -> SentenceTransformer:
+    """Get or initialize the sentence transformer model."""
+    global _embedding_model
+    if _embedding_model is None:
+        _embedding_model = SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')
+    return _embedding_model
 
 
 @function_tool
@@ -261,3 +278,192 @@ def adjust_frequency(
         "reason": reason or "User preference",
     }, indent=2)
 
+
+@function_tool
+def search_exercises_by_description(
+    description: str,
+    limit: int = 5,
+    equipment_filter: str = None,
+    difficulty_filter: str = None,
+) -> str:
+    """Search exercises by semantic meaning using natural language description.
+
+    This uses RAG (Retrieval Augmented Generation) with pgvector to find exercises
+    that match the semantic meaning of the description, not just keyword matching.
+
+    Examples:
+    - "exercises that strengthen my lower back"
+    - "movements for explosive power"
+    - "stretches for shoulder mobility"
+    - "core stability exercises"
+
+    Args:
+        description: Natural language description of what you're looking for
+        limit: Maximum number of results to return (default 5)
+        equipment_filter: Optional equipment constraint (e.g., 'bodyweight', 'dumbbells')
+        difficulty_filter: Optional difficulty level (beginner, intermediate, advanced)
+
+    Returns:
+        JSON string with list of exercises ranked by semantic similarity
+    """
+    import asyncio
+    from sqlalchemy import select, text
+    from src.database import async_session_factory
+    from src.models.workout import Exercise
+
+    async def _search():
+        # Generate embedding for the search description
+        model = get_embedding_model()
+        query_embedding = model.encode(description, convert_to_numpy=True).tolist()
+
+        async with async_session_factory() as session:
+            # Build the SQL query with vector similarity search
+            # Using cosine distance for similarity (<=> operator in pgvector)
+            query_parts = [
+                "SELECT e.id, e.name, e.exercise_type, e.target_muscle_groups,",
+                "       e.equipment_required, e.instructions, e.form_cues,",
+                "       e.difficulty, e.sets, e.reps, e.rest_seconds,",
+                "       (e.embedding <=> :query_embedding) AS distance",
+                "FROM exercises e",
+                "WHERE e.embedding IS NOT NULL",
+            ]
+
+            params = {"query_embedding": str(query_embedding)}
+
+            # Add filters if specified
+            if equipment_filter:
+                query_parts.append("  AND :equipment = ANY(e.equipment_required)")
+                params["equipment"] = equipment_filter
+
+            if difficulty_filter:
+                query_parts.append("  AND e.difficulty = :difficulty")
+                params["difficulty"] = difficulty_filter
+
+            # Order by similarity and limit results
+            query_parts.append("ORDER BY distance ASC")
+            query_parts.append("LIMIT :limit")
+            params["limit"] = limit
+
+            sql_query = "\n".join(query_parts)
+
+            # Execute the query
+            result = await session.execute(text(sql_query), params)
+            rows = result.fetchall()
+
+            # Format results
+            exercises = []
+            for row in rows:
+                exercises.append({
+                    "id": str(row.id),
+                    "name": row.name,
+                    "exercise_type": row.exercise_type,
+                    "target_muscle_groups": row.target_muscle_groups,
+                    "equipment_required": row.equipment_required,
+                    "difficulty": row.difficulty,
+                    "instructions": row.instructions,
+                    "form_cues": row.form_cues,
+                    "prescription": {
+                        "sets": row.sets,
+                        "reps": row.reps,
+                        "rest_seconds": row.rest_seconds,
+                    },
+                    "similarity_score": float(1 - row.distance),  # Convert distance to similarity
+                })
+
+            return {
+                "search_description": description,
+                "results_count": len(exercises),
+                "filters_applied": {
+                    "equipment": equipment_filter,
+                    "difficulty": difficulty_filter,
+                },
+                "exercises": exercises,
+            }
+
+    result = asyncio.run(_search())
+    return json.dumps(result, indent=2)
+
+
+@function_tool
+def find_similar_exercises(
+    exercise_name: str,
+    limit: int = 3,
+) -> str:
+    """Find exercises similar to a given exercise using semantic similarity.
+
+    Uses the exercise's embedding to find other exercises with similar movement
+    patterns, muscle groups, or training effects.
+
+    Args:
+        exercise_name: Name of the reference exercise
+        limit: Maximum number of similar exercises to return (default 3)
+
+    Returns:
+        JSON string with list of similar exercises
+    """
+    import asyncio
+    from sqlalchemy import select, text
+    from src.database import async_session_factory
+    from src.models.workout import Exercise
+
+    async def _find_similar():
+        async with async_session_factory() as session:
+            # First, get the reference exercise
+            result = await session.execute(
+                select(Exercise).where(Exercise.name == exercise_name)
+            )
+            reference_exercise = result.scalar_one_or_none()
+
+            if not reference_exercise:
+                return {
+                    "error": f"Exercise '{exercise_name}' not found in database"
+                }
+
+            if reference_exercise.embedding is None:
+                return {
+                    "error": f"Exercise '{exercise_name}' does not have an embedding"
+                }
+
+            # Find similar exercises using vector similarity
+            sql_query = """
+                SELECT e.id, e.name, e.exercise_type, e.target_muscle_groups,
+                       e.equipment_required, e.instructions, e.difficulty,
+                       (e.embedding <=> :reference_embedding) AS distance
+                FROM exercises e
+                WHERE e.embedding IS NOT NULL
+                  AND e.name != :reference_name
+                ORDER BY distance ASC
+                LIMIT :limit
+            """
+
+            result = await session.execute(
+                text(sql_query),
+                {
+                    "reference_embedding": str(reference_exercise.embedding),
+                    "reference_name": exercise_name,
+                    "limit": limit,
+                }
+            )
+            rows = result.fetchall()
+
+            similar_exercises = []
+            for row in rows:
+                similar_exercises.append({
+                    "id": str(row.id),
+                    "name": row.name,
+                    "exercise_type": row.exercise_type,
+                    "target_muscle_groups": row.target_muscle_groups,
+                    "equipment_required": row.equipment_required,
+                    "difficulty": row.difficulty,
+                    "instructions": row.instructions,
+                    "similarity_score": float(1 - row.distance),
+                })
+
+            return {
+                "reference_exercise": exercise_name,
+                "similar_exercises": similar_exercises,
+                "count": len(similar_exercises),
+            }
+
+    result = asyncio.run(_find_similar())
+    return json.dumps(result, indent=2)

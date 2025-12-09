@@ -58,8 +58,13 @@ Available tools:
 - get_exercises_by_equipment: Filter by available equipment
 - get_exercises_by_difficulty: Match to fitness level
 - get_alternative_exercises: Find substitutes
+- search_exercises_by_description: PREFERRED - Semantic search using natural language
+  (e.g., "exercises for explosive leg power", "movements to strengthen lower back")
+- find_similar_exercises: Find exercises similar to a reference exercise
 
-Use these tools to query the curated exercise database and create optimal workout plans."""
+IMPORTANT: Prefer using search_exercises_by_description for most queries as it uses
+AI-powered semantic search to understand the intent and find the best matches, not just
+keyword matching. It searches exercise names, instructions, and form cues by meaning."""
 
     return Agent(
         name="Workout Plan Agent",
@@ -71,6 +76,8 @@ Use these tools to query the curated exercise database and create optimal workou
             workout_tools.get_exercises_by_equipment,
             workout_tools.get_exercises_by_difficulty,
             workout_tools.get_alternative_exercises,
+            workout_tools.search_exercises_by_description,  # NEW: Semantic search
+            workout_tools.find_similar_exercises,  # NEW: Similarity search
         ],
         output_type=WorkoutPlanOutput,  # Structured output
     )

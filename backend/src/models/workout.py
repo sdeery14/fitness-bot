@@ -3,6 +3,7 @@
 from sqlalchemy import Column, ForeignKey, Integer, JSON, String, Text
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import relationship
+from pgvector.sqlalchemy import Vector
 
 from src.models import Base, TimestampMixin, UUIDMixin
 
@@ -86,6 +87,9 @@ class Exercise(Base, UUIDMixin, TimestampMixin):
     instructions = Column(Text, nullable=False)  # Step-by-step execution
     form_cues = Column(JSON, nullable=True)  # ["Keep core tight", "Full range of motion"]
     alternative_exercise_ids = Column(JSON, nullable=True)  # UUIDs of alternative exercises
+
+    # Vector embedding for semantic search (384 dimensions for sentence-transformers/all-MiniLM-L6-v2)
+    embedding = Column(Vector(384), nullable=True)  # Semantic search embedding
 
     # Relationships
     workout = relationship("Workout", back_populates="exercises")
