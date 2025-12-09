@@ -8,7 +8,7 @@ Architecture:
     workout_plan_agent → query_agent (with MCP server) → postgres-mcp → PostgreSQL
 
 The query agent:
-- Connects to postgres-mcp via stdio (spawns subprocess)
+- MCP server is initialized lazily in query_tools.py to avoid async context issues
 - Accepts plain text descriptions of data needs
 - Uses MCP tools provided by postgres-mcp (execute_sql, list_schemas, etc.)
 - Returns formatted results
@@ -16,19 +16,19 @@ The query agent:
 This separates database concerns from business logic and leverages
 postgres-mcp's built-in safety features (read-only mode, query validation).
 """
-import os
-
 from agents import Agent
-from agents.mcp import MCPServerStdio
 
 from src.ai.agent import create_model_settings
 
 
 def create_query_agent() -> Agent:
-    """Create the Query Agent with postgres-mcp MCP server integration.
+    """Create the Query Agent for database operations.
 
-    This agent connects to postgres-mcp via stdio transport and automatically
-    gets access to all the tools provided by the postgres-mcp server:
+    This agent is designed to work with the postgres-mcp MCP server that gets
+    initialized lazily by query_tools.py when the query_database function is called.
+    The MCP server connection is added to this agent dynamically at runtime.
+
+    The agent gets access to all the tools provided by the postgres-mcp server:
     - execute_sql: Execute SQL queries
     - list_schemas: List database schemas
     - list_objects: List tables/views in a schema
@@ -42,23 +42,10 @@ def create_query_agent() -> Agent:
     exercises, workouts, and other fitness data.
 
     Returns:
-        Agent configured with postgres-mcp MCP server
+        Agent configured for database queries (MCP server added at runtime)
     """
-    # Get database URI from environment
-    database_uri = os.environ.get(
-        "DATABASE_URI",
-        "postgresql://fitness_user:fitness_pass_dev@localhost:5432/fitness_bot"
-    )
-
-    # Create MCP server connection via stdio
-    # This spawns postgres-mcp as a subprocess and communicates via stdin/stdout
-    mcp_server = MCPServerStdio(
-        name="postgres-mcp",
-        params={
-            "command": "postgres-mcp",  # Assumes postgres-mcp is in PATH (installed via uv tool)
-            "args": [database_uri, "--access-mode=unrestricted"],
-        },
-    )
+    # Note: MCP server is NOT created here to avoid async context issues
+    # It's created lazily in query_tools.py when first needed
 
     instructions = """You are a database query specialist that helps other agents access
 fitness-related data from PostgreSQL using natural language requests.
@@ -128,7 +115,7 @@ you from fulfilling a request (e.g., missing embedding vectors)."""
         handoff_description="Database query specialist using postgres-mcp MCP server",
         instructions=instructions,
         model_settings=create_model_settings("balanced"),
-        mcp_servers=[mcp_server],  # This gives the agent access to all postgres-mcp tools
+        # MCP server is added dynamically by query_tools.py at runtime
     )
 
 

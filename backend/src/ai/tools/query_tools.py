@@ -18,11 +18,17 @@ _mcp_server_context: ContextVar[MCPServerStdio | None] = ContextVar("mcp_server"
 
 
 def _get_database_uri() -> str:
-    """Get database URI from environment."""
-    return os.environ.get(
-        "DATABASE_URI",
-        "postgresql://fitness_user:fitness_pass_dev@localhost:5432/fitness_bot"
+    """Get database URI from environment.
+
+    Converts DATABASE_URL (with asyncpg driver) to standard postgresql:// format
+    that postgres-mcp expects.
+    """
+    database_url = os.environ.get(
+        "DATABASE_URL",
+        "postgresql+asyncpg://fitness_user:fitness_pass_dev@postgres:5432/fitness_bot"
     )
+    # Convert asyncpg format to standard postgresql format for postgres-mcp
+    return database_url.replace("postgresql+asyncpg://", "postgresql://")
 
 
 async def _get_or_create_mcp_server() -> MCPServerStdio:
