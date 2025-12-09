@@ -7,15 +7,22 @@ Architecture:
     workout_plan_agent → query_database → query_agent (with MCP server) → PostgreSQL
 """
 import json
+import os
 from contextvars import ContextVar
 
 from agents import Runner, function_tool
 from agents.mcp import MCPServerStdio
 
-from src.ai.app_agents.query_agent import DATABASE_URI, query_agent
-
 # Context variable to store the MCP server instance
 _mcp_server_context: ContextVar[MCPServerStdio | None] = ContextVar("mcp_server", default=None)
+
+
+def _get_database_uri() -> str:
+    """Get database URI from environment."""
+    return os.environ.get(
+        "DATABASE_URI",
+        "postgresql://fitness_user:fitness_pass_dev@localhost:5432/fitness_bot"
+    )
 
 
 async def _get_or_create_mcp_server() -> MCPServerStdio:
@@ -30,17 +37,20 @@ async def _get_or_create_mcp_server() -> MCPServerStdio:
     server = _mcp_server_context.get()
     if server is None:
         # Create new MCP server with stdio transport
+        database_uri = _get_database_uri()
         server = MCPServerStdio(
             name="Postgres MCP",
             params={
                 "command": "postgres-mcp",  # Assumes postgres-mcp is in PATH (installed via uv tool install)
-                "args": [DATABASE_URI, "--access-mode=restricted"],
+                "args": [database_uri, "--access-mode=restricted"],
             },
         )
         # Initialize the server
         await server.__aenter__()
         _mcp_server_context.set(server)
 
+        # Lazy import to avoid circular dependency
+        from src.ai.app_agents.query_agent import query_agent
         # Add the MCP server to the query agent
         query_agent.mcp_servers = [server]
 
@@ -79,6 +89,9 @@ async def query_database(description: str) -> str:
     try:
         # Ensure MCP server is initialized
         await _get_or_create_mcp_server()
+
+        # Lazy import to avoid circular dependency
+        from src.ai.app_agents.query_agent import query_agent
 
         # Build prompt for query agent
         prompt = f"""Execute this database query request:
