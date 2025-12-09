@@ -9,11 +9,12 @@ This agent is responsible for:
 
 Uses OpenAI Agents SDK with function tools for exercise database queries.
 """
+
 from agents import Agent
 
 from src.ai.agent import create_model_settings
 from src.ai.schemas import WorkoutPlanOutput
-from src.ai.tools import workout_tools
+from src.ai.tools import query_tools
 
 
 def create_workout_plan_agent() -> Agent:
@@ -53,18 +54,24 @@ Exercise prescription format:
 - RPE: Rate of Perceived Exertion (1-10 scale, typically 7-9 for main lifts)
 - Rest: 60-180 seconds between sets
 
-Available tools:
-- get_exercises_by_muscle_group: Find exercises for specific muscles
-- get_exercises_by_equipment: Filter by available equipment
-- get_exercises_by_difficulty: Match to fitness level
-- get_alternative_exercises: Find substitutes
-- search_exercises_by_description: PREFERRED - Semantic search using natural language
-  (e.g., "exercises for explosive leg power", "movements to strengthen lower back")
-- find_similar_exercises: Find exercises similar to a reference exercise
+Available tool:
+- query_database: Query the exercise database using natural language via the MCP
+  query agent and postgres-mcp server. This tool can:
+  - Filter exercises by muscle groups, equipment, difficulty
+  - Perform semantic/vector similarity searches using pgvector
+  - Retrieve workouts by ID
+  - Execute any SELECT query based on your description
 
-IMPORTANT: Prefer using search_exercises_by_description for most queries as it uses
-AI-powered semantic search to understand the intent and find the best matches, not just
-keyword matching. It searches exercise names, instructions, and form cues by meaning."""
+  Examples:
+    * "Find all chest exercises with dumbbells"
+    * "Get beginner leg exercises"
+    * "Find exercises for shoulder mobility"
+    * "Get exercises targeting back and biceps"
+    * "Find exercises similar to squats"
+    * "Search for explosive leg power exercises"
+
+The query_database tool provides safe, structured database access through the
+postgres-mcp server with automatic SQL generation from natural language."""
 
     return Agent(
         name="Workout Plan Agent",
@@ -72,12 +79,8 @@ keyword matching. It searches exercise names, instructions, and form cues by mea
         instructions=instructions,
         model_settings=create_model_settings("balanced"),
         tools=[
-            workout_tools.get_exercises_by_muscle_group,
-            workout_tools.get_exercises_by_equipment,
-            workout_tools.get_exercises_by_difficulty,
-            workout_tools.get_alternative_exercises,
-            workout_tools.search_exercises_by_description,  # NEW: Semantic search
-            workout_tools.find_similar_exercises,  # NEW: Similarity search
+            # MCP query tool (database access via postgres-mcp server)
+            query_tools.query_database,
         ],
         output_type=WorkoutPlanOutput,  # Structured output
     )
