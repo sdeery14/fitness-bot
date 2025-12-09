@@ -41,8 +41,8 @@ async def _get_or_create_mcp_server() -> MCPServerStdio:
         server = MCPServerStdio(
             name="Postgres MCP",
             params={
-                "command": "postgres-mcp",  # Assumes postgres-mcp is in PATH (installed via uv tool install)
-                "args": [database_uri, "--access-mode=restricted"],
+                "command": "npx",  # Use npx to run the globally installed package
+                "args": ["-y", "@modelcontextprotocol/server-postgres", database_uri, "--access-mode=restricted"],
             },
         )
         # Initialize the server

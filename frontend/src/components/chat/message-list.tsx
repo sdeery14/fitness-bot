@@ -4,6 +4,7 @@ import { useRef, useEffect } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
+import { SuggestionCards } from "@/components/chat/suggestion-cards";
 
 export interface Message {
   id: string;
@@ -15,9 +16,11 @@ export interface Message {
 interface MessageListProps {
   messages: Message[];
   isLoading?: boolean;
+  onSelectSuggestion?: (prompt: string) => void;
+  onFillInput?: (prompt: string) => void;
 }
 
-export function MessageList({ messages, isLoading }: MessageListProps) {
+export function MessageList({ messages, isLoading, onSelectSuggestion, onFillInput }: MessageListProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // Auto-scroll to bottom when new messages arrive
@@ -27,33 +30,18 @@ export function MessageList({ messages, isLoading }: MessageListProps) {
     }
   }, [messages]);
 
+  // Show suggestions if no messages OR only AI greeting (no user messages yet)
+  const hasUserMessages = messages.some(msg => msg.sender_type === "user");
+  const shouldShowSuggestions = !hasUserMessages && !isLoading && (onSelectSuggestion || onFillInput);
+
   return (
     <ScrollArea className="flex-1">
       <div className="">
-        {messages.length === 0 && !isLoading && (
-          <div className="flex items-center justify-center min-h-[60vh] text-center px-4">
-            <div className="max-w-2xl">
-              <div className="mb-6 text-6xl">💪</div>
-              <h2 className="text-3xl font-bold text-gray-900 mb-4">Start Your Fitness Journey</h2>
-              <p className="text-lg text-gray-600 mb-8">
-                Tell me about your fitness goals and I'll help create a personalized plan just for you.
-              </p>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-left">
-                <div className="p-4 border-2 border-gray-200 rounded-xl hover:border-blue-500 hover:bg-blue-50 transition-all cursor-pointer">
-                  <p className="text-sm font-medium text-gray-700">🎯 "I want to lose 20 pounds in 3 months"</p>
-                </div>
-                <div className="p-4 border-2 border-gray-200 rounded-xl hover:border-blue-500 hover:bg-blue-50 transition-all cursor-pointer">
-                  <p className="text-sm font-medium text-gray-700">💪 "Build muscle and gain strength"</p>
-                </div>
-                <div className="p-4 border-2 border-gray-200 rounded-xl hover:border-blue-500 hover:bg-blue-50 transition-all cursor-pointer">
-                  <p className="text-sm font-medium text-gray-700">🏃 "Train for my first marathon"</p>
-                </div>
-                <div className="p-4 border-2 border-gray-200 rounded-xl hover:border-blue-500 hover:bg-blue-50 transition-all cursor-pointer">
-                  <p className="text-sm font-medium text-gray-700">🧘 "Improve flexibility and balance"</p>
-                </div>
-              </div>
-            </div>
-          </div>
+        {shouldShowSuggestions && (
+          <SuggestionCards 
+            onSelectSuggestion={onSelectSuggestion || (() => {})} 
+            onFillInput={onFillInput}
+          />
         )}
 
         {messages.map((message) => (

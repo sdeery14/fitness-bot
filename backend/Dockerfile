@@ -2,11 +2,17 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
-# Install system dependencies
+# Install system dependencies including Node.js for postgres-mcp
 RUN apt-get update && apt-get install -y \
     gcc \
     postgresql-client \
+    curl \
+    && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get install -y nodejs \
     && rm -rf /var/lib/apt/lists/*
+
+# Install postgres-mcp MCP server globally via npm
+RUN npm install -g @modelcontextprotocol/server-postgres
 
 # Install uv
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv

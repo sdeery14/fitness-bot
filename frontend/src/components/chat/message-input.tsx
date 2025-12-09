@@ -9,15 +9,36 @@ interface MessageInputProps {
   onSendMessage: (content: string) => void;
   isSending?: boolean;
   placeholder?: string;
+  value?: string;
+  onValueChange?: (value: string) => void;
 }
 
 export function MessageInput({ 
   onSendMessage, 
   isSending = false,
-  placeholder = "Type your message..." 
+  placeholder = "Type your message...",
+  value: externalValue,
+  onValueChange,
 }: MessageInputProps) {
-  const [input, setInput] = useState("");
+  const [internalInput, setInternalInput] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  
+  // Use external value if provided, otherwise use internal state
+  const input = externalValue !== undefined ? externalValue : internalInput;
+  const setInput = onValueChange || setInternalInput;
+
+  // Auto-resize textarea based on content
+  useEffect(() => {
+    const textarea = textareaRef.current;
+    if (textarea) {
+      // Reset height to auto to get the correct scrollHeight
+      textarea.style.height = 'auto';
+      // Set height based on scrollHeight, with a max height
+      const maxHeight = 400; // Max height in pixels (about 20 lines)
+      const newHeight = Math.min(textarea.scrollHeight, maxHeight);
+      textarea.style.height = `${newHeight}px`;
+    }
+  }, [input]);
 
   const handleSubmit = (e?: React.FormEvent) => {
     e?.preventDefault();
@@ -45,14 +66,14 @@ export function MessageInput({
   return (
     <div className="border-t border-gray-200 bg-white py-4" role="region" aria-label="Message input">
       <form onSubmit={handleSubmit} className="max-w-3xl mx-auto px-4" aria-label="Send message form">
-        <div className="relative flex items-end gap-2 bg-white border-2 border-gray-300 rounded-2xl shadow-lg focus-within:border-blue-500 focus-within:shadow-xl transition-all">
+        <div className="relative flex items-end gap-2 bg-white border-2 border-gray-300 rounded-2xl shadow-lg focus-within:border-blue-400 focus-within:shadow-xl transition-all">
           <Textarea
             ref={textareaRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder={placeholder}
-            className="min-h-[52px] max-h-[200px] resize-none flex-1 bg-transparent border-0 px-4 py-3 text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-0"
+            className="min-h-[52px] max-h-[400px] resize-none flex-1 bg-transparent border-0 px-4 py-3 text-gray-900 placeholder:text-gray-400 focus-visible:outline-none focus:outline-none focus:ring-0 focus-visible:ring-0 overflow-y-auto"
             rows={1}
             aria-label="Message input"
             aria-describedby="message-input-help"

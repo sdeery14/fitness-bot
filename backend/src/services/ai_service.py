@@ -136,12 +136,11 @@ How can I assist you today?
 
 What would you like to work on?"""
             else:
-                agent_response = """Welcome! I'm so excited to help you get started on your fitness journey!
+                agent_response = """Welcome! I'm thrilled to help you start your fitness journey! 🎉
 
-To create the perfect plan for you, I'd love to learn about your goals. Could you tell me:
-• What fitness goal would you like to achieve? (For example: lose weight, build muscle, improve endurance, or just feel healthier overall)
+You can click one of the quick-start options above to fill in a template (which you can customize), or tell me about your fitness goals in your own words.
 
-What brings you here today?"""
+Either way, I'm here to help you succeed!"""
         else:
             # Save user's initial message
             await self.conversation_service.add_message(

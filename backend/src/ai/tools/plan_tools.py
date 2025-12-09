@@ -308,7 +308,7 @@ async def build_fitness_plan(requirements: FitnessPlanInput) -> str:
                     "dietary_restrictions": requirements.dietary_restrictions,
                     "meal_frequency": requirements.meal_frequency,
                     "injuries_or_conditions": requirements.injuries_or_conditions,
-                    "schedule_preferences": requirements.schedule_preferences,
+                    "schedule_preferences": requirements.schedule_preferences.model_dump(),
                 }
 
                 # Create fitness plan record

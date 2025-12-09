@@ -15,12 +15,14 @@ export function ChatInterface({
   onSendMessage,
 }: ChatInterfaceProps) {
   const [isLoading, setIsLoading] = useState(false);
+  const [inputValue, setInputValue] = useState("");
 
   const handleSendMessage = async (content: string) => {
     setIsLoading(true);
 
     try {
       await onSendMessage(content);
+      setInputValue(""); // Clear input after successful send
     } catch (error) {
       console.error("Error sending message:", error);
     } finally {
@@ -28,14 +30,25 @@ export function ChatInterface({
     }
   };
 
+  const handleFillInput = (prompt: string) => {
+    setInputValue(prompt);
+    // Note: We don't send automatically - user can review and edit first
+  };
+
   return (
     <div className="flex flex-col h-full bg-white">
-      <MessageList messages={messages} isLoading={isLoading} />
+      <MessageList 
+        messages={messages} 
+        isLoading={isLoading}
+        onFillInput={handleFillInput}
+      />
       
       <MessageInput
         onSendMessage={handleSendMessage}
         isSending={isLoading}
         placeholder="Tell me about your fitness goals, dietary preferences, or ask questions..."
+        value={inputValue}
+        onValueChange={setInputValue}
       />
     </div>
   );
