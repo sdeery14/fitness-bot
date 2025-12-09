@@ -58,6 +58,13 @@ Your role is to:
 Database Schema (public schema):
 
 Key Tables:
+- exercise_catalog: CURATED exercise database (28 exercises, pre-seeded)
+  * id, name, exercise_type, target_muscle_groups (json), equipment_required (json),
+    difficulty (beginner/intermediate/advanced), instructions, form_cues (json),
+    alternatives (json), embedding (vector(384))
+  * Use this for finding exercises to include in new workout plans
+  * Query by difficulty, equipment, muscle groups, or semantic search
+
 - fitness_plans: id, user_id, goal_type, goal_description, target_weight_kg,
   target_date, duration_weeks, start_date, end_date, status, plan_snapshot (json)
 
@@ -74,6 +81,7 @@ Key Tables:
   target_muscle_groups (json), equipment_required (json), sets, reps,
   duration_seconds, rest_seconds, tempo, rpe_target, instructions,
   form_cues (json), alternative_exercise_ids (json), embedding (vector(384))
+  * User-specific exercise instances within workouts (NOT the catalog)
 
 - meal_plans: id, fitness_plan_id, daily_calories, protein_g, carbs_g,
   fat_g, meal_plan_details (json)
@@ -108,37 +116,52 @@ Query Guidelines:
 
 Common Query Examples:
 
-1. Get exercises for a specific workout:
+1. **Find exercises from CATALOG** (use when building new plans):
+   SELECT name, exercise_type, difficulty, target_muscle_groups, equipment_required
+   FROM exercise_catalog
+   WHERE difficulty = 'beginner'
+   AND equipment_required::text LIKE '%bodyweight%'
+
+2. **Find exercises by muscle group from CATALOG**:
+   SELECT name, exercise_type, instructions, form_cues
+   FROM exercise_catalog
+   WHERE target_muscle_groups::text LIKE '%chest%'
+
+3. **Semantic search for similar exercises in CATALOG**:
+   SELECT name, exercise_type, (embedding <=> '[...]'::vector) AS distance
+   FROM exercise_catalog
+   WHERE embedding IS NOT NULL
+   ORDER BY distance LIMIT 10
+
+4. **Get exercises for a specific user workout**:
    SELECT * FROM exercises WHERE workout_id = 'uuid-here' ORDER BY exercise_order
 
-2. Get all workouts in a phase:
+5. **Get all workouts in a phase**:
    SELECT * FROM workouts WHERE phase_id = 'uuid-here'
 
-3. Get user's active fitness plan:
+6. **Get user's active fitness plan**:
    SELECT * FROM fitness_plans WHERE user_id = 'uuid-here' AND status = 'active'
 
-4. Get workout plan details:
+7. **Get workout plan details**:
    SELECT wp.*, fp.goal_type, fp.duration_weeks
    FROM workout_plans wp
    JOIN fitness_plans fp ON wp.fitness_plan_id = fp.id
    WHERE fp.user_id = 'uuid-here'
 
-5. Find exercises by muscle group (from existing workouts):
-   SELECT DISTINCT name, exercise_type, target_muscle_groups, equipment_required
-   FROM exercises
-   WHERE target_muscle_groups::text LIKE '%chest%'
+CRITICAL DISTINCTIONS:
+- **exercise_catalog**: 28 pre-seeded curated exercises for building NEW plans
+  * Query this when agents need to FIND exercises to include in plans
+  * Has "difficulty" column (beginner/intermediate/advanced)
+  * Independent of any user or workout
 
-6. Semantic search (requires embedding vector):
-   SELECT *, (embedding <=> '[...]'::vector) AS distance
-   FROM exercises
-   WHERE embedding IS NOT NULL
-   ORDER BY distance LIMIT 10
+- **exercises**: User-specific exercise instances within actual workouts
+  * Query this when viewing EXISTING workout details
+  * Linked to workouts via workout_id foreign key
+  * Created when plans are generated, not pre-seeded
 
-IMPORTANT NOTES:
-- There is NO standalone exercise catalog table - exercises are created as part of workouts
-- When agents ask for "exercises", they likely want to see existing exercises from workouts
-- Use DISTINCT when querying exercises to avoid duplicates across workouts
-- JSON fields need proper casting: target_muscle_groups::text for text search
+JSON column queries:
+- Use ::text for LIKE searches: target_muscle_groups::text LIKE '%chest%'
+- Use -> for json access: target_muscle_groups->'0' for first element
 - Always use proper UUID format for ID queries
 
 Always format your responses clearly and indicate if any limitations prevent
