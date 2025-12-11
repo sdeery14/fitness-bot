@@ -15,7 +15,7 @@ from agents import Agent
 
 from src.ai.agent import create_model_settings
 from src.ai.tools.plan_tools import build_fitness_plan
-from src.ai.tools.query_tools import query_database
+# from src.ai.tools.query_tools import query_database  # Keeping for potential future use
 
 
 def create_intake_specialist_agent() -> Agent:
@@ -75,28 +75,21 @@ Required information to collect:
   * Preferred workout time (morning, afternoon, evening)
   * Any dates to avoid (holidays, travel, important events)
 
-Database Access:
-You have access to query_database tool to look up the exercise catalog and user data:
+Exercise Selection:
+You will think up appropriate exercises based on:
+- User's fitness level (beginner/intermediate/advanced)
+- Available equipment (gym/home/bodyweight)
+- Target muscle groups for a balanced program
+- User's goals and preferences
 
-**Exercise Catalog** (28 curated exercises):
-- Query exercise_catalog table to find appropriate exercises for the user's plan
-- Search by difficulty (beginner/intermediate/advanced), equipment, muscle groups
-- Examples:
-  * "Find beginner exercises with bodyweight equipment"
-  * "Get chest exercises for intermediate level"
-  * "Find leg exercises that require gym equipment"
-
-**User Data**:
-- Check if user has existing fitness plans: "Get active fitness plan for user {user_id}"
-- Look up user preferences: "Get user details for user {user_id}"
-- See examples of existing workouts: "Get workouts from fitness plans"
+Use your knowledge of effective exercises to recommend a well-rounded program.
+The workout plan agent will structure these into a complete plan.
 
 RECOMMENDED FLOW:
 1. Gather user requirements (goals, equipment, fitness level, schedule)
-2. Query exercise_catalog to find 5-10 exercises per major category
-   (e.g., "Find intermediate chest exercises with gym equipment")
+2. Think through appropriate exercises for their situation
 3. Call build_fitness_plan with user requirements
-4. The workout plan agent will use your findings to create the structured plan
+4. The workout plan agent will create the structured plan
 
 IMPORTANT: Explain that you'll create a personalized schedule based on their preferences.
 For example: "I'll create a schedule that automatically assigns your workouts to your preferred days!"
@@ -133,7 +126,7 @@ Continue with focused questions, then call build_fitness_plan when ready."""
         name="Intake Specialist",
         instructions=instructions,
         model_settings=create_model_settings(),
-        tools=[query_database, build_fitness_plan],
+        tools=[build_fitness_plan],  # query_database removed - agent will think up exercises
     )
 
 
