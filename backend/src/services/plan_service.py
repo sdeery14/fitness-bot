@@ -410,26 +410,51 @@ class PlanService:
                 self.db.add(workout_plan)
                 await self.db.flush()  # Flush to get the workout_plan ID
                 
-                # Create individual Workout records from workout cycle
-                from src.models.workout import Workout
-                workouts_list = self._extract_workouts_from_cycle(workout_cycle)
+                # Create individual Workout records from workout details
+                from src.models.workout import Workout, Exercise
+                
+                # Get workouts list from PhaseWorkoutDetails
+                workouts_list = workout_details.get("workouts", [])
                 
                 for workout_data in workouts_list:
+                    # Create Workout record with data from WorkoutDay
                     workout = Workout(
                         workout_plan_id=workout_plan.id,
                         phase_id=phase.id,
                         name=workout_data.get("day_name", "Workout"),
-                        workout_type="strength",  # Default type
+                        workout_type=workout_data.get("workout_type", "strength"),
                         duration_minutes=workout_data.get("duration_minutes", 60),
-                        intensity_level="moderate",  # Default intensity
+                        intensity_level=workout_data.get("intensity_level", "moderate"),
                         workout_structure={
-                            "warmup": workout_data.get("warmup", "5-10 minutes of light cardio"),
-                            "cooldown": workout_data.get("cooldown", "5-10 minutes of stretching"),
+                            "warmup": workout_data.get("warmup", "5-10 minutes of light cardio and dynamic stretching"),
+                            "cooldown": workout_data.get("cooldown", "5-10 minutes of stretching and mobility"),
                             "focus": workout_data.get("focus", "General"),
-                            "exercises": workout_data.get("exercises", []),
+                            "notes": workout_data.get("notes"),
                         },
                     )
                     self.db.add(workout)
+                    await self.db.flush()  # Get workout ID for exercises
+                    
+                    # Create Exercise records for each exercise in this workout
+                    exercises_list = workout_data.get("exercises", [])
+                    for exercise_order, exercise_data in enumerate(exercises_list, start=1):
+                        exercise = Exercise(
+                            workout_id=workout.id,
+                            exercise_order=exercise_order,
+                            name=exercise_data.get("name", "Unknown Exercise"),
+                            exercise_type=exercise_data.get("exercise_type", "compound"),
+                            target_muscle_groups=exercise_data.get("target_muscle_groups", []),
+                            equipment_required=exercise_data.get("equipment_required", ["bodyweight"]),
+                            sets=exercise_data.get("sets"),
+                            reps=exercise_data.get("reps"),
+                            duration_seconds=exercise_data.get("duration_seconds"),
+                            rest_seconds=exercise_data.get("rest_seconds", 60),
+                            tempo=exercise_data.get("tempo"),
+                            rpe_target=exercise_data.get("rpe_target"),
+                            instructions=exercise_data.get("instructions", ""),
+                            form_cues=exercise_data.get("form_cues", []),
+                        )
+                        self.db.add(exercise)
 
             # Extract meal details for this phase
             meal_details = phase_data.get("meal_details", {})
