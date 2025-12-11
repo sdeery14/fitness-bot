@@ -107,26 +107,45 @@ class ScheduleService:
         meals_result = await self.db.execute(meals_stmt)
         meals = list(meals_result.scalars().all())
 
-        # Generate schedule entries for workouts based on split type
+        # Generate schedule entries for workouts using training cycle from plan_snapshot
         if workouts:
-            split_type = schedule_preferences.get("split_type", "weekly_fixed")
+            # Extract training_cycle from plan_snapshot if available
+            training_cycle = None
+            if plan.plan_snapshot:
+                workout_plan_output = plan.plan_snapshot.get("workout_plan_output", {})
+                workout_plan_data = workout_plan_output.get("workout_plan", {})
+                training_cycle = workout_plan_data.get("training_cycle")
             
-            if split_type == "rolling":
-                await self._generate_rolling_split_entries(
+            if training_cycle:
+                # Use explicit training cycle from AI agent
+                await self._generate_cycle_based_entries(
                     schedule=schedule,
                     workouts=workouts,
+                    training_cycle=training_cycle,
                     start_date=start_date,
                     duration_weeks=plan.duration_weeks,
                     preferences=schedule_preferences,
                 )
             else:
-                await self._generate_weekly_fixed_entries(
-                    schedule=schedule,
-                    workouts=workouts,
-                    start_date=start_date,
-                    duration_weeks=plan.duration_weeks,
-                    preferences=schedule_preferences,
-                )
+                # Fallback to legacy behavior if no training_cycle provided
+                split_type = schedule_preferences.get("split_type", "weekly_fixed")
+                
+                if split_type == "rolling":
+                    await self._generate_rolling_split_entries(
+                        schedule=schedule,
+                        workouts=workouts,
+                        start_date=start_date,
+                        duration_weeks=plan.duration_weeks,
+                        preferences=schedule_preferences,
+                    )
+                else:
+                    await self._generate_weekly_fixed_entries(
+                        schedule=schedule,
+                        workouts=workouts,
+                        start_date=start_date,
+                        duration_weeks=plan.duration_weeks,
+                        preferences=schedule_preferences,
+                    )
 
         # Generate schedule entries for meals
         if meals:
@@ -279,6 +298,79 @@ class ScheduleService:
             
             # Move to next workout and next day
             workout_idx += 1
+            current_date += timedelta(days=1)
+    
+    async def _generate_cycle_based_entries(
+        self,
+        schedule: Schedule,
+        workouts: list[Workout],
+        training_cycle: list[dict],
+        start_date: date,
+        duration_weeks: int,
+        preferences: dict | None,
+    ) -> None:
+        """Generate schedule entries based on explicit training cycle from AI agent.
+        
+        Uses the training_cycle structure from the workout plan to schedule workouts
+        and rest days. The cycle repeats throughout the program duration.
+        
+        Args:
+            schedule: Schedule to add entries to
+            workouts: List of workouts from the plan
+            training_cycle: List of cycle items (workout or rest) from plan_snapshot
+            start_date: Schedule start date
+            duration_weeks: Total plan duration in weeks
+            preferences: User scheduling preferences dict
+        """
+        # Calculate plan end date
+        plan_end_date = start_date + timedelta(weeks=duration_weeks)
+        
+        # Get user preferences
+        avoid_dates = preferences.get("avoid_dates", []) if preferences else []
+        preferred_time = self._parse_preferred_time(preferences)
+        
+        # Create workout ID lookup
+        workout_id_map = {i: workout.id for i, workout in enumerate(workouts)}
+        
+        # Start cycling through training cycle
+        current_date = start_date
+        cycle_idx = 0
+        
+        while current_date <= plan_end_date:
+            date_str = current_date.isoformat()
+            
+            # Skip avoid dates
+            if date_str in avoid_dates:
+                current_date += timedelta(days=1)
+                continue
+            
+            # Get current cycle item
+            cycle_item = training_cycle[cycle_idx % len(training_cycle)]
+            item_type = cycle_item.get("type")
+            
+            if item_type == "workout":
+                # Schedule workout
+                workout_index = cycle_item.get("workout_index")
+                if workout_index is not None and workout_index < len(workouts):
+                    workout_id = workout_id_map[workout_index]
+                    
+                    entry = ScheduleEntry(
+                        schedule_id=schedule.id,
+                        entry_type="workout",
+                        entry_date=current_date,
+                        entry_time=preferred_time,
+                        workout_id=workout_id,
+                        meal_id=None,
+                        completion_status="scheduled",
+                    )
+                    self.db.add(entry)
+            
+            elif item_type == "rest":
+                # Rest day - no workout scheduled (could add rest day entry if needed)
+                pass
+            
+            # Move to next cycle item and next day
+            cycle_idx += 1
             current_date += timedelta(days=1)
     
     def _parse_preferred_time(self, preferences: dict | None) -> time | None:

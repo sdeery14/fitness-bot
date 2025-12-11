@@ -34,6 +34,39 @@ class WorkoutDay(BaseModel):
     cooldown: str = Field(description="Cooldown/stretching instructions")
 
 
+class RestDay(BaseModel):
+    """Represents a rest day in the training cycle."""
+
+    model_config = {"extra": "forbid"}  # Strict schema for agents SDK
+
+    day_name: str = Field(default="Rest Day", description="Rest day identifier")
+    notes: str | None = Field(
+        default=None,
+        description="Optional rest day guidance (e.g., 'Light stretching', 'Active recovery walk')",
+    )
+
+
+class WorkoutCycleItem(BaseModel):
+    """A single item in the training cycle (workout or rest).
+
+    This defines the order and structure of the training cycle, allowing for:
+    - Rolling splits (e.g., Upper/Lower/Rest repeating regardless of calendar week)
+    - Weekly fixed schedules (specific days mapped to specific workouts)
+    - Mixed schedules (workouts with built-in rest days)
+    """
+
+    model_config = {"extra": "forbid"}  # Strict schema for agents SDK
+
+    type: str = Field(description="Item type: 'workout' or 'rest'")
+    workout_index: int | None = Field(
+        default=None,
+        description="Index into workouts list (for type='workout'). 0-based index.",
+    )
+    rest_day: RestDay | None = Field(
+        default=None, description="Rest day information (for type='rest')"
+    )
+
+
 class WorkoutPlan(BaseModel):
     """Complete workout plan structure."""
 
@@ -46,6 +79,9 @@ class WorkoutPlan(BaseModel):
     )
     duration_weeks: int = Field(description="Program duration in weeks", ge=4, le=16)
     workouts: list[WorkoutDay] = Field(description="List of workout days in the program")
+    training_cycle: list[WorkoutCycleItem] = Field(
+        description="The training cycle structure defining the order of workouts and rest days. This cycle repeats throughout the program. Example: [workout 0, workout 1, rest, workout 2, workout 3, rest] for Upper/Lower split with rest days."
+    )
     progression_notes: str = Field(description="How to progress the program over time")
 
 

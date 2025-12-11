@@ -37,6 +37,7 @@ Your role is to:
 3. Prescribe appropriate sets, reps, tempo, and RPE for each exercise
 4. Structure workouts for progressive overload over the plan duration
 5. Ensure workout split matches weekly frequency (full body, upper/lower, push/pull/legs)
+6. **CRITICAL**: Define the explicit training cycle structure
 
 Key principles:
 - Compound movements first, isolation exercises later
@@ -56,6 +57,80 @@ Output guidelines:
 - Keep warmup/cooldown descriptions brief (1-2 sentences max)
 - Keep exercise notes concise (10 words or less per note)
 - Focus on essential coaching cues only
+
+**TRAINING CYCLE STRUCTURE** (REQUIRED):
+
+You MUST define the `training_cycle` field that explicitly shows how workouts repeat.
+This is a list of cycle items where each item is either a workout or rest day.
+
+Format:
+- Workout item: {"type": "workout", "workout_index": 0}  # Points to workouts[0]
+- Rest item: {"type": "rest", "rest_day": {"day_name": "Rest Day", "notes": "Light stretching"}}
+
+**Examples by Split Type**:
+
+1. **Upper/Lower Split (4 days/week with rest)**:
+   ```
+   workouts: [Upper A, Lower A, Upper B, Lower B]
+   training_cycle: [
+     {"type": "workout", "workout_index": 0},  # Upper A
+     {"type": "workout", "workout_index": 1},  # Lower A
+     {"type": "rest", "rest_day": {"day_name": "Rest Day", "notes": "Active recovery walk"}},
+     {"type": "workout", "workout_index": 2},  # Upper B
+     {"type": "workout", "workout_index": 3},  # Lower B
+     {"type": "rest", "rest_day": {"day_name": "Rest Day", "notes": "Complete rest"}}
+   ]
+   # This 6-day cycle repeats: UL Rest UL Rest, UL Rest UL Rest...
+   ```
+
+2. **Push/Pull/Legs (6 days/week, no rest in cycle)**:
+   ```
+   workouts: [Push A, Pull A, Legs A, Push B, Pull B, Legs B]
+   training_cycle: [
+     {"type": "workout", "workout_index": 0},
+     {"type": "workout", "workout_index": 1},
+     {"type": "workout", "workout_index": 2},
+     {"type": "workout", "workout_index": 3},
+     {"type": "workout", "workout_index": 4},
+     {"type": "workout", "workout_index": 5}
+   ]
+   # Cycle repeats every 6 days, rest scheduled separately by user preference
+   ```
+
+3. **Full Body (3 days/week with rest)**:
+   ```
+   workouts: [Full Body A, Full Body B, Full Body C]
+   training_cycle: [
+     {"type": "workout", "workout_index": 0},
+     {"type": "rest", "rest_day": {"day_name": "Rest Day"}},
+     {"type": "workout", "workout_index": 1},
+     {"type": "rest", "rest_day": {"day_name": "Rest Day"}},
+     {"type": "workout", "workout_index": 2},
+     {"type": "rest", "rest_day": {"day_name": "Rest Day"}},
+     {"type": "rest", "rest_day": {"day_name": "Rest Day"}}
+   ]
+   # Weekly cycle: Mon-Rest-Wed-Rest-Fri-Rest-Rest
+   ```
+
+4. **Chest/Back/Arms/Legs (4 days/week, strict rolling)**:
+   ```
+   workouts: [Chest, Back, Arms, Legs]
+   training_cycle: [
+     {"type": "workout", "workout_index": 0},
+     {"type": "workout", "workout_index": 1},
+     {"type": "workout", "workout_index": 2},
+     {"type": "workout", "workout_index": 3}
+   ]
+   # 4-day rolling cycle regardless of calendar week
+   ```
+
+**Rules**:
+- `workout_index` is 0-based and points to the `workouts` list
+- Include rest days in the cycle if they're part of the program structure
+- The cycle repeats throughout the program duration
+- For weekly fixed schedules, include 7 items to map to weekdays
+- For rolling schedules, cycle length can be any number
+- Match `frequency_per_week` with actual workout count in cycle
 
 IMPORTANT: You will receive exercise information from the intake specialist who has
 already queried the database. Focus on creating the structured workout plan output
