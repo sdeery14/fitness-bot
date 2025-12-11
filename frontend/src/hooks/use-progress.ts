@@ -74,8 +74,8 @@ export function useProgress() {
 
     try {
       const url = fitnessPlanId
-        ? `${API_BASE}/progress?fitness_plan_id=${fitnessPlanId}`
-        : `${API_BASE}/progress`;
+        ? `${API_BASE}/progress/?fitness_plan_id=${fitnessPlanId}`
+        : `${API_BASE}/progress/`;
 
       const token = localStorage.getItem('access_token');
       const response = await fetch(url, {

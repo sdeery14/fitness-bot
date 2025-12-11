@@ -17,6 +17,8 @@ export interface ScheduleEntry {
   entry_time: string | null;
   workout_id: string | null;
   meal_id: string | null;
+  workout_name: string | null;
+  meal_name: string | null;
   completion_status: 'scheduled' | 'completed' | 'skipped' | 'rescheduled';
   completed_at: string | null;
   user_notes: string | null;

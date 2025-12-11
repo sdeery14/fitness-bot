@@ -12,6 +12,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useSchedule } from '@/hooks/use-schedule';
 import type { ScheduleEntry } from '@/store/schedule-store';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -35,6 +36,7 @@ interface DaySchedule {
 }
 
 export function ScheduleCalendar({ days = 14 }: ScheduleCalendarProps) {
+  const router = useRouter();
   const { upcomingSchedule, upcomingLoading, upcomingError, fetchUpcomingSchedule } = useSchedule();
   const [currentDays, setCurrentDays] = useState(days);
   const [groupedSchedule, setGroupedSchedule] = useState<DaySchedule[]>([]);
@@ -204,7 +206,7 @@ export function ScheduleCalendar({ days = 14 }: ScheduleCalendarProps) {
                     todayClass && 'ring-2 ring-primary',
                     pastClass && 'opacity-70'
                   )}
-
+                  onClick={() => router.push(`/dashboard/schedule/${day.date}`)}
                 >
                   <CardHeader className="pb-3">
                     <div className="flex items-center justify-between">

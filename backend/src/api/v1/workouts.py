@@ -9,7 +9,7 @@ from src.integrations.exercise_database import get_alternative_exercises
 from src.models.workout import Workout
 from src.schemas import create_success_response
 
-router = APIRouter(prefix="/workouts", tags=["workouts"])
+router = APIRouter()
 
 
 @router.get("/{workout_id}")
@@ -43,8 +43,8 @@ async def get_workout(
         "name": workout.name,
         "workout_type": workout.workout_type,
         "duration_minutes": workout.duration_minutes,
-        "difficulty_level": workout.difficulty_level,
-        "workout_details": workout.workout_details,
+        "intensity_level": workout.intensity_level,
+        "workout_structure": workout.workout_structure,
     })
 
 
