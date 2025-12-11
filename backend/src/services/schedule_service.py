@@ -335,8 +335,9 @@ class ScheduleService:
         # Calculate plan end date
         plan_end_date = start_date + timedelta(weeks=duration_weeks)
         
-        # Get user preferences
-        avoid_dates = preferences.get("avoid_dates", []) if preferences else []
+        # Get user preferences (handle None values from JSON)
+        avoid_dates_raw = preferences.get("avoid_dates") if preferences else None
+        avoid_dates = avoid_dates_raw if avoid_dates_raw is not None else []
         preferred_time = self._parse_preferred_time(preferences)
         
         # Create workout ID lookup
