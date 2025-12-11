@@ -161,18 +161,50 @@ class MealPlanOutput(BaseModel):
     prep_difficulty: str = Field(description="Overall meal prep difficulty (Easy/Medium/Hard)")
 
 
+class PhaseOutput(BaseModel):
+    """A single phase in a multi-phase fitness plan.
+    
+    Examples:
+    - Bulk Phase + Cut Phase (bodybuilding)
+    - Strength Phase + Hypertrophy Phase (powerlifting)
+    - Base Building + Peak Performance (endurance)
+    - Foundation Phase + Advanced Phase (beginner progression)
+    """
+
+    model_config = {"extra": "forbid"}  # Strict schema for agents SDK
+
+    phase_number: int = Field(description="Phase number in sequence (1, 2, 3, etc.)", ge=1)
+    name: str = Field(description="Phase name (e.g., 'Bulk Phase', 'Strength Phase', 'Foundation')")
+    objectives: list[str] = Field(
+        description="Primary objectives for this phase (e.g., 'Build muscle mass', 'Increase strength')"
+    )
+    duration_weeks: int = Field(description="Duration of this phase in weeks", ge=2, le=16)
+    workout_plan_output: WorkoutPlanOutput = Field(
+        description="Phase-specific workout program with training cycle"
+    )
+    meal_plan_output: MealPlanOutput = Field(
+        description="Phase-specific nutrition plan with calorie/macro targets"
+    )
+
+
 class FitnessPlanOutput(BaseModel):
-    """Complete fitness plan combining workout and nutrition."""
+    """Complete fitness plan with one or more phases.
+    
+    Single-phase plans: Use 1 phase for straightforward goals
+    Multi-phase plans: Use 2+ phases for progressive programs (bulk/cut, beginner/advanced, etc.)
+    """
 
     model_config = {"extra": "forbid"}  # Strict schema for agents SDK
 
     goal_summary: str = Field(description="User's primary fitness goal and context")
-    duration_weeks: int = Field(description="Total program duration in weeks", ge=4, le=16)
-    fitness_level: str = Field(description="User's fitness level (beginner/intermediate/advanced)")
-    workout_plan_output: WorkoutPlanOutput = Field(
-        description="Workout program from specialist agent"
+    duration_weeks: int = Field(
+        description="Total program duration in weeks (sum of all phase durations)", ge=4, le=52
     )
-    meal_plan_output: MealPlanOutput = Field(description="Nutrition plan from specialist agent")
+    fitness_level: str = Field(description="User's fitness level (beginner/intermediate/advanced)")
+    phases: list[PhaseOutput] = Field(
+        description="One or more phases in the program. Each phase has its own workout plan, meal plan, and objectives. Examples: [Bulk Phase, Cut Phase] or [Foundation Phase] for single-phase plans.",
+        min_length=1
+    )
     key_principles: list[str] = Field(description="Key principles for success (3-5 items)")
     success_metrics: list[str] = Field(description="How to measure progress (3-5 metrics)")
     important_notes: str = Field(description="Critical information about the plan")
@@ -186,25 +218,36 @@ class FitnessPlanOutput(BaseModel):
         Raises:
             ValueError: If validation fails with specific reason
         """
-        # Check workout frequency matches plan duration
-        workout_freq = self.workout_plan_output.workout_plan.frequency_per_week
-        if not (2 <= workout_freq <= 7):
+        # Check that we have at least one phase
+        if not self.phases:
+            raise ValueError("Plan must have at least one phase.")
+        
+        # Check total duration matches sum of phase durations
+        total_phase_weeks = sum(phase.duration_weeks for phase in self.phases)
+        if total_phase_weeks != self.duration_weeks:
             raise ValueError(
-                f"Invalid workout frequency: {workout_freq}. Must be 2-7 days per week."
+                f"Total duration ({self.duration_weeks} weeks) must equal sum of phase durations ({total_phase_weeks} weeks)."
             )
-
-        # Check that workout duration is reasonable
-        if not (4 <= self.duration_weeks <= 16):
-            raise ValueError(f"Invalid duration: {self.duration_weeks}. Must be 4-16 weeks.")
-
-        # Check meal plan has sample days
-        if not self.meal_plan_output.meal_plan.sample_days:
-            raise ValueError("Meal plan must include at least one sample day.")
-
-        # Check calorie target is reasonable
-        calories = self.meal_plan_output.meal_plan.daily_calorie_target
-        if not (1200 <= calories <= 5000):
-            raise ValueError(f"Invalid calorie target: {calories}. Must be 1200-5000.")
+        
+        # Validate each phase
+        for i, phase in enumerate(self.phases, 1):
+            # Check workout frequency
+            workout_freq = phase.workout_plan_output.workout_plan.frequency_per_week
+            if not (2 <= workout_freq <= 7):
+                raise ValueError(
+                    f"Phase {i} invalid workout frequency: {workout_freq}. Must be 2-7 days per week."
+                )
+            
+            # Check meal plan has sample days
+            if not phase.meal_plan_output.meal_plan.sample_days:
+                raise ValueError(f"Phase {i} meal plan must include at least one sample day.")
+            
+            # Check calorie target is reasonable
+            calories = phase.meal_plan_output.meal_plan.daily_calorie_target
+            if not (1200 <= calories <= 5000):
+                raise ValueError(
+                    f"Phase {i} invalid calorie target: {calories}. Must be 1200-5000."
+                )
 
         return True
 

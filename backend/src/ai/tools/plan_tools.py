@@ -99,6 +99,13 @@ class FitnessPlanInput(BaseModel):
     injuries_or_conditions: list[str] = Field(
         default_factory=list, description="Injuries or health conditions"
     )
+    duration_weeks: int = Field(
+        default=12, description="Total program duration in weeks", ge=4, le=52
+    )
+    phases: list[str] | None = Field(
+        default=None,
+        description="Optional list of phase names/descriptions if user wants multi-phase plan (e.g., ['Bulk Phase - 8 weeks', 'Cut Phase - 4 weeks'] or ['Foundation - 6 weeks', 'Advanced - 6 weeks']). Leave None for single-phase plans."
+    )
     schedule_preferences: SchedulePreferences = Field(
         default_factory=SchedulePreferences,
         description="User's scheduling preferences: split_type (weekly_fixed|rolling), preferred_workout_days, rest_days, preferred_time, avoid_dates, notes",
@@ -197,22 +204,23 @@ Meal Frequency: {requirements.meal_frequency} meals per day
 
 @function_tool
 async def build_fitness_plan(requirements: FitnessPlanInput) -> str:
-    """Build a complete fitness plan by directly calling workout and meal plan tools.
+    """Build a complete fitness plan with one or more phases.
 
     This is the main function tool that the conversation agent calls when ready
-    to generate a complete fitness plan. It directly calls build_workout_plan
-    and build_meal_plan functions, then combines their results into a unified
-    fitness plan.
+    to generate a complete fitness plan. It creates phases by calling workout
+    and meal plan tools for each phase, then combines their results into a
+    unified multi-phase fitness plan.
 
     The user_id and db_session are retrieved from context variables set by the
     AI service before invoking the agent.
 
     Args:
-        requirements: FitnessPlanInput with all required parameters
+        requirements: FitnessPlanInput with all required parameters including
+                     optional phases list for multi-phase plans
 
     Returns:
         JSON string containing:
-            - fitness_plan: FitnessPlanOutput (structured plan data)
+            - fitness_plan: FitnessPlanOutput (structured plan data with phases)
             - status: str ("success" or "error")
             - message: str (human-readable result message)
             - plan_id: str (database ID once saved)
@@ -221,57 +229,90 @@ async def build_fitness_plan(requirements: FitnessPlanInput) -> str:
         ValueError: If plan generation fails
     """
     try:
-        # Build workout plan by calling the underlying function
-        workout_input = WorkoutPlanInput(
-            primary_goal=requirements.primary_goal,
-            fitness_level=requirements.fitness_level,
-            workout_frequency=requirements.workout_frequency,
-            equipment_access=requirements.equipment_access,
-            time_per_session=requirements.time_per_session,
-            injuries_or_conditions=requirements.injuries_or_conditions,
+        # Import schemas
+        from src.ai.schemas import (
+            FitnessPlanOutput,
+            MealPlanOutput,
+            PhaseOutput,
+            WorkoutPlanOutput,
         )
 
-        # Call build_workout_plan directly
-        workout_plan_json = await build_workout_plan(workout_input)
-        workout_plan_dict = json.loads(workout_plan_json)
+        # Determine if multi-phase plan
+        phase_descriptions = requirements.phases if requirements.phases else ["Complete Program"]
+        num_phases = len(phase_descriptions)
+        
+        # Split duration across phases
+        if num_phases == 1:
+            phase_durations = [requirements.duration_weeks]
+        else:
+            # Distribute duration evenly across phases (AI can override later)
+            weeks_per_phase = requirements.duration_weeks // num_phases
+            remainder = requirements.duration_weeks % num_phases
+            phase_durations = [weeks_per_phase] * num_phases
+            # Add remainder weeks to last phase
+            phase_durations[-1] += remainder
 
-        # Build meal plan input
-        meal_input = MealPlanInput(
-            primary_goal=requirements.primary_goal,
-            dietary_restrictions=requirements.dietary_restrictions,
-            meal_frequency=requirements.meal_frequency,
-            preferences="",
-        )
+        # Build phases
+        phases = []
+        for phase_num, (phase_desc, phase_weeks) in enumerate(zip(phase_descriptions, phase_durations), 1):
+            # Parse phase description (format: "Phase Name - X weeks" or just "Phase Name")
+            phase_name = phase_desc.split(" -")[0].strip() if " -" in phase_desc else phase_desc
+            
+            # Determine phase-specific adjustments
+            phase_objectives = _get_phase_objectives(phase_name, requirements.primary_goal, phase_num, num_phases)
+            
+            # Build workout plan for this phase
+            workout_input = WorkoutPlanInput(
+                primary_goal=f"{requirements.primary_goal} - {phase_name}",
+                fitness_level=requirements.fitness_level,
+                workout_frequency=requirements.workout_frequency,
+                equipment_access=requirements.equipment_access,
+                time_per_session=requirements.time_per_session,
+                injuries_or_conditions=requirements.injuries_or_conditions,
+            )
 
-        # Call build_meal_plan directly
-        meal_plan_json = await build_meal_plan(meal_input)
-        meal_plan_dict = json.loads(meal_plan_json)
+            workout_plan_json = await build_workout_plan(workout_input)
+            workout_plan_dict = json.loads(workout_plan_json)
+            workout_plan_output = WorkoutPlanOutput(**workout_plan_dict)
 
-        # Import schemas to create structured output
-        from src.ai.schemas import FitnessPlanOutput, MealPlanOutput, WorkoutPlanOutput
+            # Build meal plan for this phase
+            meal_input = MealPlanInput(
+                primary_goal=f"{requirements.primary_goal} - {phase_name}",
+                dietary_restrictions=requirements.dietary_restrictions,
+                meal_frequency=requirements.meal_frequency,
+                preferences="",
+            )
 
-        # Create WorkoutPlanOutput from the workout plan result
-        workout_plan_output = WorkoutPlanOutput(**workout_plan_dict)
+            meal_plan_json = await build_meal_plan(meal_input)
+            meal_plan_dict = json.loads(meal_plan_json)
+            meal_plan_output = MealPlanOutput(**meal_plan_dict)
 
-        # Create MealPlanOutput from the meal plan result
-        meal_plan_output = MealPlanOutput(**meal_plan_dict)
+            # Create phase output
+            phase_output = PhaseOutput(
+                phase_number=phase_num,
+                name=phase_name,
+                objectives=phase_objectives,
+                duration_weeks=phase_weeks,
+                workout_plan_output=workout_plan_output,
+                meal_plan_output=meal_plan_output,
+            )
+            phases.append(phase_output)
 
-        # Determine duration based on workout plan
-        duration_weeks = workout_plan_output.workout_plan.duration_weeks
-
-        # Create comprehensive fitness plan output
+        # Create comprehensive multi-phase fitness plan output
+        phase_summary = " + ".join([f"{p.name} ({p.duration_weeks}w)" for p in phases])
+        
         fitness_plan_output = FitnessPlanOutput(
-            goal_summary=f"Complete {duration_weeks}-week fitness plan for {requirements.primary_goal}",
-            duration_weeks=duration_weeks,
+            goal_summary=f"Complete {requirements.duration_weeks}-week fitness plan for {requirements.primary_goal} with {num_phases} phase(s): {phase_summary}",
+            duration_weeks=requirements.duration_weeks,
             fitness_level=requirements.fitness_level,
-            workout_plan_output=workout_plan_output,
-            meal_plan_output=meal_plan_output,
+            phases=phases,
             key_principles=[
                 "Progressive overload: Gradually increase intensity over time",
                 "Consistency: Follow the plan regularly for best results",
                 "Recovery: Prioritize sleep (7-9 hours) and rest days",
                 "Nutrition: Fuel your body according to the meal plan",
                 "Adaptation: Adjust based on progress and how you feel",
+                "Phase transitions: Each phase builds on the previous one",
             ],
             success_metrics=[
                 "Track workout performance (weight, reps, or time improvements)",
@@ -280,7 +321,7 @@ async def build_fitness_plan(requirements: FitnessPlanInput) -> str:
                 "Check adherence rate (aim for 80%+ consistency)",
                 "Evaluate how you feel overall (mood, strength, confidence)",
             ],
-            important_notes=f"This {duration_weeks}-week plan is designed for {requirements.fitness_level} level. Adjust weights and intensity based on your progress. Listen to your body and take extra rest if needed. Stay hydrated and consistent.",
+            important_notes=f"This {requirements.duration_weeks}-week plan is designed for {requirements.fitness_level} level with {num_phases} phase(s). Each phase has specific objectives and will transition automatically. Adjust weights and intensity based on your progress. Listen to your body and take extra rest if needed.",
         )
 
         # Validate plan completeness
@@ -340,7 +381,7 @@ async def build_fitness_plan(requirements: FitnessPlanInput) -> str:
         result_dict = {
             "fitness_plan": fitness_plan_output.model_dump(),
             "status": "success",
-            "message": f"Successfully created a {fitness_plan_output.duration_weeks}-week fitness plan for {requirements.primary_goal}!",
+            "message": f"Successfully created a {fitness_plan_output.duration_weeks}-week fitness plan for {requirements.primary_goal} with {num_phases} phase(s)!",
             "plan_id": plan_id,
         }
 
@@ -353,6 +394,66 @@ async def build_fitness_plan(requirements: FitnessPlanInput) -> str:
             "error_details": str(e),
         }
         return json.dumps(error_dict, indent=2)
+
+
+def _get_phase_objectives(phase_name: str, primary_goal: str, phase_num: int, total_phases: int) -> list[str]:
+    """Generate phase-specific objectives based on phase name and position.
+    
+    Args:
+        phase_name: Name of the phase (e.g., "Bulk Phase", "Cut Phase")
+        primary_goal: User's primary fitness goal
+        phase_num: Current phase number (1-indexed)
+        total_phases: Total number of phases
+        
+    Returns:
+        List of objectives for this phase
+    """
+    phase_lower = phase_name.lower()
+    
+    # Common phase patterns
+    if "bulk" in phase_lower or "mass" in phase_lower:
+        return [
+            "Build muscle mass through progressive overload",
+            "Increase strength on compound movements",
+            "Maintain caloric surplus for muscle growth",
+        ]
+    elif "cut" in phase_lower or "shred" in phase_lower or "lean" in phase_lower:
+        return [
+            "Maintain muscle while reducing body fat",
+            "Achieve caloric deficit through nutrition",
+            "Increase cardiovascular conditioning",
+        ]
+    elif "strength" in phase_lower or "power" in phase_lower:
+        return [
+            "Maximize strength on primary lifts",
+            "Focus on low-rep, high-weight training",
+            "Improve neuromuscular efficiency",
+        ]
+    elif "hypertrophy" in phase_lower:
+        return [
+            "Optimize muscle growth through volume training",
+            "Focus on time under tension",
+            "Target muscle groups with isolation work",
+        ]
+    elif "foundation" in phase_lower or "base" in phase_lower or phase_num == 1:
+        return [
+            "Build foundational movement patterns",
+            "Establish consistent training habits",
+            "Progress safely at appropriate intensity",
+        ]
+    elif "advanced" in phase_lower or phase_num == total_phases:
+        return [
+            "Push performance to new levels",
+            "Apply progressive overload principles",
+            f"Achieve {primary_goal} goal",
+        ]
+    else:
+        # Generic objectives based on position
+        return [
+            f"Progress toward {primary_goal}",
+            "Build on previous phase achievements",
+            "Maintain consistency and form quality",
+        ]
 
 
 @function_tool
