@@ -242,6 +242,9 @@ class ScheduleService:
                     self.db.add(entry)
                 
                 current_date += timedelta(weeks=1)
+        
+        # Commit all schedule entries
+        await self.db.flush()
     
     async def _generate_rolling_split_entries(
         self,
@@ -303,6 +306,9 @@ class ScheduleService:
             # Move to next workout and next day
             workout_idx += 1
             current_date += timedelta(days=1)
+        
+        # Commit all schedule entries
+        await self.db.flush()
     
     async def _generate_cycle_based_entries(
         self,
@@ -376,6 +382,9 @@ class ScheduleService:
             # Move to next cycle item and next day
             cycle_idx += 1
             current_date += timedelta(days=1)
+        
+        # Commit all schedule entries
+        await self.db.flush()
     
     def _parse_preferred_time(self, preferences: dict | None) -> time | None:
         """Parse preferred workout time from preferences.
@@ -479,6 +488,9 @@ class ScheduleService:
                 meal_rotation_index[meal_type] += 1
 
             current_date += timedelta(days=1)
+        
+        # Commit all schedule entries
+        await self.db.flush()
 
     async def get_schedule_by_plan(
         self,
