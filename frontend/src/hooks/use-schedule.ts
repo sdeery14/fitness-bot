@@ -13,7 +13,7 @@ import { useCallback } from 'react';
 import { useScheduleStore } from '@/store/schedule-store';
 import type { TodaySchedule, UpcomingSchedule, ScheduleEntry } from '@/store/schedule-store';
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
 
 export function useSchedule() {
   const {

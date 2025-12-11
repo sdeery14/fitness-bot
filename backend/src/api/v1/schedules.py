@@ -139,6 +139,7 @@ async def get_today_schedule(
     entry_reads = [
         ScheduleEntryRead(
             id=e.id,
+            schedule_id=e.schedule_id,
             entry_type=e.entry_type,
             entry_date=e.entry_date,
             entry_time=e.entry_time,
@@ -148,6 +149,8 @@ async def get_today_schedule(
             meal_name=e.meal.name if e.meal else None,
             user_notes=e.user_notes,
             skipped_reason=e.skipped_reason,
+            created_at=e.created_at,
+            updated_at=e.updated_at,
         )
         for e in entries
     ]
@@ -195,6 +198,7 @@ async def get_upcoming_schedule(
         grouped_by_date[date_key].append(
             ScheduleEntryRead(
                 id=e.id,
+                schedule_id=e.schedule_id,
                 entry_type=e.entry_type,
                 entry_date=e.entry_date,
                 entry_time=e.entry_time,
@@ -204,6 +208,8 @@ async def get_upcoming_schedule(
                 meal_name=e.meal.name if e.meal else None,
                 user_notes=e.user_notes,
                 skipped_reason=e.skipped_reason,
+                created_at=e.created_at,
+                updated_at=e.updated_at,
             )
         )
 
@@ -211,6 +217,7 @@ async def get_upcoming_schedule(
     entry_reads = [
         ScheduleEntryRead(
             id=e.id,
+            schedule_id=e.schedule_id,
             entry_type=e.entry_type,
             entry_date=e.entry_date,
             entry_time=e.entry_time,
@@ -220,6 +227,8 @@ async def get_upcoming_schedule(
             meal_name=e.meal.name if e.meal else None,
             user_notes=e.user_notes,
             skipped_reason=e.skipped_reason,
+            created_at=e.created_at,
+            updated_at=e.updated_at,
         )
         for e in entries
     ]
