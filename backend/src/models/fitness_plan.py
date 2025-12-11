@@ -16,7 +16,7 @@ class FitnessPlan(Base, UUIDMixin, TimestampMixin):
     user_id = Column(PGUUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
 
     # Goal definition (FR-001, FR-002, FR-003)
-    goal_type = Column(String(100), nullable=False)  # "weight_loss", "muscle_gain", "body_recomposition", "maintenance", etc.
+    goal_type = Column(String(500), nullable=False)  # Natural language goal type from user
     goal_description = Column(Text, nullable=False)  # Natural language goal from user
     target_weight_kg = Column(String(10), nullable=True)
     target_date = Column(DateTime(timezone=True), nullable=True)
