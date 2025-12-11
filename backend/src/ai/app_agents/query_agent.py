@@ -171,7 +171,7 @@ you from fulfilling a request."""
         name="Query Agent",
         handoff_description="Database query specialist using postgres-mcp MCP server",
         instructions=instructions,
-        model_settings=create_model_settings("balanced"),
+        model_settings=create_model_settings(),
         # MCP server is added dynamically by query_tools.py at runtime
     )
 

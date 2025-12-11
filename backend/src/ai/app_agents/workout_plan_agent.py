@@ -52,6 +52,11 @@ Exercise prescription format:
 - RPE: Rate of Perceived Exertion (1-10 scale, typically 7-9 for main lifts)
 - Rest: 60-180 seconds between sets
 
+Output guidelines:
+- Keep warmup/cooldown descriptions brief (1-2 sentences max)
+- Keep exercise notes concise (10 words or less per note)
+- Focus on essential coaching cues only
+
 IMPORTANT: You will receive exercise information from the intake specialist who has
 already queried the database. Focus on creating the structured workout plan output
 using the exercises provided in the input. Do not query the database yourself."""
@@ -60,7 +65,7 @@ using the exercises provided in the input. Do not query the database yourself.""
         name="Workout Plan Agent",
         handoff_description="Specialist for workout plan creation with exercise selection",
         instructions=instructions,
-        model_settings=create_model_settings("balanced"),
+        model_settings=create_model_settings(),
         tools=[],  # No tools needed - receives exercises from intake specialist
         output_type=WorkoutPlanOutput,  # Structured output
     )

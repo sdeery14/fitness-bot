@@ -24,72 +24,17 @@ from pydantic import BaseModel
 from src.config import settings
 
 
-# Model configuration presets for different use cases
-# Note: The "model" field in each preset is now overridden by settings.MODEL_NAME from env
-MODEL_CONFIGS = {
-    "fast": {
-        "model": "gpt-4o-mini",  # Overridden by settings.MODEL_NAME
-        "temperature": 0.7,
-        "max_tokens": 1000,
-        "description": "Fast, cost-effective responses for simple tasks",
-    },
-    "balanced": {
-        "model": "gpt-4o",  # Overridden by settings.MODEL_NAME
-        "temperature": 0.7,
-        "max_tokens": 2000,
-        "description": "Balanced speed and quality for most tasks",
-    },
-    "quality": {
-        "model": "gpt-4o",  # Overridden by settings.MODEL_NAME
-        "temperature": 0.5,
-        "max_tokens": 4000,
-        "description": "High-quality responses for complex planning",
-    },
-    "creative": {
-        "model": "gpt-4o",  # Overridden by settings.MODEL_NAME
-        "temperature": 1.0,
-        "max_tokens": 2000,
-        "description": "More creative responses for meal/workout variations",
-    },
-}
+def create_model_settings() -> ModelSettings:
+    """Create ModelSettings using only the model from environment.
 
-
-def get_model_config(preset: str = "balanced") -> dict[str, Any]:
-    """Get model configuration by preset name.
-
-    Args:
-        preset: One of "fast", "balanced", "quality", "creative"
+    All agents use the same model specified in MODEL_NAME environment variable.
+    No presets or token limits - let the model use its default limits.
 
     Returns:
-        Model configuration dict
-
-    Raises:
-        ValueError: If preset name is invalid
+        ModelSettings instance configured with env model
     """
-    if preset not in MODEL_CONFIGS:
-        raise ValueError(
-            f"Invalid preset '{preset}'. Choose from: {', '.join(MODEL_CONFIGS.keys())}"
-        )
-    return MODEL_CONFIGS[preset].copy()
-
-
-def create_model_settings(preset: str = "balanced") -> ModelSettings:
-    """Create ModelSettings from a preset configuration.
-
-    Uses the MODEL_NAME from environment settings for all agents,
-    while preserving temperature and token settings from the preset.
-
-    Args:
-        preset: Configuration preset name
-
-    Returns:
-        ModelSettings instance configured for the preset with env model
-    """
-    config = get_model_config(preset)
     return ModelSettings(
         model=settings.MODEL_NAME,  # Use MODEL_NAME from environment
-        temperature=config["temperature"],
-        max_tokens=config.get("max_tokens"),
     )
 
 

@@ -81,7 +81,7 @@ Continue supporting their journey, then call build_fitness_plan when ready to ge
     return Agent(
         name="Conversation Agent",
         instructions=instructions,
-        model_settings=create_model_settings("balanced"),
+        model_settings=create_model_settings(),
         tools=[build_fitness_plan, get_active_fitness_plan],
     )
 

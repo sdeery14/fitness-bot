@@ -132,7 +132,7 @@ Continue with focused questions, then call build_fitness_plan when ready."""
     return Agent(
         name="Intake Specialist",
         instructions=instructions,
-        model_settings=create_model_settings("balanced"),
+        model_settings=create_model_settings(),
         tools=[query_database, build_fitness_plan],
     )
 

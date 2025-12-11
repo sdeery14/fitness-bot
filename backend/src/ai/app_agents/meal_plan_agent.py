@@ -68,7 +68,7 @@ Use these tools to access accurate nutritional data from USDA FoodData Central."
         name="Meal Plan Agent",
         handoff_description="Specialist for meal plan creation with USDA nutritional data",
         instructions=instructions,
-        model_settings=create_model_settings("balanced"),
+        model_settings=create_model_settings(),
         tools=[
             meal_tools.search_usda_foods,
             meal_tools.get_food_nutrition,
