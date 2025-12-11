@@ -5,53 +5,14 @@ import { useRouter } from "next/navigation";
 import { ChatInterface } from "@/components/chat/chat-interface";
 import { type Message } from "@/components/chat/message-list";
 import { Button } from "@/components/ui/button";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { ArrowLeft, Plus } from "lucide-react";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
-
-// Conversation types with descriptions
-const CONVERSATION_TYPES = [
-  {
-    value: "general_question",
-    label: "General Question",
-    description: "Ask general fitness and nutrition questions",
-  },
-  {
-    value: "plan_creation",
-    label: "Create Plan",
-    description: "Create a new fitness or meal plan",
-  },
-  {
-    value: "plan_update",
-    label: "Update Progress",
-    description: "Log workouts, meals, and track progress",
-  },
-  {
-    value: "plan_modification",
-    label: "Modify Plan",
-    description: "Adjust exercises, meals, or plan settings",
-  },
-  {
-    value: "disruption_handling",
-    label: "Handle Disruption",
-    description: "Report schedule changes or disruptions",
-  },
-] as const;
-
-type ConversationType = typeof CONVERSATION_TYPES[number]["value"];
 
 export default function ChatPage() {
   const router = useRouter();
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [conversationId, setConversationId] = useState<string | null>(null);
-  const [conversationType, setConversationType] = useState<ConversationType>("general_question");
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -86,7 +47,6 @@ export default function ChatPage() {
         },
         body: JSON.stringify({
           force_new: forceNew,
-          conversation_type: conversationType,
         }),
       });
 
@@ -131,18 +91,6 @@ export default function ChatPage() {
     await startConversation(true);
     
     // Reset flag after conversation created
-    isCreatingNewChat.current = false;
-  };
-
-  const handleConversationTypeChange = async (newType: ConversationType) => {
-    setConversationType(newType);
-    
-    // Start a new conversation with the new type
-    isCreatingNewChat.current = true;
-    setMessages([]);
-    setError(null);
-    setConversationId(null);
-    await startConversation(true);
     isCreatingNewChat.current = false;
   };
 
@@ -254,26 +202,6 @@ export default function ChatPage() {
           </div>
 
           <div className="flex items-center gap-3">
-            {/* Conversation Type Selector */}
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-gray-600">Mode:</span>
-              <Select value={conversationType} onValueChange={handleConversationTypeChange}>
-                <SelectTrigger className="w-[200px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {CONVERSATION_TYPES.map((type) => (
-                    <SelectItem key={type.value} value={type.value}>
-                      <div className="flex flex-col">
-                        <span className="font-medium">{type.label}</span>
-                        <span className="text-xs text-gray-500">{type.description}</span>
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            
             {conversationId && (
               <Button
                 variant="outline"
