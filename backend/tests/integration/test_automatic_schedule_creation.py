@@ -57,75 +57,83 @@ async def test_automatic_schedule_creation_on_plan_save(db_session: AsyncSession
     await db_session.commit()
     await db_session.refresh(plan)
 
-    # Create AI-generated plan output structure
+    # Create AI-generated plan output structure with phases
     plan_output = {
         "goal_summary": "12-week 5K training plan with progressive running and strength work",
         "duration_weeks": plan_duration_weeks,
         "fitness_level": "intermediate",
-        "workout_plan_output": {
-            "workout_plan": {
-                "frequency_per_week": 4,
-                "program_type": "Running Training",
+        "phases": [
+            {
+                "phase_number": 1,
+                "name": "Complete Program",
+                "objectives": ["Build endurance", "Increase speed", "Complete 5K race"],
                 "duration_weeks": plan_duration_weeks,
-                "progression_notes": "Increase weekly mileage by 10% each week",
-                "workouts": [
-                    {
-                        "day_name": "Monday - Easy Run",
-                        "focus": "Aerobic Base",
-                        "duration_minutes": 30,
-                        "exercises": []
-                    },
-                    {
-                        "day_name": "Wednesday - Tempo Run",
-                        "focus": "Speed Endurance",
-                        "duration_minutes": 40,
-                        "exercises": []
-                    },
-                    {
-                        "day_name": "Friday - Intervals",
-                        "focus": "Speed Work",
-                        "duration_minutes": 45,
-                        "exercises": []
-                    },
-                    {
-                        "day_name": "Sunday - Long Run",
-                        "focus": "Endurance",
-                        "duration_minutes": 60,
-                        "exercises": []
-                    }
-                ],
-                "training_cycle": [
-                    {"type": "workout", "workout_index": 0},
-                    {"type": "rest", "rest_day": {"day_name": "Rest Day"}},
-                    {"type": "workout", "workout_index": 1},
-                    {"type": "rest", "rest_day": {"day_name": "Rest Day"}},
-                    {"type": "workout", "workout_index": 2},
-                    {"type": "rest", "rest_day": {"day_name": "Rest Day"}},
-                    {"type": "workout", "workout_index": 3}
-                ]
-            },
-            "key_exercises": ["Running", "Intervals", "Tempo"],
-            "equipment_used": ["Running shoes", "Watch"]
-        },
-        "meal_plan_output": {
-            "meal_plan": {
-                "daily_calorie_target": 2200,
-                "macro_split": "45% Carbs, 25% Protein, 30% Fat",
-                "meal_frequency": 3,
-                "sample_days": [
-                    {
-                        "day_name": "Training Day",
-                        "meals": [
-                            {"meal_name": "Breakfast", "foods": []},
-                            {"meal_name": "Lunch", "foods": []},
-                            {"meal_name": "Dinner", "foods": []}
+                "workout_plan_output": {
+                    "workout_plan": {
+                        "frequency_per_week": 4,
+                        "program_type": "Running Training",
+                        "duration_weeks": plan_duration_weeks,
+                        "progression_notes": "Increase weekly mileage by 10% each week",
+                        "workouts": [
+                            {
+                                "day_name": "Monday - Easy Run",
+                                "focus": "Aerobic Base",
+                                "duration_minutes": 30,
+                                "exercises": []
+                            },
+                            {
+                                "day_name": "Wednesday - Tempo Run",
+                                "focus": "Speed Endurance",
+                                "duration_minutes": 40,
+                                "exercises": []
+                            },
+                            {
+                                "day_name": "Friday - Intervals",
+                                "focus": "Speed Work",
+                                "duration_minutes": 45,
+                                "exercises": []
+                            },
+                            {
+                                "day_name": "Sunday - Long Run",
+                                "focus": "Endurance",
+                                "duration_minutes": 60,
+                                "exercises": []
+                            }
+                        ],
+                        "training_cycle": [
+                            {"type": "workout", "workout_index": 0},
+                            {"type": "rest", "rest_day": {"day_name": "Rest Day"}},
+                            {"type": "workout", "workout_index": 1},
+                            {"type": "rest", "rest_day": {"day_name": "Rest Day"}},
+                            {"type": "workout", "workout_index": 2},
+                            {"type": "rest", "rest_day": {"day_name": "Rest Day"}},
+                            {"type": "workout", "workout_index": 3}
                         ]
-                    }
-                ]
-            },
-            "key_foods": ["Oatmeal", "Chicken", "Rice"],
-            "prep_difficulty": "Medium"
-        },
+                    },
+                    "key_exercises": ["Running", "Intervals", "Tempo"],
+                    "equipment_used": ["Running shoes", "Watch"]
+                },
+                "meal_plan_output": {
+                    "meal_plan": {
+                        "daily_calorie_target": 2200,
+                        "macro_split": "45% Carbs, 25% Protein, 30% Fat",
+                        "meal_frequency": 3,
+                        "sample_days": [
+                            {
+                                "day_name": "Training Day",
+                                "meals": [
+                                    {"meal_name": "Breakfast", "foods": []},
+                                    {"meal_name": "Lunch", "foods": []},
+                                    {"meal_name": "Dinner", "foods": []}
+                                ]
+                            }
+                        ]
+                    },
+                    "key_foods": ["Oatmeal", "Chicken", "Rice"],
+                    "prep_difficulty": "Medium"
+                }
+            }
+        ],
         "key_principles": ["Progressive overload", "Adequate recovery", "Proper nutrition"],
         "success_metrics": ["Complete all runs", "Increase distance weekly", "Finish 5K race"],
         "important_notes": "Listen to your body and adjust as needed"
@@ -289,29 +297,37 @@ async def test_schedule_not_duplicated_on_multiple_saves(db_session: AsyncSessio
     await db_session.commit()
     await db_session.refresh(plan)
 
-    # Minimal plan output
+    # Minimal plan output with phases
     plan_output = {
         "goal_summary": "8-week weight loss plan",
         "duration_weeks": plan_duration_weeks,
         "fitness_level": "beginner",
-        "workout_plan_output": {
-            "workout_plan": {
-                "frequency_per_week": 3,
-                "workouts": [],
-                "training_cycle": []
-            },
-            "key_exercises": [],
-            "equipment_used": []
-        },
-        "meal_plan_output": {
-            "meal_plan": {
-                "daily_calorie_target": 1800,
-                "macro_split": "40% Carbs, 30% Protein, 30% Fat",
-                "meal_frequency": 3,
-            },
-            "key_foods": [],
-            "prep_difficulty": "Easy"
-        },
+        "phases": [
+            {
+                "phase_number": 1,
+                "name": "Weight Loss Phase",
+                "objectives": ["Lose weight", "Build habits"],
+                "duration_weeks": plan_duration_weeks,
+                "workout_plan_output": {
+                    "workout_plan": {
+                        "frequency_per_week": 3,
+                        "workouts": [],
+                        "training_cycle": []
+                    },
+                    "key_exercises": [],
+                    "equipment_used": []
+                },
+                "meal_plan_output": {
+                    "meal_plan": {
+                        "daily_calorie_target": 1800,
+                        "macro_split": "40% Carbs, 30% Protein, 30% Fat",
+                        "meal_frequency": 3,
+                    },
+                    "key_foods": [],
+                    "prep_difficulty": "Easy"
+                }
+            }
+        ],
         "key_principles": [],
         "success_metrics": [],
         "important_notes": ""

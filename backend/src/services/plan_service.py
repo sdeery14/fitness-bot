@@ -260,6 +260,29 @@ class PlanService:
 
         return meal
 
+    def _extract_workouts_from_cycle(self, workout_cycle: list[dict]) -> list[dict]:
+        """Extract workout data from training cycle.
+        
+        Args:
+            workout_cycle: Training cycle with workout and rest day items
+            
+        Returns:
+            List of workout dictionaries
+        """
+        workouts = []
+        for item in workout_cycle:
+            if item.get("type") == "workout":
+                workout_index = item.get("workout_index", 0)
+                # For now, create basic workout structure
+                # The actual workout details should come from the cycle
+                workouts.append({
+                    "day_name": f"Workout {workout_index + 1}",
+                    "duration_minutes": 60,
+                    "focus": "Training",
+                    "exercises": [],  # Will be populated from workout_cycle details if available
+                })
+        return workouts
+
     async def get_plan_workouts(self, plan_id: UUID) -> list[WorkoutPlan]:
         """Retrieve all workout plans for a fitness plan.
 
@@ -324,23 +347,11 @@ class PlanService:
         plan.plan_snapshot = plan_output
         plan.status = "active"
 
-        # Extract phases from plan output - supports both old and new format
+        # Extract phases from plan output
         phases_data = plan_output.get("phases", [])
         
-        # Legacy format fallback - convert single plan to single phase
         if not phases_data:
-            workout_plan_output = plan_output.get("workout_plan_output", {})
-            meal_plan_output = plan_output.get("meal_plan_output", {})
-            if workout_plan_output or meal_plan_output:
-                # Create a single phase from legacy format
-                phases_data = [{
-                    "phase_number": 1,
-                    "name": "Complete Program",
-                    "objectives": ["Follow the complete training and nutrition program"],
-                    "duration_weeks": plan.duration_weeks,
-                    "workout_plan_output": workout_plan_output,
-                    "meal_plan_output": meal_plan_output,
-                }]
+            raise ValueError("Plan output must contain phases data")
         
         # Process each phase
         from src.models.fitness_plan import Phase
@@ -368,30 +379,40 @@ class PlanService:
             self.db.add(phase)
             await self.db.flush()  # Flush to get the phase ID
             
-            # Extract workout plan data for this phase
-            workout_plan_output = phase_data.get("workout_plan_output", {})
-            workout_plan_data = workout_plan_output.get("workout_plan", {})
+            # Extract workout details for this phase
+            workout_details = phase_data.get("workout_details", {})
+            workout_cycle = workout_details.get("workout_cycle", [])
             
-            if workout_plan_data:
+            if workout_cycle:
+                # Calculate frequency from workout cycle
+                workout_days = [item for item in workout_cycle if item.get("type") == "workout"]
+                frequency_per_week = len(workout_days)
+                
                 # Create a WorkoutPlan record for this phase
+                progression_notes = workout_details.get("progression_notes", "Progressive overload")
+                # Truncate progression_strategy to fit VARCHAR(255) limit
+                progression_strategy = progression_notes[:252] + "..." if len(progression_notes) > 255 else progression_notes
+                
                 workout_plan = WorkoutPlan(
                     fitness_plan_id=plan_id,
-                    frequency_per_week=workout_plan_data.get("frequency_per_week", 3),
-                    progression_strategy=workout_plan_data.get("progression_notes", "Progressive overload"),
+                    frequency_per_week=frequency_per_week,
+                    progression_strategy=progression_strategy,
                     workout_plan_details={
-                        "program_type": workout_plan_data.get("program_type", "General"),
+                        "program_type": plan_output.get("workout_metadata", {}).get("program_type", "General"),
                         "duration_weeks": phase_duration,
-                        "goal": workout_plan_data.get("goal", "General Fitness"),
-                        "training_cycle": workout_plan_data.get("training_cycle", []),
+                        "training_cycle": workout_cycle,
                         "phase_number": phase_number,
+                        "intensity_guidance": workout_details.get("intensity_guidance", ""),
+                        "volume_notes": workout_details.get("volume_notes", ""),
+                        "progression_notes": progression_notes,  # Store full text in JSON
                     },
                 )
                 self.db.add(workout_plan)
                 await self.db.flush()  # Flush to get the workout_plan ID
                 
-                # Create individual Workout records from workouts array
+                # Create individual Workout records from workout cycle
                 from src.models.workout import Workout
-                workouts_list = workout_plan_data.get("workouts", [])
+                workouts_list = self._extract_workouts_from_cycle(workout_cycle)
                 
                 for workout_data in workouts_list:
                     workout = Workout(
@@ -410,40 +431,39 @@ class PlanService:
                     )
                     self.db.add(workout)
 
-            # Extract meal plan data for this phase
-            meal_plan_output = phase_data.get("meal_plan_output", {})
-            meal_plan_data = meal_plan_output.get("meal_plan", {})
+            # Extract meal details for this phase
+            meal_details = phase_data.get("meal_details", {})
             
-            if meal_plan_data:
-            # Parse macro split to calculate individual macro targets
-            daily_calories = meal_plan_data.get("daily_calorie_target", 2000)
-            macro_split = meal_plan_data.get("macro_split", "40% Carbs, 30% Protein, 30% Fat")
+            if meal_details:
+                # Parse macro split to calculate individual macro targets
+                daily_calories = meal_details.get("daily_calorie_target", 2000)
+                macro_split = meal_details.get("macro_split", "40% Carbs, 30% Protein, 30% Fat")
 
-            # Extract percentages from macro split string
-            # Default to 40/30/30 (carbs/protein/fat) if parsing fails
-            protein_percent = 30
-            carbs_percent = 40
-            fats_percent = 30
+                # Extract percentages from macro split string
+                # Default to 40/30/30 (carbs/protein/fat) if parsing fails
+                protein_percent = 30
+                carbs_percent = 40
+                fats_percent = 30
 
-            # Try to parse the macro split
-            import re
-            if "protein" in macro_split.lower():
-                protein_match = re.search(r'(\d+)%?\s*protein', macro_split.lower())
-                if protein_match:
-                    protein_percent = int(protein_match.group(1))
-            if "carb" in macro_split.lower():
-                carbs_match = re.search(r'(\d+)%?\s*carb', macro_split.lower())
-                if carbs_match:
-                    carbs_percent = int(carbs_match.group(1))
-            if "fat" in macro_split.lower():
-                fats_match = re.search(r'(\d+)%?\s*fat', macro_split.lower())
-                if fats_match:
-                    fats_percent = int(fats_match.group(1))
+                # Try to parse the macro split
+                import re
+                if "protein" in macro_split.lower():
+                    protein_match = re.search(r'(\d+)%?\s*protein', macro_split.lower())
+                    if protein_match:
+                        protein_percent = int(protein_match.group(1))
+                if "carb" in macro_split.lower():
+                    carbs_match = re.search(r'(\d+)%?\s*carb', macro_split.lower())
+                    if carbs_match:
+                        carbs_percent = int(carbs_match.group(1))
+                if "fat" in macro_split.lower():
+                    fats_match = re.search(r'(\d+)%?\s*fat', macro_split.lower())
+                    if fats_match:
+                        fats_percent = int(fats_match.group(1))
 
-            # Calculate macro grams (protein: 4 cal/g, carbs: 4 cal/g, fats: 9 cal/g)
-            protein_grams = int((daily_calories * protein_percent / 100) / 4)
-            carbs_grams = int((daily_calories * carbs_percent / 100) / 4)
-            fats_grams = int((daily_calories * fats_percent / 100) / 9)
+                # Calculate macro grams (protein: 4 cal/g, carbs: 4 cal/g, fats: 9 cal/g)
+                protein_grams = int((daily_calories * protein_percent / 100) / 4)
+                carbs_grams = int((daily_calories * carbs_percent / 100) / 4)
+                fats_grams = int((daily_calories * fats_percent / 100) / 9)
 
                 # Create a MealPlan record for this phase
                 meal_plan = MealPlan(
@@ -454,18 +474,19 @@ class PlanService:
                         "protein_percent": protein_percent,
                         "carbs_percent": carbs_percent,
                         "fats_percent": fats_percent,
+                        "phase_nutrition_focus": meal_details.get("phase_nutrition_focus", ""),
                     },
                     protein_grams_target=protein_grams,
                     carbs_grams_target=carbs_grams,
                     fats_grams_target=fats_grams,
-                    meals_per_day=meal_plan_data.get("meal_frequency", 3),
+                    meals_per_day=len(meal_details.get("sample_days", [{}])[0].get("meals", [])),
                 )
                 self.db.add(meal_plan)
                 await self.db.flush()  # Flush to get the meal_plan ID
                 
                 # Create individual Meal records from sample_days array
                 from src.models.meal import Meal
-                sample_days = meal_plan_data.get("sample_days", [])
+                sample_days = meal_details.get("sample_days", [])
                 
                 for day_idx, day_plan in enumerate(sample_days):
                     meals_list = day_plan.get("meals", [])

@@ -141,6 +141,88 @@ class MealPlan(BaseModel):
     hydration_guidance: str = Field(description="Water intake recommendations")
 
 
+class WorkoutPlanMetadata(BaseModel):
+    """Plan-level workout metadata that applies across all phases."""
+
+    model_config = {"extra": "forbid"}
+
+    program_type: str = Field(
+        description="Training split type (e.g., 'Push/Pull/Legs', 'Upper/Lower', 'Full Body', 'Bro Split')"
+    )
+    progression_strategy: str = Field(
+        description="How to progress over time (e.g., 'Linear progression', 'Double progression', 'DUP', 'Wave loading')"
+    )
+    training_principles: list[str] = Field(
+        description="Key training principles for the program (e.g., 'Progressive overload', 'Mind-muscle connection', 'Controlled tempo')"
+    )
+    equipment_used: list[str] = Field(
+        description="Equipment required across all phases (e.g., ['Barbell', 'Dumbbells', 'Cables'])"
+    )
+    phase_progression_notes: str = Field(
+        description="How training changes across phases (e.g., 'Phase 1: 3x12 light, Phase 2: 4x10 moderate, Phase 3: 5x8 heavy')"
+    )
+
+
+class MealPlanMetadata(BaseModel):
+    """Plan-level nutrition metadata that applies across all phases."""
+
+    model_config = {"extra": "forbid"}
+
+    dietary_approach: str = Field(
+        description="Overall dietary strategy (e.g., 'Flexible dieting', 'Meal prep', 'Intermittent fasting', 'Intuitive eating')"
+    )
+    macro_strategy: str = Field(
+        description="Macronutrient distribution approach (e.g., 'Moderate carb', 'Low carb', 'High protein', 'Carb cycling')"
+    )
+    meal_timing: str = Field(
+        description="Meal timing strategy (e.g., '4 meals evenly spaced', 'Pre/post workout nutrition focus', '16:8 IF window')"
+    )
+    hydration_guidance: str = Field(
+        description="Water intake recommendations (e.g., '0.5-1oz per lb bodyweight', '3-4 liters daily')"
+    )
+    phase_nutrition_notes: str = Field(
+        description="How nutrition changes across phases (e.g., 'Phase 1: 2500 cal, Phase 2: 2800 cal, Phase 3: 3000 cal')"
+    )
+
+
+class PhaseWorkoutDetails(BaseModel):
+    """Phase-specific workout implementation details."""
+
+    model_config = {"extra": "forbid"}
+
+    workout_cycle: list[WorkoutCycleItem] = Field(
+        description="Weekly workout cycle for this phase (workout days + rest days)"
+    )
+    intensity_guidance: str = Field(
+        description="Intensity guidelines for this phase (e.g., 'RPE 7-8', '70-80% 1RM', 'Moderate intensity')"
+    )
+    volume_notes: str = Field(
+        description="Volume approach for this phase (e.g., '12-15 sets per muscle per week', 'Moderate volume for adaptation')"
+    )
+    progression_notes: str = Field(
+        description="How to progress within this phase (e.g., 'Add 5 lbs per week', 'Increase reps when hitting top range')"
+    )
+
+
+class PhaseMealDetails(BaseModel):
+    """Phase-specific nutrition implementation details."""
+
+    model_config = {"extra": "forbid"}
+
+    daily_calorie_target: int = Field(
+        description="Target daily calories for this phase", ge=1200, le=5000
+    )
+    macro_split: str = Field(
+        description="Macronutrient ratio for this phase (e.g., '40% Carbs, 30% Protein, 30% Fat')"
+    )
+    sample_days: list[DailyMealPlan] = Field(
+        description="Sample meal plans for this phase (e.g., training day, rest day)", min_length=1
+    )
+    phase_nutrition_focus: str = Field(
+        description="Nutrition focus for this phase (e.g., 'Metabolic adaptation', 'Muscle building', 'Performance peak', 'Fat loss')"
+    )
+
+
 class WorkoutPlanOutput(BaseModel):
     """Structured output from Workout Plan Agent."""
 
@@ -178,18 +260,26 @@ class PhaseOutput(BaseModel):
     objectives: list[str] = Field(
         description="Primary objectives for this phase (e.g., 'Build muscle mass', 'Increase strength')"
     )
-    duration_weeks: int = Field(description="Duration of this phase in weeks", ge=2, le=16)
-    workout_plan_output: WorkoutPlanOutput = Field(
-        description="Phase-specific workout program with training cycle"
+    start_date: str = Field(
+        description="Phase start date in YYYY-MM-DD format (e.g., '2025-12-15')"
     )
-    meal_plan_output: MealPlanOutput = Field(
-        description="Phase-specific nutrition plan with calorie/macro targets"
+    end_date: str = Field(
+        description="Phase end date in YYYY-MM-DD format (e.g., '2026-01-10')"
+    )
+    duration_weeks: int = Field(
+        description="Duration of this phase in weeks (convenience field, derived from dates)", ge=2, le=16
+    )
+    workout_details: PhaseWorkoutDetails = Field(
+        description="Phase-specific workout implementation with training cycle and intensity guidelines"
+    )
+    meal_details: PhaseMealDetails = Field(
+        description="Phase-specific nutrition implementation with calorie targets and meal plans"
     )
 
 
 class FitnessPlanOutput(BaseModel):
     """Complete fitness plan with one or more phases.
-    
+
     Single-phase plans: Use 1 phase for straightforward goals
     Multi-phase plans: Use 2+ phases for progressive programs (bulk/cut, beginner/advanced, etc.)
     """
@@ -197,10 +287,22 @@ class FitnessPlanOutput(BaseModel):
     model_config = {"extra": "forbid"}  # Strict schema for agents SDK
 
     goal_summary: str = Field(description="User's primary fitness goal and context")
+    start_date: str = Field(
+        description="Plan start date in YYYY-MM-DD format (e.g., '2025-12-15')"
+    )
+    end_date: str = Field(
+        description="Plan end date/target date in YYYY-MM-DD format (e.g., '2026-03-15' or race day)"
+    )
     duration_weeks: int = Field(
-        description="Total program duration in weeks (sum of all phase durations)", ge=4, le=52
+        description="Total program duration in weeks (convenience field, derived from dates)", ge=4, le=52
     )
     fitness_level: str = Field(description="User's fitness level (beginner/intermediate/advanced)")
+    workout_metadata: WorkoutPlanMetadata = Field(
+        description="High-level workout strategy and principles that apply across all phases"
+    )
+    meal_metadata: MealPlanMetadata = Field(
+        description="High-level nutrition strategy and principles that apply across all phases"
+    )
     phases: list[PhaseOutput] = Field(
         description="One or more phases in the program. Each phase has its own workout plan, meal plan, and objectives. Examples: [Bulk Phase, Cut Phase] or [Foundation Phase] for single-phase plans.",
         min_length=1
@@ -221,7 +323,7 @@ class FitnessPlanOutput(BaseModel):
         # Check that we have at least one phase
         if not self.phases:
             raise ValueError("Plan must have at least one phase.")
-        
+
         # Check total duration matches sum of phase durations
         total_phase_weeks = sum(phase.duration_weeks for phase in self.phases)
         if total_phase_weeks != self.duration_weeks:
@@ -231,19 +333,16 @@ class FitnessPlanOutput(BaseModel):
         
         # Validate each phase
         for i, phase in enumerate(self.phases, 1):
-            # Check workout frequency
-            workout_freq = phase.workout_plan_output.workout_plan.frequency_per_week
-            if not (2 <= workout_freq <= 7):
-                raise ValueError(
-                    f"Phase {i} invalid workout frequency: {workout_freq}. Must be 2-7 days per week."
-                )
+            # Check workout cycle exists
+            if not phase.workout_details.workout_cycle:
+                raise ValueError(f"Phase {i} workout cycle must not be empty.")
             
             # Check meal plan has sample days
-            if not phase.meal_plan_output.meal_plan.sample_days:
+            if not phase.meal_details.sample_days:
                 raise ValueError(f"Phase {i} meal plan must include at least one sample day.")
             
             # Check calorie target is reasonable
-            calories = phase.meal_plan_output.meal_plan.daily_calorie_target
+            calories = phase.meal_details.daily_calorie_target
             if not (1200 <= calories <= 5000):
                 raise ValueError(
                     f"Phase {i} invalid calorie target: {calories}. Must be 1200-5000."

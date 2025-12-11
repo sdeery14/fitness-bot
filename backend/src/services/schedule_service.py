@@ -112,9 +112,13 @@ class ScheduleService:
             # Extract training_cycle from plan_snapshot if available
             training_cycle = None
             if plan.plan_snapshot:
-                workout_plan_output = plan.plan_snapshot.get("workout_plan_output", {})
-                workout_plan_data = workout_plan_output.get("workout_plan", {})
-                training_cycle = workout_plan_data.get("training_cycle")
+                # Try new schema structure first (phases with workout_details)
+                phases = plan.plan_snapshot.get("phases", [])
+                if phases and len(phases) > 0:
+                    # Use the first phase's workout cycle for now
+                    # TODO: Handle multi-phase scheduling properly
+                    workout_details = phases[0].get("workout_details", {})
+                    training_cycle = workout_details.get("workout_cycle")
             
             if training_cycle:
                 # Use explicit training cycle from AI agent

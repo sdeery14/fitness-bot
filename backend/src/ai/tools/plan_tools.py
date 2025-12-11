@@ -6,14 +6,17 @@ by calling specialist agents via function tools.
 
 import json
 from contextvars import ContextVar
+from datetime import date, datetime, timedelta
 from uuid import UUID
 
 from agents import Runner, function_tool
 from pydantic import BaseModel, Field
 
+from src.ai.app_agents.meal_phase_agent import meal_phase_agent
 from src.ai.app_agents.meal_plan_agent import meal_plan_agent
+from src.ai.app_agents.workout_phase_agent import workout_phase_agent
 from src.ai.app_agents.workout_plan_agent import workout_plan_agent
-from src.ai.schemas import SchedulePreferences
+from src.ai.schemas import MealPlanMetadata, SchedulePreferences, WorkoutPlanMetadata
 from src.services.plan_service import PlanService
 
 # Context variables for passing user_id and db_session to function tools
@@ -42,6 +45,70 @@ def clear_plan_tools_context() -> None:
     """
     _user_id_context.set(None)
     _db_session_context.set(None)
+
+
+def _parse_and_validate_dates(
+    start_date_str: str, end_date_str: str | None, duration_weeks: int
+) -> tuple[date, date, int]:
+    """Parse and validate start/end dates for a fitness plan.
+
+    Args:
+        start_date_str: Start date as "YYYY-MM-DD" or "today"
+        end_date_str: Optional end date as "YYYY-MM-DD" or None
+        duration_weeks: Fallback duration if no end_date provided
+
+    Returns:
+        Tuple of (start_date, end_date, actual_duration_weeks)
+
+    Raises:
+        ValueError: If dates are invalid or inconsistent
+    """
+    # Parse start date
+    if start_date_str.lower() == "today":
+        start = date.today()
+    else:
+        try:
+            start = datetime.strptime(start_date_str, "%Y-%m-%d").date()
+        except ValueError as e:
+            raise ValueError(
+                f"Invalid start_date format: '{start_date_str}'. Use YYYY-MM-DD or 'today'."
+            ) from e
+
+    # Calculate or parse end date
+    if end_date_str:
+        try:
+            end = datetime.strptime(end_date_str, "%Y-%m-%d").date()
+        except ValueError as e:
+            raise ValueError(
+                f"Invalid end_date format: '{end_date_str}'. Use YYYY-MM-DD."
+            ) from e
+
+        # Calculate actual duration from dates
+        days_diff = (end - start).days
+        if days_diff <= 0:
+            raise ValueError(f"end_date ({end_date_str}) must be after start_date ({start_date_str}).")
+
+        # Calculate weeks (round up to ensure full coverage)
+        actual_weeks = (days_diff + 6) // 7  # Round up
+
+        if actual_weeks < 4:
+            raise ValueError(
+                f"Plan duration too short: {actual_weeks} weeks. Minimum 4 weeks required."
+            )
+        if actual_weeks > 52:
+            raise ValueError(
+                f"Plan duration too long: {actual_weeks} weeks. Maximum 52 weeks allowed."
+            )
+    else:
+        # Use duration_weeks to calculate end date
+        if not (4 <= duration_weeks <= 52):
+            raise ValueError(
+                f"duration_weeks must be between 4 and 52. Got: {duration_weeks}"
+            )
+        actual_weeks = duration_weeks
+        end = start + timedelta(weeks=duration_weeks)
+
+    return start, end, actual_weeks
 
 
 class WorkoutPlanInput(BaseModel):
@@ -99,12 +166,31 @@ class FitnessPlanInput(BaseModel):
     injuries_or_conditions: list[str] = Field(
         default_factory=list, description="Injuries or health conditions"
     )
-    duration_weeks: int = Field(
-        default=12, description="Total program duration in weeks", ge=4, le=52
+    start_date: str = Field(
+        description="Plan start date in YYYY-MM-DD format (e.g., '2025-12-15'). Use 'today' for current date."
     )
-    phases: list[str] | None = Field(
+    end_date: str | None = Field(
         default=None,
-        description="Optional list of phase names/descriptions if user wants multi-phase plan (e.g., ['Bulk Phase - 8 weeks', 'Cut Phase - 4 weeks'] or ['Foundation - 6 weeks', 'Advanced - 6 weeks']). Leave None for single-phase plans."
+        description="Target end date in YYYY-MM-DD format if user has a specific goal date (e.g., race day, event, vacation). If None, calculate from start_date + duration_weeks."
+    )
+    duration_weeks: int = Field(
+        default=12, description="Total program duration in weeks (used if end_date not specified)", ge=4, le=52
+    )
+    phases: list[str] = Field(
+        description="List of phase names for the fitness plan. ALWAYS include at least one phase. Every plan should have logical progression phases (e.g., Foundation → Building → Peak). Examples: ['Foundation Phase', 'Building Phase', 'Peak Performance Phase'] or ['Bulk Phase', 'Cut Phase'] or ['Base Building', 'Race Preparation', 'Taper']. Phase names should be descriptive and aligned with the training goal. Even short plans benefit from phases like ['Adaptation', 'Development'].",
+        min_length=1
+    )
+    workout_plan_description: str = Field(
+        description="High-level workout plan strategy spanning all phases. Include: program type (e.g., 'Push/Pull/Legs', 'Upper/Lower', 'Full Body'), progression strategy (linear progression, DUP, wave loading, etc.), key training principles, equipment usage, and how intensity/volume/frequency changes across phases. Example: 'Push/Pull/Legs split with linear progression. Phase 1: 3 sets x 12 reps (lighter weight, form focus). Phase 2: 4 sets x 10 reps (moderate weight). Phase 3: 5 sets x 8 reps (heavier weight, strength focus). Progressive overload each week.'"
+    )
+    meal_plan_description: str = Field(
+        description="High-level nutrition strategy spanning all phases. Include: dietary approach (flexible dieting, meal prep, intermittent fasting, etc.), macro distribution strategy, calorie targets per phase, meal timing preferences, and how nutrition adjusts as phases progress. Example: 'Flexible dieting with moderate carbs. Phase 1: 2500 cal (40% carb, 30% protein, 30% fat) - metabolic adaptation. Phase 2: 2800 cal (45% carb, 30% protein, 25% fat) - muscle building. Phase 3: 3000 cal (50% carb, 30% protein, 20% fat) - performance peak. 4-5 meals daily.'"
+    )
+    workout_metadata: WorkoutPlanMetadata = Field(
+        description="Structured workout metadata with program_type, progression_strategy, training_principles, equipment_used, and phase_progression_notes"
+    )
+    meal_metadata: MealPlanMetadata = Field(
+        description="Structured meal metadata with dietary_approach, macro_strategy, meal_timing, hydration_guidance, and phase_nutrition_notes"
     )
     schedule_preferences: SchedulePreferences = Field(
         default_factory=SchedulePreferences,
@@ -232,79 +318,130 @@ async def build_fitness_plan(requirements: FitnessPlanInput) -> str:
         # Import schemas
         from src.ai.schemas import (
             FitnessPlanOutput,
-            MealPlanOutput,
             PhaseOutput,
-            WorkoutPlanOutput,
         )
 
-        # Determine if multi-phase plan
-        phase_descriptions = requirements.phases if requirements.phases else ["Complete Program"]
+        # Parse and validate dates
+        start_date, end_date, actual_duration_weeks = _parse_and_validate_dates(
+            requirements.start_date,
+            requirements.end_date,
+            requirements.duration_weeks,
+        )
+
+        # Determine phases (always provided by AI)
+        phase_descriptions = requirements.phases
         num_phases = len(phase_descriptions)
-        
+
         # Split duration across phases
         if num_phases == 1:
-            phase_durations = [requirements.duration_weeks]
+            phase_durations = [actual_duration_weeks]
         else:
             # Distribute duration evenly across phases (AI can override later)
-            weeks_per_phase = requirements.duration_weeks // num_phases
-            remainder = requirements.duration_weeks % num_phases
+            weeks_per_phase = actual_duration_weeks // num_phases
+            remainder = actual_duration_weeks % num_phases
             phase_durations = [weeks_per_phase] * num_phases
             # Add remainder weeks to last phase
             phase_durations[-1] += remainder
 
-        # Build phases
+        # Calculate phase date ranges
+        phase_dates = []
+        current_start = start_date
+        for phase_weeks in phase_durations:
+            phase_end = current_start + timedelta(weeks=phase_weeks)
+            phase_dates.append((current_start, phase_end))
+            current_start = phase_end
+
+        # Use metadata provided by conversation agent (already validated Pydantic models)
+        workout_metadata = requirements.workout_metadata
+        meal_metadata = requirements.meal_metadata
+
+        # Build phases using phase-specific agents
         phases = []
-        for phase_num, (phase_desc, phase_weeks) in enumerate(zip(phase_descriptions, phase_durations), 1):
+        for phase_num, (phase_desc, phase_weeks, (phase_start, phase_end)) in enumerate(
+            zip(phase_descriptions, phase_durations, phase_dates, strict=True), 1
+        ):
             # Parse phase description (format: "Phase Name - X weeks" or just "Phase Name")
             phase_name = phase_desc.split(" -")[0].strip() if " -" in phase_desc else phase_desc
-            
+
             # Determine phase-specific adjustments
             phase_objectives = _get_phase_objectives(phase_name, requirements.primary_goal, phase_num, num_phases)
-            
-            # Build workout plan for this phase
-            workout_input = WorkoutPlanInput(
-                primary_goal=f"{requirements.primary_goal} - {phase_name}",
-                fitness_level=requirements.fitness_level,
-                workout_frequency=requirements.workout_frequency,
-                equipment_access=requirements.equipment_access,
-                time_per_session=requirements.time_per_session,
-                injuries_or_conditions=requirements.injuries_or_conditions,
+
+            # Build phase-specific workout details
+            workout_phase_prompt = f"""Generate workout details for this phase:
+
+Phase Context:
+- Phase {phase_num} of {num_phases}: {phase_name}
+- Duration: {phase_weeks} weeks ({phase_start.isoformat()} to {phase_end.isoformat()})
+- Objectives: {', '.join(phase_objectives)}
+
+Overall Workout Plan:
+{requirements.workout_plan_description}
+
+User Context:
+- Fitness Level: {requirements.fitness_level}
+- Workout Frequency: {requirements.workout_frequency} days/week
+- Equipment: {requirements.equipment_access}
+- Time per Session: {requirements.time_per_session} minutes
+- Injuries/Conditions: {', '.join(requirements.injuries_or_conditions) if requirements.injuries_or_conditions else 'None'}
+
+Generate the specific workout cycle, intensity guidance, volume notes, and progression strategy for this phase."""
+
+            workout_details_result = await Runner.run(
+                starting_agent=workout_phase_agent,
+                input=workout_phase_prompt,
+                session=None,
             )
+            workout_details = workout_details_result.final_output
 
-            workout_plan_json = await build_workout_plan(workout_input)
-            workout_plan_dict = json.loads(workout_plan_json)
-            workout_plan_output = WorkoutPlanOutput(**workout_plan_dict)
+            # Build phase-specific meal details
+            meal_phase_prompt = f"""Generate meal details for this phase:
 
-            # Build meal plan for this phase
-            meal_input = MealPlanInput(
-                primary_goal=f"{requirements.primary_goal} - {phase_name}",
-                dietary_restrictions=requirements.dietary_restrictions,
-                meal_frequency=requirements.meal_frequency,
-                preferences="",
+Phase Context:
+- Phase {phase_num} of {num_phases}: {phase_name}
+- Duration: {phase_weeks} weeks ({phase_start.isoformat()} to {phase_end.isoformat()})
+- Objectives: {', '.join(phase_objectives)}
+
+Overall Meal Plan:
+{requirements.meal_plan_description}
+
+User Context:
+- Dietary Restrictions: {', '.join(requirements.dietary_restrictions) if requirements.dietary_restrictions else 'None'}
+- Meal Frequency: {requirements.meal_frequency} meals/day
+- Primary Goal: {requirements.primary_goal}
+
+Generate the specific calorie target, macro split, sample meal plans, and nutrition focus for this phase."""
+
+            meal_details_result = await Runner.run(
+                starting_agent=meal_phase_agent,
+                input=meal_phase_prompt,
+                session=None,
             )
+            meal_details = meal_details_result.final_output
 
-            meal_plan_json = await build_meal_plan(meal_input)
-            meal_plan_dict = json.loads(meal_plan_json)
-            meal_plan_output = MealPlanOutput(**meal_plan_dict)
-
-            # Create phase output
+            # Create phase output with new structure
             phase_output = PhaseOutput(
                 phase_number=phase_num,
                 name=phase_name,
                 objectives=phase_objectives,
+                start_date=phase_start.isoformat(),
+                end_date=phase_end.isoformat(),
                 duration_weeks=phase_weeks,
-                workout_plan_output=workout_plan_output,
-                meal_plan_output=meal_plan_output,
+                workout_details=workout_details,
+                meal_details=meal_details,
             )
             phases.append(phase_output)
 
         # Create comprehensive multi-phase fitness plan output
         phase_summary = " + ".join([f"{p.name} ({p.duration_weeks}w)" for p in phases])
-        
+
         fitness_plan_output = FitnessPlanOutput(
-            goal_summary=f"Complete {requirements.duration_weeks}-week fitness plan for {requirements.primary_goal} with {num_phases} phase(s): {phase_summary}",
-            duration_weeks=requirements.duration_weeks,
+            goal_summary=f"Complete {actual_duration_weeks}-week fitness plan for {requirements.primary_goal} with {num_phases} phase(s): {phase_summary}",
+            start_date=start_date.isoformat(),
+            end_date=end_date.isoformat(),
+            duration_weeks=actual_duration_weeks,
             fitness_level=requirements.fitness_level,
+            workout_metadata=workout_metadata,
+            meal_metadata=meal_metadata,
             phases=phases,
             key_principles=[
                 "Progressive overload: Gradually increase intensity over time",
@@ -321,7 +458,7 @@ async def build_fitness_plan(requirements: FitnessPlanInput) -> str:
                 "Check adherence rate (aim for 80%+ consistency)",
                 "Evaluate how you feel overall (mood, strength, confidence)",
             ],
-            important_notes=f"This {requirements.duration_weeks}-week plan is designed for {requirements.fitness_level} level with {num_phases} phase(s). Each phase has specific objectives and will transition automatically. Adjust weights and intensity based on your progress. Listen to your body and take extra rest if needed.",
+            important_notes=f"This {actual_duration_weeks}-week plan runs from {start_date.isoformat()} to {end_date.isoformat()} and is designed for {requirements.fitness_level} level with {num_phases} phase(s). Each phase has specific objectives and will transition automatically. Adjust weights and intensity based on your progress. Listen to your body and take extra rest if needed.",
         )
 
         # Validate plan completeness
@@ -352,12 +489,17 @@ async def build_fitness_plan(requirements: FitnessPlanInput) -> str:
                     "schedule_preferences": requirements.schedule_preferences.model_dump(),
                 }
 
-                # Create fitness plan record
+                # Create fitness plan record with parsed dates
+                # Convert date to datetime for database
+                from datetime import datetime as dt
+                start_datetime = dt.combine(start_date, dt.min.time())
+
                 fitness_plan = await plan_service.create_plan(
                     user_id=user_id,
                     goal=requirements.primary_goal,
                     requirements=requirements_dict,
                     duration_weeks=fitness_plan_output.duration_weeks,
+                    start_date=start_datetime,
                 )
 
                 # Prepare plan output with requirements included
