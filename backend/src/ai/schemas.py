@@ -8,30 +8,88 @@ from pydantic import BaseModel, Field
 
 
 class WorkoutExercise(BaseModel):
-    """A single exercise in a workout."""
+    """A single exercise in a workout with complete prescription details."""
 
     model_config = {"extra": "forbid"}  # Strict schema for agents SDK
 
-    name: str = Field(description="Exercise name")
-    sets: int = Field(description="Number of sets", ge=1, le=10)
-    reps: str = Field(description="Number of reps (e.g., '8-12', '10', '30 seconds')")
-    rest_seconds: int = Field(description="Rest between sets in seconds", ge=30, le=300)
-    notes: str | None = Field(default=None, description="Additional instructions or form cues")
+    name: str = Field(description="Exercise name (e.g., 'Barbell Bench Press', 'Dumbbell Romanian Deadlift')")
+    exercise_type: str = Field(
+        description="Exercise type: 'compound', 'isolation', 'cardio', 'plyometric', 'stretch', or 'core'"
+    )
+    target_muscle_groups: list[str] = Field(
+        description="Primary muscle groups targeted (e.g., ['chest', 'triceps', 'shoulders']). Use lowercase.",
+        min_length=1
+    )
+    equipment_required: list[str] = Field(
+        description="Equipment needed (e.g., ['barbell', 'bench'], or ['bodyweight'] for no equipment). Use lowercase.",
+        min_length=1
+    )
+    sets: int | None = Field(
+        default=None,
+        description="Number of sets (null for time-based cardio exercises)", 
+        ge=1, 
+        le=10
+    )
+    reps: str | None = Field(
+        default=None,
+        description="Number of reps (e.g., '8-12', '10', 'AMRAP', or null for time-based exercises)"
+    )
+    duration_seconds: int | None = Field(
+        default=None,
+        description="Duration for timed exercises like planks or cardio (null for rep-based exercises)",
+        ge=10,
+        le=3600
+    )
+    rest_seconds: int = Field(
+        description="Rest period between sets in seconds", 
+        ge=30, 
+        le=300
+    )
+    tempo: str | None = Field(
+        default=None,
+        description="Tempo prescription in format 'eccentric-pause-concentric-pause' (e.g., '3-1-1-0' for 3s down, 1s pause, 1s up, no pause at top)"
+    )
+    rpe_target: int | None = Field(
+        default=None,
+        description="Target Rate of Perceived Exertion on 1-10 scale (e.g., 8 = 2 reps in reserve)",
+        ge=1,
+        le=10
+    )
+    instructions: str = Field(
+        description="Detailed step-by-step execution instructions (2-4 sentences covering setup, movement, and key points)"
+    )
+    form_cues: list[str] = Field(
+        default_factory=list,
+        description="2-4 specific form cues to focus on (e.g., 'Keep core tight', 'Full range of motion', 'Control the eccentric')"
+    )
 
 
 class WorkoutDay(BaseModel):
-    """A single day's workout plan."""
+    """A single day's workout plan with complete exercise details."""
 
     model_config = {"extra": "forbid"}  # Strict schema for agents SDK
 
-    day_name: str = Field(description="Day identifier (e.g., 'Day 1: Chest & Triceps', 'Monday')")
-    focus: str = Field(description="Muscle groups or focus (e.g., 'Chest & Triceps', 'Upper Body')")
+    day_name: str = Field(description="Day identifier (e.g., 'Day 1: Chest & Triceps', 'Monday', 'Upper Body Push')")
+    focus: str = Field(description="Muscle groups or focus (e.g., 'Chest & Triceps', 'Upper Body', 'Full Body')")
+    workout_type: str = Field(
+        description="Primary workout type: 'strength', 'hypertrophy', 'cardio', 'flexibility', 'hybrid', or 'power'"
+    )
+    intensity_level: str = Field(
+        description="Intensity level for this workout: 'low', 'moderate', or 'high'"
+    )
     duration_minutes: int = Field(
         description="Estimated workout duration in minutes", ge=20, le=120
     )
-    warmup: str = Field(description="Warmup instructions")
-    exercises: list[WorkoutExercise] = Field(description="List of exercises for this workout")
-    cooldown: str = Field(description="Cooldown/stretching instructions")
+    warmup: str = Field(description="Warmup instructions (2-3 sentences)")
+    exercises: list[WorkoutExercise] = Field(
+        description="List of exercises for this workout with complete prescription details",
+        min_length=1
+    )
+    cooldown: str = Field(description="Cooldown/stretching instructions (2-3 sentences)")
+    notes: str | None = Field(
+        default=None,
+        description="Additional workout notes or coaching cues"
+    )
 
 
 class RestDay(BaseModel):
@@ -65,24 +123,6 @@ class WorkoutCycleItem(BaseModel):
     rest_day: RestDay | None = Field(
         default=None, description="Rest day information (for type='rest')"
     )
-
-
-class WorkoutPlan(BaseModel):
-    """Complete workout plan structure."""
-
-    model_config = {"extra": "forbid"}  # Strict schema for agents SDK
-
-    goal: str = Field(description="Primary fitness goal (e.g., 'Build Muscle', 'Lose Weight')")
-    frequency_per_week: int = Field(description="Number of workout days per week", ge=2, le=7)
-    program_type: str = Field(
-        description="Program type (e.g., 'Push/Pull/Legs', 'Full Body', 'Upper/Lower')"
-    )
-    duration_weeks: int = Field(description="Program duration in weeks", ge=4, le=16)
-    workouts: list[WorkoutDay] = Field(description="List of workout days in the program")
-    training_cycle: list[WorkoutCycleItem] = Field(
-        description="The training cycle structure defining the order of workouts and rest days. This cycle repeats throughout the program. Example: [workout 0, workout 1, rest, workout 2, workout 3, rest] for Upper/Lower split with rest days."
-    )
-    progression_notes: str = Field(description="How to progress the program over time")
 
 
 class MealItem(BaseModel):
@@ -186,12 +226,16 @@ class MealPlanMetadata(BaseModel):
 
 
 class PhaseWorkoutDetails(BaseModel):
-    """Phase-specific workout implementation details."""
+    """Phase-specific workout implementation details with complete workout definitions."""
 
     model_config = {"extra": "forbid"}
 
+    workouts: list[WorkoutDay] = Field(
+        description="List of distinct workout sessions in this phase. Each workout contains complete exercise prescriptions with sets, reps, instructions, etc.",
+        min_length=1
+    )
     workout_cycle: list[WorkoutCycleItem] = Field(
-        description="Weekly workout cycle for this phase (workout days + rest days)"
+        description="Weekly training cycle that references workouts by index. Defines which workout happens on which day, plus rest days. Example: [{'type': 'workout', 'workout_index': 0}, {'type': 'workout', 'workout_index': 1}, {'type': 'rest', 'rest_day': {...}}]"
     )
     intensity_guidance: str = Field(
         description="Intensity guidelines for this phase (e.g., 'RPE 7-8', '70-80% 1RM', 'Moderate intensity')"
@@ -221,16 +265,6 @@ class PhaseMealDetails(BaseModel):
     phase_nutrition_focus: str = Field(
         description="Nutrition focus for this phase (e.g., 'Metabolic adaptation', 'Muscle building', 'Performance peak', 'Fat loss')"
     )
-
-
-class WorkoutPlanOutput(BaseModel):
-    """Structured output from Workout Plan Agent."""
-
-    model_config = {"extra": "forbid"}  # Strict schema for agents SDK
-
-    workout_plan: WorkoutPlan = Field(description="Complete workout program")
-    key_exercises: list[str] = Field(description="Key exercises in the program")
-    equipment_used: list[str] = Field(description="Equipment required for this plan")
 
 
 class MealPlanOutput(BaseModel):

@@ -9,16 +9,22 @@ interface WorkoutDetail {
   name: string;
   workout_type: string;
   duration_minutes: number;
-  difficulty_level: string;
-  workout_details: {
+  intensity_level: string;
+  workout_structure: {
     exercises?: Array<{
+      id: string;
       name: string;
-      sets?: number;
-      reps?: string;
-      duration?: number;
-      rest_seconds?: number;
-      notes?: string;
-      equipment?: string;
+      exercise_type: string;
+      target_muscle_groups: string[];
+      equipment: string[];
+      sets?: number | null;
+      reps?: string | null;
+      duration_seconds?: number | null;
+      rest_seconds: number;
+      tempo?: string | null;
+      rpe_target?: number | null;
+      instructions: string;
+      form_cues?: string[] | null;
     }>;
     warmup?: string;
     cooldown?: string;

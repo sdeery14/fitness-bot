@@ -3,6 +3,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, HTTPException
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 
 from src.api.deps import CurrentUserId, DatabaseSession
 from src.integrations.exercise_database import get_alternative_exercises
@@ -26,17 +27,41 @@ async def get_workout(
         current_user: Authenticated user
 
     Returns:
-        Workout details
+        Workout details with exercises
 
     Raises:
         HTTPException: If workout not found
     """
-    stmt = select(Workout).where(Workout.id == workout_id)
+    stmt = select(Workout).options(selectinload(Workout.exercises)).where(Workout.id == workout_id)
     result = await db.execute(stmt)
     workout = result.scalar_one_or_none()
 
     if not workout:
         raise HTTPException(status_code=404, detail="Workout not found")
+
+    # Build exercises list from the exercises relationship
+    exercises = []
+    for exercise in workout.exercises:
+        exercise_dict = {
+            "id": str(exercise.id),
+            "name": exercise.name,
+            "exercise_type": exercise.exercise_type,
+            "target_muscle_groups": exercise.target_muscle_groups,
+            "equipment": exercise.equipment_required,
+            "sets": exercise.sets,
+            "reps": exercise.reps,
+            "duration_seconds": exercise.duration_seconds,
+            "rest_seconds": exercise.rest_seconds,
+            "tempo": exercise.tempo,
+            "rpe_target": exercise.rpe_target,
+            "instructions": exercise.instructions,
+            "form_cues": exercise.form_cues,
+        }
+        exercises.append(exercise_dict)
+
+    # Merge workout_structure with exercises
+    workout_structure = workout.workout_structure or {}
+    workout_structure["exercises"] = exercises
 
     return create_success_response({
         "id": str(workout.id),
@@ -44,7 +69,7 @@ async def get_workout(
         "workout_type": workout.workout_type,
         "duration_minutes": workout.duration_minutes,
         "intensity_level": workout.intensity_level,
-        "workout_structure": workout.workout_structure,
+        "workout_structure": workout_structure,
     })
 
 

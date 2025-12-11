@@ -48,19 +48,29 @@ You are NOT generating a full plan. You are generating ONE PHASE of a multi-phas
 - workout_frequency: Training days per week
 
 **Your Output**: PhaseWorkoutDetails with:
-1. workout_cycle: Weekly training cycle (workout days + rest days)
-   - Workout item: {"type": "workout", "workout_index": 0}
+1. workouts: List of distinct workout sessions (WorkoutDay objects)
+   - Each workout must have: day_name, focus, workout_type, intensity_level, duration_minutes
+   - Each workout must include complete exercises with ALL required fields:
+     * name, exercise_type, target_muscle_groups, equipment_required
+     * sets, reps (or duration_seconds for timed exercises)
+     * rest_seconds, tempo, rpe_target
+     * instructions (detailed 2-4 sentence execution guide)
+     * form_cues (2-4 specific cues like "Keep core tight", "Full ROM")
+   - Include warmup and cooldown for each workout
+
+2. workout_cycle: Weekly training cycle (workout days + rest days)
+   - Workout item: {"type": "workout", "workout_index": 0}  (references workouts list)
    - Rest item: {"type": "rest", "rest_day": {"day_name": "Rest Day", "notes": "Active recovery"}}
 
-2. intensity_guidance: How hard to train this phase
+3. intensity_guidance: How hard to train this phase
    - Example: "RPE 7-8, focusing on form and mind-muscle connection"
    - Example: "70-80% 1RM, moderate intensity with controlled tempo"
 
-3. volume_notes: How much volume for this phase
+4. volume_notes: How much volume for this phase
    - Example: "12-15 sets per muscle group per week, moderate volume for adaptation"
    - Example: "16-20 sets per muscle group per week, high volume for hypertrophy"
 
-4. progression_notes: How to progress within this phase
+5. progression_notes: How to progress within this phase
    - Example: "Add 5 lbs when you can complete all sets with good form"
    - Example: "Increase reps by 1-2 when hitting top range, then add weight"
 

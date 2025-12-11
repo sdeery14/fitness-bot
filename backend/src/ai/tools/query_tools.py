@@ -1,10 +1,10 @@
 """Function tools for querying the database via MCP postgres-mcp server.
 
-These tools wrap the MCP query agent, allowing other agents (like workout_plan_agent)
+These tools wrap the MCP query agent, allowing other agents (like workout_phase_agent)
 to query the database using natural language descriptions that get translated to SQL.
 
 Architecture:
-    workout_plan_agent → query_database → query_agent (with MCP server) → PostgreSQL
+    workout_phase_agent → query_database → query_agent (with MCP server) → PostgreSQL
 """
 import json
 import os

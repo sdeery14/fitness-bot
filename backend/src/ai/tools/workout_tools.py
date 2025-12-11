@@ -4,7 +4,7 @@ These tools wrap the in-memory exercise database functions for use by AI agents.
 All tools return JSON strings as required by OpenAI Agents SDK.
 
 NOTE: These tools are kept for backward compatibility but are no longer used
-by the workout_plan_agent, which now uses the MCP query_database tool instead.
+by the workout_phase_agent, which now uses the MCP query_database tool instead.
 """
 import json
 

@@ -44,7 +44,7 @@ export default function WorkoutDetailPage() {
     );
   }
 
-  const exercises = workout.workout_details?.exercises || [];
+  const exercises = workout.workout_structure?.exercises || [];
 
   return (
     <div className="container mx-auto py-8 space-y-6">
@@ -76,11 +76,11 @@ export default function WorkoutDetailPage() {
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
               <TrendingUp className="h-5 w-5" />
-              Difficulty
+              Intensity
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <Badge className="text-lg capitalize">{workout.difficulty_level}</Badge>
+            <Badge className="text-lg capitalize">{workout.intensity_level}</Badge>
           </CardContent>
         </Card>
         <Card>
@@ -97,13 +97,13 @@ export default function WorkoutDetailPage() {
       </div>
 
       {/* Warmup */}
-      {workout.workout_details?.warmup && (
+      {workout.workout_structure?.warmup && (
         <Card>
           <CardHeader>
             <CardTitle>Warm-up</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-muted-foreground">{workout.workout_details.warmup}</p>
+            <p className="text-muted-foreground">{workout.workout_structure.warmup}</p>
           </CardContent>
         </Card>
       )}
@@ -120,10 +120,20 @@ export default function WorkoutDetailPage() {
               {index > 0 && <Separator className="my-6" />}
               <div className="space-y-3">
                 <div className="flex items-start justify-between">
-                  <div>
+                  <div className="flex-1">
                     <h3 className="text-lg font-semibold">{exercise.name}</h3>
-                    {exercise.equipment && (
-                      <p className="text-sm text-muted-foreground capitalize">Equipment: {exercise.equipment}</p>
+                    <div className="flex flex-wrap gap-2 mt-1">
+                      {exercise.exercise_type && (
+                        <Badge variant="secondary" className="capitalize">{exercise.exercise_type}</Badge>
+                      )}
+                      {exercise.equipment && exercise.equipment.length > 0 && (
+                        <Badge variant="outline">{exercise.equipment.join(', ')}</Badge>
+                      )}
+                    </div>
+                    {exercise.target_muscle_groups && exercise.target_muscle_groups.length > 0 && (
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Targets: {exercise.target_muscle_groups.map(m => m.charAt(0).toUpperCase() + m.slice(1)).join(', ')}
+                      </p>
                     )}
                   </div>
                   <Badge variant="outline">Exercise {index + 1}</Badge>
@@ -142,10 +152,10 @@ export default function WorkoutDetailPage() {
                       <p className="text-lg font-semibold">{exercise.reps}</p>
                     </div>
                   )}
-                  {exercise.duration && (
+                  {exercise.duration_seconds && (
                     <div>
                       <p className="text-sm text-muted-foreground">Duration</p>
-                      <p className="text-lg font-semibold">{exercise.duration}s</p>
+                      <p className="text-lg font-semibold">{exercise.duration_seconds}s</p>
                     </div>
                   )}
                   {exercise.rest_seconds && (
@@ -154,10 +164,36 @@ export default function WorkoutDetailPage() {
                       <p className="text-lg font-semibold">{exercise.rest_seconds}s</p>
                     </div>
                   )}
+                  {exercise.tempo && (
+                    <div>
+                      <p className="text-sm text-muted-foreground">Tempo</p>
+                      <p className="text-lg font-semibold">{exercise.tempo}</p>
+                    </div>
+                  )}
+                  {exercise.rpe_target && (
+                    <div>
+                      <p className="text-sm text-muted-foreground">RPE Target</p>
+                      <p className="text-lg font-semibold">{exercise.rpe_target}/10</p>
+                    </div>
+                  )}
                 </div>
 
-                {exercise.notes && (
-                  <p className="text-sm text-muted-foreground italic">{exercise.notes}</p>
+                {exercise.instructions && (
+                  <div className="bg-secondary/50 p-3 rounded-md">
+                    <p className="text-sm font-medium mb-1">Instructions:</p>
+                    <p className="text-sm text-muted-foreground">{exercise.instructions}</p>
+                  </div>
+                )}
+
+                {exercise.form_cues && exercise.form_cues.length > 0 && (
+                  <div>
+                    <p className="text-sm font-medium mb-1">Form Cues:</p>
+                    <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
+                      {exercise.form_cues.map((cue, cueIndex) => (
+                        <li key={cueIndex}>{cue}</li>
+                      ))}
+                    </ul>
+                  </div>
                 )}
               </div>
             </div>
@@ -166,25 +202,25 @@ export default function WorkoutDetailPage() {
       </Card>
 
       {/* Cooldown */}
-      {workout.workout_details?.cooldown && (
+      {workout.workout_structure?.cooldown && (
         <Card>
           <CardHeader>
             <CardTitle>Cool-down</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-muted-foreground">{workout.workout_details.cooldown}</p>
+            <p className="text-muted-foreground">{workout.workout_structure.cooldown}</p>
           </CardContent>
         </Card>
       )}
 
       {/* Notes */}
-      {workout.workout_details?.notes && (
+      {workout.workout_structure?.notes && (
         <Card>
           <CardHeader>
             <CardTitle>Notes</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-muted-foreground">{workout.workout_details.notes}</p>
+            <p className="text-muted-foreground">{workout.workout_structure.notes}</p>
           </CardContent>
         </Card>
       )}

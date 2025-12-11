@@ -5,7 +5,7 @@ postgres-mcp server via stdio transport. It provides database query capabilities
 to other agents without requiring direct database connections in the application.
 
 Architecture:
-    workout_plan_agent → query_agent (with MCP server) → postgres-mcp → PostgreSQL
+    workout_phase_agent → query_agent (with MCP server) → postgres-mcp → PostgreSQL
 
 The query agent:
 - MCP server is initialized lazily in query_tools.py to avoid async context issues

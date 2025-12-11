@@ -13,9 +13,7 @@ from agents import Runner, function_tool
 from pydantic import BaseModel, Field
 
 from src.ai.app_agents.meal_phase_agent import meal_phase_agent
-from src.ai.app_agents.meal_plan_agent import meal_plan_agent
 from src.ai.app_agents.workout_phase_agent import workout_phase_agent
-from src.ai.app_agents.workout_plan_agent import workout_plan_agent
 from src.ai.schemas import MealPlanMetadata, SchedulePreferences, WorkoutPlanMetadata
 from src.services.plan_service import PlanService
 
@@ -196,96 +194,6 @@ class FitnessPlanInput(BaseModel):
         default_factory=SchedulePreferences,
         description="User's scheduling preferences: split_type (weekly_fixed|rolling), preferred_workout_days, rest_days, preferred_time, avoid_dates, notes",
     )
-
-
-async def build_workout_plan(requirements: WorkoutPlanInput) -> str:
-    """Build a workout plan using the Workout Plan Agent.
-
-    This function calls the Workout Plan Agent with user requirements
-    and returns a structured workout plan as JSON.
-
-    Args:
-        requirements: WorkoutPlanInput with all required parameters
-
-    Returns:
-        JSON string with WorkoutPlanOutput structure
-
-    Raises:
-        ValueError: If agent fails to generate plan
-    """
-    # Build prompt for workout agent
-    prompt = f"""Create a workout plan with the following requirements:
-
-Goal: {requirements.primary_goal}
-Fitness Level: {requirements.fitness_level}
-Frequency: {requirements.workout_frequency} days per week
-Equipment: {requirements.equipment_access}
-Time per session: {requirements.time_per_session} minutes
-"""
-
-    if requirements.injuries_or_conditions:
-        prompt += (
-            f"\nInjuries/Conditions to consider: {', '.join(requirements.injuries_or_conditions)}"
-        )
-
-    # Run workout plan agent with structured output
-    result = await Runner.run(
-        starting_agent=workout_plan_agent,
-        input=prompt,
-        session=None,
-    )
-
-    # Extract structured output from final_output
-    # When agent has output_type defined, final_output contains the structured object
-    if result.final_output:
-        # final_output is of type WorkoutPlanOutput when workout_plan_agent has output_type=WorkoutPlanOutput
-        return json.dumps(result.final_output.model_dump(), indent=2)
-
-    raise ValueError("Workout Plan Agent did not return structured output")
-
-
-async def build_meal_plan(requirements: MealPlanInput) -> str:
-    """Build a meal plan using the Meal Plan Agent.
-
-    This function calls the Meal Plan Agent with user requirements
-    and returns a structured meal plan as JSON.
-
-    Args:
-        requirements: MealPlanInput with all required parameters
-
-    Returns:
-        JSON string with MealPlanOutput structure
-
-    Raises:
-        ValueError: If agent fails to generate plan
-    """
-    # Build prompt for meal agent
-    prompt = f"""Create a meal plan with the following requirements:
-
-Goal: {requirements.primary_goal}
-Meal Frequency: {requirements.meal_frequency} meals per day
-"""
-
-    if requirements.dietary_restrictions:
-        prompt += f"\nDietary Restrictions: {', '.join(requirements.dietary_restrictions)}"
-
-    if requirements.preferences:
-        prompt += f"\nPreferences: {requirements.preferences}"
-
-    # Run meal plan agent with structured output
-    result = await Runner.run(
-        starting_agent=meal_plan_agent,
-        input=prompt,
-        session=None,
-    )
-
-    # Extract structured output from final_output
-    # When agent has output_type defined, final_output contains the structured object
-    if result.final_output:
-        # final_output is of type MealPlanOutput when meal_plan_agent has output_type=MealPlanOutput
-        return json.dumps(result.final_output.model_dump(), indent=2)
-
-    raise ValueError("Meal Plan Agent did not return structured output")
 
 
 @function_tool
