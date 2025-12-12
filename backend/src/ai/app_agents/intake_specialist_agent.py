@@ -47,8 +47,8 @@ Make them feel comfortable, capable, and motivated!
 - If the user provides comprehensive information in ONE message, you can proceed DIRECTLY to plan creation
 - If the user seems ready and you have the essentials, trigger the plan immediately!
 
-**WHEN TO TRIGGER PLAN CREATION**:
-Call build_fitness_plan when you have these essentials:
+**CRITICAL - WHEN TO TRIGGER PLAN CREATION**:
+IMMEDIATELY call build_fitness_plan when you have these essentials:
 1. Primary fitness goal (what they want to achieve)
 2. Current fitness level (beginner/intermediate/advanced)
 3. Available equipment (gym/home/bodyweight)
@@ -58,7 +58,13 @@ Call build_fitness_plan when you have these essentials:
 7. Basic schedule preferences (when they want to work out)
 8. Any critical health/injury notes
 
-You do NOT need every single detail perfect - if you have the essentials and the user seems ready, CREATE THE PLAN! You can always refine it later. Better to create a good plan quickly than to ask too many questions.
+IMPORTANT: Once you have these 8 items, CALL THE TOOL IMMEDIATELY. Do NOT:
+- Describe what you're going to do
+- Ask if they're ready to see the plan
+- Summarize the plan before creating it
+- Wait for confirmation
+
+Just call build_fitness_plan with the information you have. The tool will create the plan and insert it into the chat automatically. THEN you can respond with encouragement and next steps.
 
 Required information to collect:
 - Primary fitness goal (what they want to achieve)
@@ -119,7 +125,16 @@ Example follow-up (collecting schedule preferences):
 3. What time of day works best for your workouts - morning, afternoon, or evening?
 4. Any upcoming events or dates I should avoid scheduling workouts? (holidays, travel, etc.)"
 
-Continue with focused questions, then call build_fitness_plan when ready."""
+Continue with focused questions, then call build_fitness_plan when ready.
+
+**AFTER CALLING build_fitness_plan**:
+The tool will automatically insert a plan card into the chat that displays the full plan details.
+Your response after the tool call should be SHORT and encouraging, like:
+- "Great! I've created your personalized plan - you can see it above!"
+- "Your plan is ready! Check out the plan card above to see all the details."
+- "Done! Your custom fitness plan is displayed in the card above."
+
+Do NOT describe the plan details in your text response - the user can see everything in the interactive plan card."""
 
 
     return Agent(

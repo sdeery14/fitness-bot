@@ -209,23 +209,46 @@ export default function ChatPage() {
       console.log("Response data keys:", Object.keys(responseData));
       console.log("Response data:", responseData);
       
-      // Extract AI response - check multiple possible keys
-      const aiResponse = responseData.assistant_response || responseData.agent_response || responseData.assistant_message?.content;
-
-      // Add AI response to chat
-      setMessages((prev) => [
-        ...prev,
-        { 
-          id: (Date.now() + 1).toString(), 
-          sender_type: "ai", 
-          message_content: aiResponse || "I'm processing your request...",
-          created_at: new Date().toISOString(),
-        },
-      ]);
-
       // Set conversation ID if this was a new conversation
-      if (!conversationId && responseData.conversation_id) {
-        setConversationId(responseData.conversation_id);
+      const newConversationId = !conversationId && responseData.conversation_id 
+        ? responseData.conversation_id 
+        : conversationId;
+      
+      if (newConversationId !== conversationId) {
+        setConversationId(newConversationId);
+      }
+
+      // Reload full conversation history to get all messages including plan messages
+      if (newConversationId) {
+        const historyRes = await fetch(`${API_URL}/ai/conversations/${newConversationId}`, {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        });
+        
+        const historyData = await historyRes.json();
+        if (historyRes.ok) {
+          const historyResponseData = historyData.data || historyData;
+          if (historyResponseData.message_history && historyResponseData.message_history.length > 0) {
+            const mappedMessages = historyResponseData.message_history.map((msg: any) => ({
+              ...msg,
+              sender_type: msg.sender_type === "assistant" ? "ai" : msg.sender_type,
+            }));
+            setMessages(mappedMessages);
+          }
+        }
+      } else {
+        // Fallback: Add AI response to chat if conversation reload fails
+        const aiResponse = responseData.assistant_response || responseData.agent_response || responseData.assistant_message?.content;
+        setMessages((prev) => [
+          ...prev,
+          { 
+            id: (Date.now() + 1).toString(), 
+            sender_type: "ai", 
+            message_content: aiResponse || "I'm processing your request...",
+            created_at: new Date().toISOString(),
+          },
+        ]);
       }
 
       // Reload conversations to pick up the newly generated title

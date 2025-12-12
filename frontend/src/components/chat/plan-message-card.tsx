@@ -39,7 +39,7 @@ export function PlanMessageCard({ planId }: PlanMessageCardProps) {
     const loadPlanData = async () => {
       try {
         const token = localStorage.getItem("access_token");
-        const res = await fetch(`${API_URL}/plans/${planId}`, {
+        const res = await fetch(`${API_URL}/fitness-plans/${planId}`, {
           headers: {
             Authorization: `Bearer ${token}`,
           },
@@ -165,7 +165,7 @@ export function PlanMessageCard({ planId }: PlanMessageCardProps) {
                       Phase {phase.phase_number}: {phase.phase_name}
                     </div>
                     <div className="text-sm text-gray-600">
-                      {phase.duration_weeks} weeks • {phase.workouts.length} workouts • {phase.meals.length} meal plans
+                      {phase.duration_weeks} weeks • {phase.workout_details?.workouts?.length || 0} workouts • {phase.meal_details?.sample_days?.length || 0} meal days
                     </div>
                   </div>
                   {expandedPhase === phase.phase_number ? (
@@ -180,36 +180,40 @@ export function PlanMessageCard({ planId }: PlanMessageCardProps) {
                     <p className="text-sm text-gray-700">{phase.description}</p>
 
                     {/* Workouts */}
-                    <div>
-                      <h5 className="font-semibold text-gray-900 mb-2 flex items-center gap-2">
-                        <Dumbbell className="h-4 w-4" />
-                        Workouts
-                      </h5>
-                      <div className="space-y-2">
-                        {phase.workouts.map((workout, idx) => (
-                          <div key={idx} className="bg-gray-50 rounded p-3 text-sm">
-                            <div className="font-medium text-gray-900">{workout.workout_name}</div>
-                            <div className="text-gray-600">{workout.exercises?.length || 0} exercises</div>
-                          </div>
-                        ))}
+                    {phase.workout_details?.workouts && phase.workout_details.workouts.length > 0 && (
+                      <div>
+                        <h5 className="font-semibold text-gray-900 mb-2 flex items-center gap-2">
+                          <Dumbbell className="h-4 w-4" />
+                          Workouts
+                        </h5>
+                        <div className="space-y-2">
+                          {phase.workout_details.workouts.map((workout: any, idx: number) => (
+                            <div key={idx} className="bg-gray-50 rounded p-3 text-sm">
+                              <div className="font-medium text-gray-900">{workout.day_name}</div>
+                              <div className="text-gray-600">{workout.exercises?.length || 0} exercises • {workout.duration_minutes} min</div>
+                            </div>
+                          ))}
+                        </div>
                       </div>
-                    </div>
+                    )}
 
                     {/* Meals */}
-                    <div>
-                      <h5 className="font-semibold text-gray-900 mb-2 flex items-center gap-2">
-                        <Utensils className="h-4 w-4" />
-                        Meal Plans
-                      </h5>
-                      <div className="space-y-2">
-                        {phase.meals.map((meal, idx) => (
-                          <div key={idx} className="bg-gray-50 rounded p-3 text-sm">
-                            <div className="font-medium text-gray-900">Day {meal.day_number}</div>
-                            <div className="text-gray-600">{meal.daily_meals?.length || 0} meals • {meal.total_calories} cal</div>
-                          </div>
-                        ))}
+                    {phase.meal_details?.sample_days && phase.meal_details.sample_days.length > 0 && (
+                      <div>
+                        <h5 className="font-semibold text-gray-900 mb-2 flex items-center gap-2">
+                          <Utensils className="h-4 w-4" />
+                          Meal Plans
+                        </h5>
+                        <div className="space-y-2">
+                          {phase.meal_details.sample_days.map((day: any, idx: number) => (
+                            <div key={idx} className="bg-gray-50 rounded p-3 text-sm">
+                              <div className="font-medium text-gray-900">{day.day_name}</div>
+                              <div className="text-gray-600">{day.meals?.length || 0} meals • {day.target_calories} cal</div>
+                            </div>
+                          ))}
+                        </div>
                       </div>
-                    </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -237,7 +241,7 @@ export function PlanMessageCard({ planId }: PlanMessageCardProps) {
               </>
             )}
           </Button>
-          <Link href={`/dashboard/plans/${planId}`} className="flex-1">
+          <Link href="/dashboard/plan" className="flex-1">
             <Button size="sm" className="w-full">
               View Full Plan →
             </Button>

@@ -36,6 +36,11 @@ export function MessageList({ messages, isLoading, onSelectSuggestion, onFillInp
   const hasUserMessages = messages.some(msg => msg.sender_type === "user");
   const shouldShowSuggestions = !hasUserMessages && !isLoading && (onSelectSuggestion || onFillInput);
 
+  // Sort messages by created_at timestamp to ensure correct order
+  const sortedMessages = [...messages].sort((a, b) => 
+    new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+  );
+
   return (
     <ScrollArea className="flex-1">
       <div className="">
@@ -46,7 +51,7 @@ export function MessageList({ messages, isLoading, onSelectSuggestion, onFillInp
           />
         )}
 
-        {messages.map((message) => {
+        {sortedMessages.map((message) => {
           // Render plan message card
           if (message.sender_type === "plan" && message.plan_id) {
             return (

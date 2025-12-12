@@ -273,13 +273,35 @@ User Message: {initial_message}"""
         has_plans = await self.plan_service.has_existing_plans(user.id)
         selected_agent = conversation_agent if has_plans else intake_specialist_agent
 
+        # For new conversations, create with title from user message before running agent
+        # This allows plan tools to insert plan messages during execution
+        is_new_conversation = db_conversation is None
+        if is_new_conversation:
+            from src.services.title_generation_service import generate_conversation_title
+            
+            # Generate title from user's first message only
+            title = await generate_conversation_title(user_message, "")
+            
+            db_conversation = await self.conversation_service.create_conversation(
+                user_id=user.id,
+                conversation_type="plan_creation",
+                title=title,
+            )
+
+        # Save user's message BEFORE running agent to ensure correct timestamp order
+        await self.conversation_service.add_message(
+            conversation_id=db_conversation.id,
+            sender_type="user",
+            message_content=user_message,
+        )
+
         # Set context for plan tools (enables database persistence)
         from src.ai.tools.plan_tools import set_plan_tools_context, clear_plan_tools_context
 
         set_plan_tools_context(
             user_id=user.id,
             db_session=self.db,
-            conversation_id=db_conversation.id if db_conversation else None
+            conversation_id=db_conversation.id
         )
 
         try:
@@ -303,26 +325,16 @@ User Message: {user_message}"""
         # Extract response
         agent_response = result.final_output if result.final_output else "I understand. Let me help you with that."
 
-        # If this is a new conversation (first message), create it now with generated title
-        if not db_conversation:
+        # For new conversations, generate and update the title
+        if is_new_conversation:
             from src.services.title_generation_service import generate_conversation_title
             
             # Generate title from first exchange
             title = await generate_conversation_title(user_message, agent_response)
             
-            # Create conversation with title
-            db_conversation = await self.conversation_service.create_conversation(
-                user_id=user.id,
-                conversation_type="plan_creation",
-                title=title,
-            )
-
-        # Save user's message
-        await self.conversation_service.add_message(
-            conversation_id=db_conversation.id,
-            sender_type="user",
-            message_content=user_message,
-        )
+            # Update conversation with generated title
+            db_conversation.title = title
+            await self.db.commit()
 
         # Save AI response
         await self.conversation_service.add_message(
