@@ -8,7 +8,7 @@ from src.api.deps import CurrentUserId, DatabaseSession
 from src.models.meal import Meal
 from src.schemas import create_success_response
 
-router = APIRouter(prefix="/meals", tags=["meals"])
+router = APIRouter()
 
 
 @router.get("/{meal_id}")
@@ -30,6 +30,10 @@ async def get_meal(
     Raises:
         HTTPException: If meal not found or user doesn't have access
     """
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.info(f"Fetching meal {meal_id} for user {user_id}")
+    
     # Query meal and verify ownership through meal_plan → fitness_plan → user
     from src.models.meal import MealPlan
     from src.models.fitness_plan import FitnessPlan
@@ -41,10 +45,13 @@ async def get_meal(
         .where(Meal.id == meal_id)
         .where(FitnessPlan.user_id == user_id)
     )
+    logger.info(f"Executing query with JOIN")
     result = await db.execute(stmt)
     meal = result.scalar_one_or_none()
+    logger.info(f"Query result: {meal}")
 
     if not meal:
+        logger.warning(f"Meal {meal_id} not found for user {user_id}")
         raise HTTPException(status_code=404, detail="Meal not found")
 
     return create_success_response({
