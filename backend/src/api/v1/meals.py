@@ -28,9 +28,19 @@ async def get_meal(
         Meal details including ingredients and nutrition
 
     Raises:
-        HTTPException: If meal not found
+        HTTPException: If meal not found or user doesn't have access
     """
-    stmt = select(Meal).where(Meal.id == meal_id)
+    # Query meal and verify ownership through meal_plan → fitness_plan → user
+    from src.models.meal import MealPlan
+    from src.models.fitness_plan import FitnessPlan
+    
+    stmt = (
+        select(Meal)
+        .join(MealPlan, Meal.meal_plan_id == MealPlan.id)
+        .join(FitnessPlan, MealPlan.fitness_plan_id == FitnessPlan.id)
+        .where(Meal.id == meal_id)
+        .where(FitnessPlan.user_id == user_id)
+    )
     result = await db.execute(stmt)
     meal = result.scalar_one_or_none()
 
