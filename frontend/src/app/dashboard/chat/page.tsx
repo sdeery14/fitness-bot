@@ -95,7 +95,8 @@ export default function ChatPage() {
       // Backend response format: { status, data: { conversation_id, ... }, metadata }
       const responseData = data.data || data; // Support both new and old formats
       
-      setConversationId(responseData.conversation_id);
+      // conversation_id will be null for initial greeting (not yet stored in DB)
+      setConversationId(responseData.conversation_id || null);
       
       // Load message history (backend returns both user message and AI response)
       if (responseData.message_history && responseData.message_history.length > 0) {
@@ -169,10 +170,8 @@ export default function ChatPage() {
   };
 
   const handleSendMessage = async (content: string) => {
-    if (!conversationId) {
-      setError("No active conversation");
-      return;
-    }
+    // Use "new" for first message when no conversation exists
+    const targetConversationId = conversationId || "new";
 
     // Add user message to chat immediately (optimistic UI)
     const userMessage: Message = {
@@ -185,7 +184,7 @@ export default function ChatPage() {
     setMessages((prev) => [...prev, userMessage]);
 
     try {
-      const res = await fetch(`${API_URL}/ai/conversations/${conversationId}/messages`, {
+      const res = await fetch(`${API_URL}/ai/conversations/${targetConversationId}/messages`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -223,6 +222,11 @@ export default function ChatPage() {
           created_at: new Date().toISOString(),
         },
       ]);
+
+      // Set conversation ID if this was a new conversation
+      if (!conversationId && responseData.conversation_id) {
+        setConversationId(responseData.conversation_id);
+      }
 
       // Reload conversations to pick up the newly generated title
       await loadConversations();
@@ -309,9 +313,9 @@ export default function ChatPage() {
 
       {/* Chat Area */}
       <div className="flex-1 flex flex-col">
-        {conversationId ? (
+        {conversationId || messages.length > 0 ? (
           <ChatInterface
-            conversationId={conversationId}
+            conversationId={conversationId || "new"}
             messages={messages}
             onSendMessage={handleSendMessage}
           />

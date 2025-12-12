@@ -66,18 +66,20 @@ async def start_conversation(
     user_id: CurrentUserId,
     db: DatabaseSession,
 ):
-    """Start a new AI conversation for fitness planning.
+    """Get initial AI greeting without creating conversation in DB.
+    
+    Conversation is only created when user sends their first message.
 
     Args:
-        request: Initial message
+        request: Initial message (unused - always returns greeting)
         user_id: Current authenticated user ID
         db: Database session
 
     Returns:
-        Conversation ID and agent response
+        AI greeting message (no conversation_id yet)
 
     Raises:
-        HTTPException: If user not found or conversation fails
+        HTTPException: If user not found
     """
     user_service = UserService(db)
     user = await user_service.get_user(user_id)
@@ -88,16 +90,39 @@ async def start_conversation(
             detail="User not found",
         )
 
-    ai_service = AIOrchestrationService(db)
-
     try:
-        result = await ai_service.start_conversation(
-            user=user,
-            initial_message=request.initial_message,
-            force_new=request.force_new,
-        )
+        plan_service = PlanService(db)
+        has_plans = await plan_service.has_existing_plans(user.id)
 
-        return create_success_response(result)
+        # Return appropriate greeting based on user's history
+        if has_plans:
+            agent_response = """Welcome back! I'm your AI fitness coach, ready to help you with your fitness journey.
+
+How can I assist you today?
+• Discuss your current plan
+• Make modifications to your workouts or meals
+• Start a fresh plan with a new goal
+• Get advice on your progress
+
+What would you like to work on?"""
+        else:
+            agent_response = """Welcome! I'm thrilled to help you start your fitness journey! 🎉
+
+You can click one of the quick-start options above to fill in a template (which you can customize), or tell me about your fitness goals in your own words.
+
+Either way, I'm here to help you succeed!"""
+
+        return create_success_response({
+            "agent_response": agent_response,
+            "conversation_id": None,  # No conversation created yet
+            "status": "greeting",
+            "message_history": [{
+                "id": "greeting",
+                "sender_type": "assistant",
+                "message_content": agent_response,
+                "created_at": None,
+            }],
+        })
 
     except Exception as e:
         import traceback
@@ -116,19 +141,19 @@ async def send_message(
     user_id: CurrentUserId,
     db: DatabaseSession,
 ):
-    """Send a message in an existing conversation.
+    """Send a message - creates conversation on first user message.
 
     Args:
-        conversation_id: Conversation ID
+        conversation_id: Conversation ID (use "new" for first message)
         request: User message
         user_id: Current authenticated user ID
         db: Database session
 
     Returns:
-        Agent response
+        Agent response with conversation_id
 
     Raises:
-        HTTPException: If conversation not found or send fails
+        HTTPException: If user not found or send fails
     """
     # Validate message is not empty
     if not request.message or not request.message.strip():
@@ -149,9 +174,13 @@ async def send_message(
     ai_service = AIOrchestrationService(db)
 
     try:
+        # Check if this is a first message (conversation_id == "new")
+        is_first_message = conversation_id == "new"
+        actual_conversation_id = None if is_first_message else conversation_id
+
         result = await ai_service.continue_conversation(
             user=user,
-            conversation_id=conversation_id,
+            conversation_id=actual_conversation_id,
             user_message=request.message,
             timezone_override=request.timezone,
         )
@@ -163,18 +192,7 @@ async def send_message(
         # Extract the assistant message content from the result
         assistant_message_content = result["assistant_message"]["content"] if isinstance(result.get("assistant_message"), dict) else result.get("agent_response", "")
         
-        # Generate title if this is the first user message (conversation has no title yet)
-        from src.models.conversation import Conversation
-        from sqlalchemy import select
-        stmt = select(Conversation).where(Conversation.id == conversation_id)
-        conv_result = await db.execute(stmt)
-        conversation = conv_result.scalar_one_or_none()
-        
-        if conversation and not conversation.title:
-            from src.services.title_generation_service import generate_conversation_title
-            title = await generate_conversation_title(request.message, assistant_message_content)
-            conversation.title = title
-            await db.commit()
+        # Title is generated automatically in ai_service for new conversations
         
         return create_success_response({
             "message_id": message_id,

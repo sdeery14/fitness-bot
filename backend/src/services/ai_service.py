@@ -205,46 +205,51 @@ User Message: {initial_message}"""
     async def continue_conversation(
         self,
         user: User,
-        conversation_id: str,
+        conversation_id: str | None,
         user_message: str,
         timezone_override: str | None = None,
     ) -> dict:
-        """Continue an existing conversation.
+        """Continue an existing conversation or create new one on first message.
 
         Args:
             user: User in the conversation
-            conversation_id: Session ID from previous interaction
+            conversation_id: Conversation ID (None for first message)
             user_message: User's message
             timezone_override: Optional timezone to override user's stored timezone for this message
 
         Returns:
             Dict with agent_response, status, and updated context
         """
-        # Load conversation from database
-        from uuid import UUID
-        try:
-            conversation_uuid = UUID(conversation_id)
-            db_conversation = await self.conversation_service.get_conversation(
-                conversation_id=conversation_uuid,
-                load_messages=True,
-            )
-        except ValueError:
-            # If not a valid UUID, try session_id format
-            db_conversation = await self.conversation_service.get_conversation_by_session_id(
-                session_id=conversation_id,
-                load_messages=True,
-            )
+        # Load or create conversation
+        db_conversation = None
+        
+        if conversation_id:
+            # Load existing conversation from database
+            from uuid import UUID
+            try:
+                conversation_uuid = UUID(conversation_id)
+                db_conversation = await self.conversation_service.get_conversation(
+                    conversation_id=conversation_uuid,
+                    load_messages=True,
+                )
+            except ValueError:
+                # If not a valid UUID, try session_id format
+                db_conversation = await self.conversation_service.get_conversation_by_session_id(
+                    session_id=conversation_id,
+                    load_messages=True,
+                )
 
-        if not db_conversation:
-            raise ValueError(f"Conversation not found: {conversation_id}")
+            if not db_conversation:
+                raise ValueError(f"Conversation not found: {conversation_id}")
 
-        # Build complete conversation history from database messages
+        # Build complete conversation history from database messages (empty for new conversations)
         conversation_history = []
-        for msg in db_conversation.messages:
-            conversation_history.append({
-                "role": "user" if msg.sender_type == "user" else "assistant",
-                "content": msg.message_content,
-            })
+        if db_conversation:
+            for msg in db_conversation.messages:
+                conversation_history.append({
+                    "role": "user" if msg.sender_type == "user" else "assistant",
+                    "content": msg.message_content,
+                })
 
         # Get current datetime in user's timezone (use override if provided)
         user_timezone = timezone_override or user.timezone or "UTC"
@@ -262,13 +267,6 @@ User Message: {initial_message}"""
             user_context=user_context,
             requirements={},
             conversation_history=conversation_history,  # Pass full conversation history through context
-        )
-
-        # Save user's message before processing
-        await self.conversation_service.add_message(
-            conversation_id=db_conversation.id,
-            sender_type="user",
-            message_content=user_message,
         )
 
         # Check if user has existing fitness plans to determine which agent to use
@@ -300,6 +298,27 @@ User Message: {user_message}"""
 
         # Extract response
         agent_response = result.final_output if result.final_output else "I understand. Let me help you with that."
+
+        # If this is a new conversation (first message), create it now with generated title
+        if not db_conversation:
+            from src.services.title_generation_service import generate_conversation_title
+            
+            # Generate title from first exchange
+            title = await generate_conversation_title(user_message, agent_response)
+            
+            # Create conversation with title
+            db_conversation = await self.conversation_service.create_conversation(
+                user_id=user.id,
+                conversation_type="plan_creation",
+                title=title,
+            )
+
+        # Save user's message
+        await self.conversation_service.add_message(
+            conversation_id=db_conversation.id,
+            sender_type="user",
+            message_content=user_message,
+        )
 
         # Save AI response
         await self.conversation_service.add_message(

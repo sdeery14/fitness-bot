@@ -24,6 +24,7 @@ class ConversationService:
         user_id: UUID,
         conversation_type: str = "plan_creation",
         fitness_plan_id: UUID | None = None,
+        title: str = "New Conversation",
     ) -> Conversation:
         """Create a new conversation.
 
@@ -31,6 +32,7 @@ class ConversationService:
             user_id: User ID
             conversation_type: Type of conversation (plan_creation, plan_update, general_question)
             fitness_plan_id: Optional fitness plan ID to associate
+            title: Conversation title (will be auto-generated after first message)
 
         Returns:
             Created conversation
@@ -41,6 +43,7 @@ class ConversationService:
             fitness_plan_id=fitness_plan_id,
             status="active",
             conversation_context={},
+            title=title,
         )
 
         self.db.add(conversation)
