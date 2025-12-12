@@ -295,7 +295,10 @@ async def get_conversation(
 
     try:
         conv_service = ConversationService(db)
-        conversation = await conv_service.get_conversation(conversation_id)
+        conversation = await conv_service.get_conversation(
+            conversation_id=conversation_id,
+            load_messages=True,
+        )
         
         if not conversation:
             raise HTTPException(
@@ -313,13 +316,24 @@ async def get_conversation(
                 detail="Not authorized to access this conversation"
             )
         
+        # Build message history
+        message_history = [
+            {
+                "id": str(msg.id),
+                "sender_type": msg.sender_type,
+                "message_content": msg.message_content,
+                "created_at": msg.created_at.isoformat() if msg.created_at else None,
+            }
+            for msg in conversation.messages
+        ]
+        
         return create_success_response({
             "id": str(conversation.id),
             "conversation_id": str(conversation.id),
             "user_id": str(conversation.user_id),
             "status": conversation.status,
             "conversation_type": conversation.conversation_type,
-            "messages": [],  # Would retrieve from Message model in full implementation
+            "message_history": message_history,
         })
     except HTTPException:
         raise
