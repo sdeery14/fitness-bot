@@ -6,6 +6,8 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
 import { SuggestionCards } from "@/components/chat/suggestion-cards";
 import { PlanMessageCard } from "@/components/chat/plan-message-card";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 export interface Message {
   id: string;
@@ -90,8 +92,26 @@ export function MessageList({ messages, isLoading, onSelectSuggestion, onFillInp
                   <p className="text-sm font-semibold text-gray-900">
                     {message.sender_type === "ai" ? "AI Fitness Coach" : "You"}
                   </p>
-                  <div className="prose prose-sm max-w-none">
-                    <p className="text-[15px] leading-relaxed text-gray-800 whitespace-pre-wrap">{message.message_content}</p>
+                  <div className="prose prose-sm max-w-none text-[15px] leading-relaxed text-gray-800">
+                    {message.sender_type === "ai" ? (
+                      <ReactMarkdown 
+                        remarkPlugins={[remarkGfm]}
+                        components={{
+                          p: ({node, ...props}) => <p className="mb-2" {...props} />,
+                          ul: ({node, ...props}) => <ul className="list-disc ml-4 mb-2" {...props} />,
+                          ol: ({node, ...props}) => <ol className="list-decimal ml-4 mb-2" {...props} />,
+                          li: ({node, ...props}) => <li className="mb-1" {...props} />,
+                          strong: ({node, ...props}) => <strong className="font-semibold" {...props} />,
+                          em: ({node, ...props}) => <em className="italic" {...props} />,
+                          code: ({node, ...props}) => <code className="bg-gray-100 px-1 py-0.5 rounded text-sm" {...props} />,
+                          pre: ({node, ...props}) => <pre className="bg-gray-100 p-3 rounded-lg overflow-x-auto mb-2" {...props} />,
+                        }}
+                      >
+                        {message.message_content}
+                      </ReactMarkdown>
+                    ) : (
+                      <p className="whitespace-pre-wrap">{message.message_content}</p>
+                    )}
                   </div>
                   <p className="text-xs text-gray-400 pt-1">
                     {new Date(message.created_at).toLocaleTimeString([], {
