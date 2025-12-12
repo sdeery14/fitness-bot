@@ -12,6 +12,7 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1
 
 interface Conversation {
   id: string;
+  title?: string;
   status: string;
   conversation_type: string;
   created_at: string;
@@ -222,6 +223,9 @@ export default function ChatPage() {
           created_at: new Date().toISOString(),
         },
       ]);
+
+      // Reload conversations to pick up the newly generated title
+      await loadConversations();
     } catch (err) {
       // Remove optimistic message on error
       setMessages((prev) => prev.filter((m) => m.id !== userMessage.id));
@@ -290,9 +294,7 @@ export default function ChatPage() {
                   <MessageSquare className="h-4 w-4 flex-shrink-0" />
                   <div className="flex-1 min-w-0">
                     <div className="truncate">
-                      {conv.conversation_type === "fitness_planning"
-                        ? "Fitness Planning"
-                        : "Chat"}
+                      {conv.title || "New Conversation"}
                     </div>
                     <div className="text-xs text-gray-500 truncate">
                       {new Date(conv.updated_at).toLocaleDateString()}

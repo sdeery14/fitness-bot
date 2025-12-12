@@ -237,6 +237,7 @@ async def list_conversations(
             "conversations": [
                 {
                     "id": str(conv.id),
+                    "title": conv.title,
                     "status": conv.status,
                     "conversation_type": conv.conversation_type,
                     "created_at": conv.created_at.isoformat() if conv.created_at else None,
