@@ -118,7 +118,7 @@ export function PhaseTimeline({ phases, currentPhaseNumber }: PhaseTimelineProps
               const isLast = index === sortedPhases.length - 1;
 
               return (
-                <div key={phase.id} className="relative">
+                <div key={phase.id || `phase-${phase.phase_number}-${index}`} className="relative">
                   {/* Timeline node */}
                   <div className="absolute left-0 top-0 z-10">
                     {getStatusIcon(status)}
@@ -181,10 +181,13 @@ export function PhaseTimeline({ phases, currentPhaseNumber }: PhaseTimelineProps
                           {phase.objectives.map((obj, objIndex) => {
                             const objectiveText = typeof obj === "string" ? obj : obj.description;
                             const isCompleted = typeof obj === "object" ? obj.completed : status === "completed";
+                            const objectiveKey = typeof obj === "object" && obj.id 
+                              ? obj.id 
+                              : `${phase.id}-obj-${objIndex}`;
 
                             return (
                               <li
-                                key={objIndex}
+                                key={objectiveKey}
                                 className="flex items-start gap-2 text-sm text-gray-700"
                               >
                                 {isCompleted ? (
