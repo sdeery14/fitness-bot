@@ -26,6 +26,7 @@ class Conversation(Base, UUIDMixin, TimestampMixin):
     )
 
     # Conversation metadata
+    title = Column(String(255), nullable=True)  # Auto-generated title from first message
     conversation_type = Column(
         Enum("plan_creation", "plan_update", "general_question", name="conversation_type"),
         nullable=False,

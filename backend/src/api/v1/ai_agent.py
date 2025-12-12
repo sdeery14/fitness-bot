@@ -163,6 +163,19 @@ async def send_message(
         # Extract the assistant message content from the result
         assistant_message_content = result["assistant_message"]["content"] if isinstance(result.get("assistant_message"), dict) else result.get("agent_response", "")
         
+        # Generate title if this is the first user message (conversation has no title yet)
+        from src.models.conversation import Conversation
+        from sqlalchemy import select
+        stmt = select(Conversation).where(Conversation.id == conversation_id)
+        conv_result = await db.execute(stmt)
+        conversation = conv_result.scalar_one_or_none()
+        
+        if conversation and not conversation.title:
+            from src.services.title_generation_service import generate_conversation_title
+            title = await generate_conversation_title(request.message, assistant_message_content)
+            conversation.title = title
+            await db.commit()
+        
         return create_success_response({
             "message_id": message_id,
             "conversation_id": result["conversation_id"],
