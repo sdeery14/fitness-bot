@@ -191,6 +191,54 @@ async def send_message(
         ) from e
 
 
+@router.get("/conversations")
+async def list_conversations(
+    user_id: CurrentUserId,
+    db: DatabaseSession,
+) -> dict:
+    """List all conversations for the current user.
+
+    Args:
+        user_id: Current authenticated user ID
+        db: Database session
+
+    Returns:
+        List of user's conversations
+
+    Raises:
+        HTTPException: If retrieval fails
+    """
+    from src.models.conversation import Conversation
+    from sqlalchemy import select
+    
+    try:
+        stmt = (
+            select(Conversation)
+            .where(Conversation.user_id == user_id)
+            .order_by(Conversation.updated_at.desc())
+        )
+        result = await db.execute(stmt)
+        conversations = result.scalars().all()
+        
+        return create_success_response({
+            "conversations": [
+                {
+                    "id": str(conv.id),
+                    "status": conv.status,
+                    "conversation_type": conv.conversation_type,
+                    "created_at": conv.created_at.isoformat() if conv.created_at else None,
+                    "updated_at": conv.updated_at.isoformat() if conv.updated_at else None,
+                }
+                for conv in conversations
+            ]
+        })
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to retrieve conversations: {str(e)}"
+        ) from e
+
+
 @router.get("/conversations/{conversation_id}")
 async def get_conversation(
     conversation_id: str,

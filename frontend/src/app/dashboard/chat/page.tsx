@@ -5,14 +5,24 @@ import { useRouter } from "next/navigation";
 import { ChatInterface } from "@/components/chat/chat-interface";
 import { type Message } from "@/components/chat/message-list";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Plus } from "lucide-react";
+import { Plus, MessageSquare } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
+
+interface Conversation {
+  id: string;
+  status: string;
+  conversation_type: string;
+  created_at: string;
+  updated_at: string;
+}
 
 export default function ChatPage() {
   const router = useRouter();
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [conversationId, setConversationId] = useState<string | null>(null);
+  const [conversations, setConversations] = useState<Conversation[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -28,12 +38,37 @@ export default function ChatPage() {
     }
   }, [router]);
 
+  // Load user's conversations
+  useEffect(() => {
+    if (accessToken) {
+      loadConversations();
+    }
+  }, [accessToken]);
+
   // Start a new conversation when component mounts
   useEffect(() => {
     if (accessToken && !conversationId && !isCreatingNewChat.current) {
       startConversation(false);
     }
   }, [accessToken, conversationId]);
+
+  const loadConversations = async () => {
+    try {
+      const res = await fetch(`${API_URL}/ai/conversations`, {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        const responseData = data.data || data;
+        setConversations(responseData.conversations || []);
+      }
+    } catch (err) {
+      console.error("Error loading conversations:", err);
+    }
+  };
 
   const startConversation = async (forceNew: boolean = false) => {
     try {
@@ -90,8 +125,46 @@ export default function ChatPage() {
     // Start a new conversation (forceNew=true to prevent loading history)
     await startConversation(true);
     
+    // Reload conversations list
+    await loadConversations();
+    
     // Reset flag after conversation created
     isCreatingNewChat.current = false;
+  };
+
+  const handleSelectConversation = async (convId: string) => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      setConversationId(convId);
+
+      // Load the conversation details
+      const res = await fetch(`${API_URL}/ai/conversations/${convId}`, {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        const responseData = data.data || data;
+        // Load message history if available
+        if (responseData.message_history && responseData.message_history.length > 0) {
+          const mappedMessages = responseData.message_history.map((msg: any) => ({
+            ...msg,
+            sender_type: msg.sender_type === "assistant" ? "ai" : msg.sender_type,
+          }));
+          setMessages(mappedMessages);
+        } else {
+          setMessages([]);
+        }
+      }
+    } catch (err) {
+      console.error("Error loading conversation:", err);
+      setError("Failed to load conversation");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleSendMessage = async (content: string) => {
@@ -183,48 +256,72 @@ export default function ChatPage() {
   }
 
   return (
-    <div className="flex flex-col h-screen bg-white">
-      {/* Header */}
-      <div className="flex-shrink-0 border-b border-gray-200 bg-white">
-        <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => router.push("/dashboard")}
-              className="text-gray-600 hover:text-gray-900 hover:bg-gray-100"
-            >
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Dashboard
-            </Button>
-            <div className="h-6 w-px bg-gray-300"></div>
-            <h1 className="text-lg font-semibold text-gray-900">AI Fitness Coach</h1>
-          </div>
+    <div className="flex h-[calc(100vh-4rem)] bg-white">
+      {/* Sidebar */}
+      <div className="w-64 border-r border-gray-200 flex flex-col bg-gray-50">
+        {/* New Chat Button */}
+        <div className="p-4 border-b border-gray-200">
+          <Button
+            onClick={handleNewChat}
+            className="w-full gap-2"
+            disabled={isLoading}
+          >
+            <Plus className="h-4 w-4" />
+            New Chat
+          </Button>
+        </div>
 
-          <div className="flex items-center gap-3">
-            {conversationId && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleNewChat}
-                className="gap-2 border-gray-300 text-gray-700 hover:bg-gray-50"
+        {/* Conversations List */}
+        <div className="flex-1 overflow-y-auto p-2">
+          <div className="space-y-1">
+            {conversations.map((conv) => (
+              <button
+                key={conv.id}
+                onClick={() => handleSelectConversation(conv.id)}
+                className={cn(
+                  "w-full text-left px-3 py-2 rounded-md text-sm transition-colors",
+                  "hover:bg-gray-200",
+                  conversationId === conv.id
+                    ? "bg-gray-200 font-medium"
+                    : "text-gray-700"
+                )}
               >
-                <Plus className="h-4 w-4" />
-                New Chat
-              </Button>
-            )}
+                <div className="flex items-center gap-2">
+                  <MessageSquare className="h-4 w-4 flex-shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <div className="truncate">
+                      {conv.conversation_type === "fitness_planning"
+                        ? "Fitness Planning"
+                        : "Chat"}
+                    </div>
+                    <div className="text-xs text-gray-500 truncate">
+                      {new Date(conv.updated_at).toLocaleDateString()}
+                    </div>
+                  </div>
+                </div>
+              </button>
+            ))}
           </div>
         </div>
       </div>
 
       {/* Chat Area */}
-      {conversationId && (
-        <ChatInterface
-          conversationId={conversationId}
-          messages={messages}
-          onSendMessage={handleSendMessage}
-        />
-      )}
+      <div className="flex-1 flex flex-col">
+        {conversationId ? (
+          <ChatInterface
+            conversationId={conversationId}
+            messages={messages}
+            onSendMessage={handleSendMessage}
+          />
+        ) : (
+          <div className="flex-1 flex items-center justify-center text-gray-500">
+            <div className="text-center">
+              <MessageSquare className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+              <p>Select a conversation or start a new chat</p>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
