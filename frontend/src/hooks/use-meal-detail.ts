@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 
 const API_BASE = 'http://localhost:8000/api/v1';
 
@@ -37,7 +37,7 @@ export function useMealDetail() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchMeal = async (mealId: string) => {
+  const fetchMeal = useCallback(async (mealId: string) => {
     setLoading(true);
     setError(null);
     
@@ -61,7 +61,7 @@ export function useMealDetail() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   return { meal, loading, error, fetchMeal };
 }
