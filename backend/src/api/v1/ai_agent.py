@@ -323,6 +323,7 @@ async def get_conversation(
                 "sender_type": msg.sender_type,
                 "message_content": msg.message_content,
                 "created_at": msg.created_at.isoformat() if msg.created_at else None,
+                "plan_id": str(msg.plan_id) if msg.plan_id else None,
             }
             for msg in conversation.messages
         ]

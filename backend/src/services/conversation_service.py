@@ -120,15 +120,17 @@ class ConversationService:
         message_content: str,
         model_used: str | None = None,
         function_calls: dict | None = None,
+        plan_id: UUID | None = None,
     ) -> Message:
         """Add a message to a conversation.
 
         Args:
             conversation_id: Conversation ID
-            sender_type: Message sender (user, assistant, system)
+            sender_type: Message sender (user, assistant, system, plan)
             message_content: Message text
             model_used: AI model used (for assistant messages)
             function_calls: Function calls made (for assistant messages)
+            plan_id: Plan ID (for plan messages)
 
         Returns:
             Created message
@@ -139,6 +141,7 @@ class ConversationService:
             message_content=message_content,
             model_used=model_used,
             function_calls=function_calls,
+            plan_id=plan_id,
         )
 
         self.db.add(message)

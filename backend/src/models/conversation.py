@@ -78,12 +78,19 @@ class Message(Base, UUIDMixin, TimestampMixin):
 
     # Message metadata
     sender_type = Column(
-        Enum("user", "assistant", "system", name="sender_type"),
+        Enum("user", "assistant", "system", "plan", name="sender_type"),
         nullable=False,
     )
 
     # Message content
     message_content = Column(Text, nullable=False)
+
+    # Plan reference (for plan messages)
+    plan_id = Column(
+        PGUUID(as_uuid=True),
+        ForeignKey("fitness_plans.id", ondelete="SET NULL"),
+        nullable=True,
+    )
 
     # AI metadata (for assistant messages)
     model_used = Column(String(100), nullable=True)  # "gpt-4", "gpt-3.5-turbo", etc.
@@ -91,6 +98,7 @@ class Message(Base, UUIDMixin, TimestampMixin):
 
     # Relationships
     conversation = relationship("Conversation", back_populates="messages")
+    fitness_plan = relationship("FitnessPlan")
 
     def __repr__(self) -> str:
         return f"<Message(id={self.id}, conversation_id={self.conversation_id}, sender={self.sender_type})>"

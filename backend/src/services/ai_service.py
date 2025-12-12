@@ -276,7 +276,11 @@ User Message: {initial_message}"""
         # Set context for plan tools (enables database persistence)
         from src.ai.tools.plan_tools import set_plan_tools_context, clear_plan_tools_context
 
-        set_plan_tools_context(user_id=user.id, db_session=self.db)
+        set_plan_tools_context(
+            user_id=user.id,
+            db_session=self.db,
+            conversation_id=db_conversation.id if db_conversation else None
+        )
 
         try:
             # Continue conversation with the new user message

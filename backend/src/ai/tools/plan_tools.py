@@ -17,12 +17,13 @@ from src.ai.app_agents.workout_phase_agent import workout_phase_agent
 from src.ai.schemas import MealPlanMetadata, SchedulePreferences, WorkoutPlanMetadata
 from src.services.plan_service import PlanService
 
-# Context variables for passing user_id and db_session to function tools
+# Context variables for passing user_id, db_session, and conversation_id to function tools
 _user_id_context: ContextVar[UUID | None] = ContextVar("user_id", default=None)
 _db_session_context: ContextVar[object | None] = ContextVar("db_session", default=None)
+_conversation_id_context: ContextVar[UUID | None] = ContextVar("conversation_id", default=None)
 
 
-def set_plan_tools_context(user_id: UUID, db_session: object) -> None:
+def set_plan_tools_context(user_id: UUID, db_session: object, conversation_id: UUID | None = None) -> None:
     """Set the context for plan tools to enable database persistence.
 
     This should be called by the AI service before invoking agents that use
@@ -31,9 +32,11 @@ def set_plan_tools_context(user_id: UUID, db_session: object) -> None:
     Args:
         user_id: User's UUID for plan ownership
         db_session: Database session for persistence operations
+        conversation_id: Optional conversation ID for plan message insertion
     """
     _user_id_context.set(user_id)
     _db_session_context.set(db_session)
+    _conversation_id_context.set(conversation_id)
 
 
 def clear_plan_tools_context() -> None:
@@ -43,6 +46,12 @@ def clear_plan_tools_context() -> None:
     """
     _user_id_context.set(None)
     _db_session_context.set(None)
+    _conversation_id_context.set(None)
+
+
+def _get_conversation_id() -> UUID | None:
+    """Get the conversation ID from context."""
+    return _conversation_id_context.get()
 
 
 def _parse_and_validate_dates(
@@ -421,6 +430,19 @@ Generate the specific calorie target, macro split, sample meal plans, and nutrit
                 )
 
                 plan_id = str(fitness_plan.id)
+
+                # Insert a plan message into the conversation for rich display
+                conversation_id = _get_conversation_id()
+                if conversation_id:
+                    from src.services.conversation_service import ConversationService
+                    conv_service = ConversationService(db_session)
+                    
+                    await conv_service.add_message(
+                        conversation_id=conversation_id,
+                        sender_type="plan",
+                        message_content=f"Fitness Plan Created: {fitness_plan_output.duration_weeks}-week plan",
+                        plan_id=fitness_plan.id,
+                    )
 
             except Exception as save_error:
                 # Log the error but don't fail the entire operation
