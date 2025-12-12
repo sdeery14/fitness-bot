@@ -12,15 +12,8 @@
 
 import { useRouter } from 'next/navigation';
 import { ScheduleCalendar } from '@/components/fitness/schedule-calendar';
-import { DailySchedule } from '@/components/fitness/daily-schedule';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft } from 'lucide-react';
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from '@/components/ui/tabs';
 
 export default function SchedulePage() {
   const router = useRouter();
@@ -43,21 +36,8 @@ export default function SchedulePage() {
         </p>
       </div>
 
-      {/* Tabs */}
-      <Tabs defaultValue="calendar" className="space-y-6">
-        <TabsList>
-          <TabsTrigger value="calendar">Calendar View</TabsTrigger>
-          <TabsTrigger value="today">Today</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="calendar" className="space-y-6">
-          <ScheduleCalendar />
-        </TabsContent>
-
-        <TabsContent value="today">
-          <DailySchedule />
-        </TabsContent>
-      </Tabs>
+      {/* Calendar View */}
+      <ScheduleCalendar />
     </div>
   );
 }

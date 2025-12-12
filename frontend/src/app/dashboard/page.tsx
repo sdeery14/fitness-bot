@@ -12,7 +12,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { DailySchedule } from '@/components/fitness/daily-schedule';
+import { TodaySchedule } from '@/components/fitness/today-schedule';
 import { ProgressChart } from '@/components/fitness/progress-chart';
 import { DisruptionReportDialog } from '@/components/fitness/disruption-report-dialog';
 import { Card, CardContent } from '@/components/ui/card';
@@ -108,7 +108,7 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* Today's Schedule */}
         <div>
-          <DailySchedule />
+          <TodaySchedule />
         </div>
 
         {/* Progress Overview */}
