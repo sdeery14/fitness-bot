@@ -524,11 +524,24 @@ class PlanService:
                         meal_fat = sum(food.get("fat_g", 0) for food in foods)
                         meal_calories = meal_data.get("total_calories", 0)
                         
+                        # Convert foods to ingredients format for frontend
+                        ingredients = []
+                        for food in foods:
+                            ingredients.append({
+                                "name": food.get("name", "Unknown"),
+                                "quantity": food.get("portion", "1 serving").split()[0],  # Extract number
+                                "unit": " ".join(food.get("portion", "1 serving").split()[1:]) or "serving",  # Extract unit
+                                "calories": food.get("calories", 0),
+                                "protein_grams": food.get("protein_g", 0),
+                                "carbs_grams": food.get("carbs_g", 0),
+                                "fats_grams": food.get("fat_g", 0),
+                            })
+                        
                         meal = Meal(
                             meal_plan_id=meal_plan.id,
                             phase_id=phase.id,
                             name=meal_data.get("meal_name", "Meal"),
-                            meal_type=meal_data.get("meal_name", "Meal").lower(),
+                            meal_type=meal_data.get("meal_name", "Meal").lower().split()[0] if meal_data.get("meal_name") else "meal",  # Extract first word (breakfast, lunch, etc.)
                             day_of_week=day_idx + 1,  # 1-7 for each sample day
                             calories=meal_calories,
                             protein_grams=meal_protein,
@@ -536,8 +549,11 @@ class PlanService:
                             fats_grams=meal_fat,
                             fiber_grams=0,  # Not provided in current schema
                             meal_details={
-                                "time": meal_data.get("time", ""),
-                                "foods": foods,
+                                "ingredients": ingredients,
+                                "instructions": [],  # Instructions not provided in current schema
+                                "prep_time_minutes": 0,  # Not provided in current schema
+                                "cook_time_minutes": 0,  # Not provided in current schema
+                                "servings": 1,
                                 "notes": meal_data.get("notes", ""),
                             },
                         )
