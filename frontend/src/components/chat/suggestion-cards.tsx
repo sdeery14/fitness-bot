@@ -31,6 +31,10 @@ My situation:
 - Time per workout: 45-60 minutes
 - Dietary restrictions: None, but I prefer balanced meals
 - Schedule: I prefer working out Monday, Wednesday, Friday, and optionally Saturday. I like morning workouts (6-8 AM) and always rest on Sundays.
+- Grocery shopping: Once per week on Sunday mornings
+- Meal prep: Batch prep twice weekly (Sunday and Wednesday evenings) for 2 hours each session
+- Cooking skill: Intermediate
+- Storage: I have meal prep containers and good fridge space
 - Health notes: No injuries or conditions to consider
 
 Please create a balanced fitness plan that helps me build healthy habits!`,
@@ -54,6 +58,10 @@ My situation:
 - Time per workout: 60-90 minutes
 - Dietary restrictions: None, focusing on high-protein diet
 - Schedule: I prefer a rolling 5-day training cycle (Day 1-5, then repeat) with one rest day after each cycle. I prefer afternoon/evening workouts (4-7 PM). I have a competition coming up in 12 weeks.
+- Grocery shopping: Twice weekly (Sunday and Wednesday) to keep food fresh for high performance
+- Meal prep: Large batch prep every 3 days (Sunday, Wednesday, Saturday) for 2-3 hours to support training volume
+- Cooking skill: Intermediate to advanced
+- Storage: Large fridge and freezer with extensive meal prep containers
 - Health notes: No current injuries, experienced with compound lifts
 
 Please create a comprehensive performance-focused plan!`,
@@ -77,6 +85,10 @@ My situation:
 - Time per workout: 30-45 minutes
 - Dietary restrictions: Anti-inflammatory diet preferred
 - Schedule: Flexible schedule, prefer Monday/Wednesday/Friday with longer rest periods. Morning workouts (7-9 AM) work best. Need to avoid any workout on physical therapy days (Tuesdays and Thursdays).
+- Grocery shopping: Weekly on Saturdays to minimize trips during recovery
+- Meal prep: Simple batch prep once per week (Saturday afternoons) for 1-2 hours - need easy, anti-inflammatory meals
+- Cooking skill: Intermediate, but prefer simple recipes during recovery
+- Storage: Good storage capacity with meal prep containers
 - Health notes: Recovering from lower back strain - need to avoid heavy spinal loading, focus on core stability and proper movement patterns
 
 Please create a safe, progressive recovery-focused plan!`,

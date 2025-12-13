@@ -304,6 +304,8 @@ $userEmail = "dev@example.com"
 # Clear fitness plans, schedules, and conversation history (keeps account)
 docker-compose -f docker/docker-compose.yml exec -T postgres psql -U fitness_user -d fitness_bot -c "
 DELETE FROM schedule_entries WHERE schedule_id IN (SELECT id FROM schedules WHERE user_id = (SELECT id FROM users WHERE email = '$userEmail'));
+DELETE FROM grocery_shopping_trips WHERE id IN (SELECT DISTINCT grocery_trip_id FROM schedule_entries WHERE grocery_trip_id IS NOT NULL AND schedule_id IN (SELECT id FROM schedules WHERE user_id = (SELECT id FROM users WHERE email = '$userEmail')));
+DELETE FROM meal_prep_sessions WHERE id IN (SELECT DISTINCT meal_prep_session_id FROM schedule_entries WHERE meal_prep_session_id IS NOT NULL AND schedule_id IN (SELECT id FROM schedules WHERE user_id = (SELECT id FROM users WHERE email = '$userEmail')));
 DELETE FROM schedules WHERE user_id = (SELECT id FROM users WHERE email = '$userEmail');
 DELETE FROM workouts WHERE workout_plan_id IN (SELECT id FROM workout_plans WHERE fitness_plan_id IN (SELECT id FROM fitness_plans WHERE user_id = (SELECT id FROM users WHERE email = '$userEmail')));
 DELETE FROM workout_plans WHERE fitness_plan_id IN (SELECT id FROM fitness_plans WHERE user_id = (SELECT id FROM users WHERE email = '$userEmail'));

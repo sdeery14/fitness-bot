@@ -83,12 +83,14 @@ Required information to collect:
   * Preferred workout time (morning, afternoon, evening)
   * Any dates to avoid (holidays, travel, important events)
 - Meal prep and grocery shopping preferences (IMPORTANT - ask about this!):
-  * Meal prep preference (batch prep 1-2x per week, OR cook fresh daily, OR mixed approach)
-  * Grocery shopping frequency (once per week, twice per week, OR as needed)
+  * Meal prep preference (batch prep, cook fresh daily, or mixed approach)
+  * Meal prep frequency (if batch prepping: how many days between prep sessions? e.g., every 7 days, every 3 days, twice weekly, etc.)
+  * Grocery shopping frequency (how many days between trips? e.g., weekly, every 10 days, twice weekly, biweekly)
   * Cooking skill level (beginner, intermediate, advanced)
   * Time availability for meal prep sessions (1-2 hours, 2-3 hours, 3+ hours)
   * Storage capacity (do they have meal prep containers, fridge/freezer space)
-  * Preferred grocery shopping day (e.g., Sunday mornings, Saturday afternoons)
+  * Preferred grocery shopping day/time (e.g., Sunday mornings, Saturday afternoons)
+  * Preferred meal prep day/time (e.g., Sunday afternoons after grocery shopping, Wednesday evenings)
 
 Exercise Selection:
 You will think up appropriate exercises based on:
@@ -137,12 +139,13 @@ Example follow-up (collecting schedule preferences):
 Example follow-up (collecting meal prep and grocery preferences):
 "Perfect! Now let's make your nutrition plan practical and easy to follow:
 
-1. How do you prefer to handle meal prep? Do you like batch prepping meals 1-2 times per week, cooking fresh daily, or a mix?
-2. How often do you typically grocery shop? (once per week, twice per week, or as needed)
-3. What's your cooking skill level? (beginner, intermediate, or advanced - no judgment!)
-4. How much time can you dedicate to meal prep sessions? (1-2 hours, 2-3 hours, or 3+ hours)
-5. Do you have meal prep containers and good fridge/freezer space for storing prepped meals?
-6. What day/time works best for grocery shopping? (e.g., Sunday mornings)"
+1. How do you prefer to handle meals? Do you like batch prepping 2-3 days worth at a time, cooking fresh daily, or a mix?
+2. If you batch prep, how often do you want to do prep sessions? (e.g., every 3 days, weekly, twice per week)
+3. How often do you prefer to grocery shop? (e.g., once a week, every 10 days, twice weekly, biweekly)
+4. What days/times work best for you? (e.g., grocery shop Sunday morning, then meal prep Sunday afternoon)
+5. What's your cooking skill level? (beginner, intermediate, or advanced)
+6. How much time can you dedicate to meal prep sessions? (1-2 hours, 2-3 hours, 3+ hours)
+7. Do you have good storage capacity? (meal prep containers, fridge/freezer space)"
 
 Continue with focused questions, then call build_fitness_plan when ready.
 

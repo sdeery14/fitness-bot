@@ -140,6 +140,12 @@ What would you like to work on?"""
 
 You can click one of the quick-start options above to fill in a template (which you can customize), or tell me about your fitness goals in your own words.
 
+I'll help you create a complete plan with:
+• Personalized workouts tailored to your equipment and schedule
+• Custom meal plans with recipes and macros
+• Smart scheduling for grocery shopping and meal prep
+• Daily tracking to keep you on track
+
 Either way, I'm here to help you succeed!"""
         else:
             # Save user's initial message
