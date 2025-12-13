@@ -26,7 +26,7 @@ class FitnessPlan(Base, UUIDMixin, TimestampMixin):
     start_date = Column(DateTime(timezone=True), nullable=False)
     end_date = Column(DateTime(timezone=True), nullable=False)
     status = Column(
-        Enum("draft", "active", "paused", "completed", "abandoned", name="plan_status"),
+        Enum("draft", "active", "paused", "completed", "abandoned", "replaced", name="plan_status"),
         nullable=False,
         default="draft",
     )
@@ -34,8 +34,14 @@ class FitnessPlan(Base, UUIDMixin, TimestampMixin):
     # AI-generated plan snapshot (FR-009, FR-010)
     plan_snapshot = Column(JSON, nullable=False)  # Complete plan structure for reference
 
+    # Plan versioning - track modifications and evolution
+    parent_plan_id = Column(PGUUID(as_uuid=True), ForeignKey("fitness_plans.id", ondelete="SET NULL"), nullable=True, index=True)
+    version = Column(Integer, nullable=False, default=1)  # Version number within the plan family
+    version_notes = Column(Text, nullable=True)  # Description of what changed in this version
+
     # Relationships
     user = relationship("User", back_populates="fitness_plans")
+    parent_plan = relationship("FitnessPlan", remote_side="FitnessPlan.id", backref="child_plans")
     phases = relationship("Phase", back_populates="fitness_plan", cascade="all, delete-orphan", order_by="Phase.phase_number")
     workout_plans = relationship("WorkoutPlan", back_populates="fitness_plan", cascade="all, delete-orphan")
     meal_plans = relationship("MealPlan", back_populates="fitness_plan", cascade="all, delete-orphan")

@@ -309,44 +309,6 @@ User Message: {initial_message}"""
             # Build context-aware input with datetime information
             contextual_message = f"""Current Date and Time: {current_dt.strftime('%A, %B %d, %Y at %I:%M %p')} ({user_timezone})
 User Message: {user_message}"""
-
-            # For users with existing plans (fitness coach agent), include their active plan
-            if has_plans:
-                active_plan = await self.plan_service.get_active_plan(user.id)
-                if active_plan and active_plan.plan_snapshot:
-                    import json
-                    # Format the plan data nicely for the agent
-                    plan_data = {
-                        "plan_id": str(active_plan.id),
-                        "goal": active_plan.goal_description,
-                        "duration_weeks": active_plan.duration_weeks,
-                        "start_date": active_plan.start_date.isoformat() if active_plan.start_date else None,
-                        "end_date": active_plan.end_date.isoformat() if active_plan.end_date else None,
-                        "status": active_plan.status,
-                    }
-                    
-                    # Add workout plan details if available
-                    if "workout_plan" in active_plan.plan_snapshot:
-                        plan_data["workout_plan"] = active_plan.plan_snapshot["workout_plan"]
-                    
-                    # Add meal plan details if available
-                    if "meal_plan" in active_plan.plan_snapshot:
-                        plan_data["meal_plan"] = active_plan.plan_snapshot["meal_plan"]
-                    
-                    # Add phases if available
-                    if "phases" in active_plan.plan_snapshot:
-                        plan_data["phases"] = active_plan.plan_snapshot["phases"]
-                    
-                    # Add key principles if available
-                    if "key_principles" in active_plan.plan_snapshot:
-                        plan_data["key_principles"] = active_plan.plan_snapshot["key_principles"]
-                    
-                    contextual_message = f"""Current Date and Time: {current_dt.strftime('%A, %B %d, %Y at %I:%M %p')} ({user_timezone})
-
-Active Fitness Plan:
-{json.dumps(plan_data, indent=2)}
-
-User Message: {user_message}"""
             
             # Append contextual user message to conversation history
             conversation_input = conversation_history + [{"role": "user", "content": contextual_message}]

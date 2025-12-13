@@ -147,6 +147,62 @@ class PlanService:
         result = await self.db.execute(stmt)
         return result.scalar_one_or_none()
 
+    async def create_plan_version(
+        self,
+        parent_plan_id: UUID,
+        version_notes: str | None = None,
+    ) -> FitnessPlan:
+        """Create a new version of an existing fitness plan.
+
+        This creates a copy of the parent plan with:
+        - Incremented version number
+        - parent_plan_id pointing to the original
+        - 'active' status (parent plan will be marked 'replaced')
+        - Same plan_snapshot (to be modified by caller)
+
+        Args:
+            parent_plan_id: UUID of the plan to create a version from
+            version_notes: Optional description of what changed
+
+        Returns:
+            New plan instance
+
+        Raises:
+            ValueError: If parent plan not found
+        """
+        # Get parent plan
+        parent_plan = await self.get_plan(parent_plan_id)
+        if not parent_plan:
+            raise ValueError(f"Parent plan not found: {parent_plan_id}")
+
+        # Create new plan as a copy
+        new_plan = FitnessPlan(
+            user_id=parent_plan.user_id,
+            goal_type=parent_plan.goal_type,
+            goal_description=parent_plan.goal_description,
+            target_weight_kg=parent_plan.target_weight_kg,
+            target_date=parent_plan.target_date,
+            duration_weeks=parent_plan.duration_weeks,
+            start_date=parent_plan.start_date,
+            end_date=parent_plan.end_date,
+            status="active",
+            plan_snapshot=parent_plan.plan_snapshot.copy() if parent_plan.plan_snapshot else {},
+            parent_plan_id=parent_plan_id,
+            version=parent_plan.version + 1,
+            version_notes=version_notes,
+        )
+
+        # Mark parent plan as replaced
+        parent_plan.status = "replaced"
+
+        # Save both plans
+        self.db.add(new_plan)
+        await self.db.commit()
+        await self.db.refresh(new_plan)
+        await self.db.refresh(parent_plan)
+
+        return new_plan
+
     async def update_plan_status(
         self,
         plan_id: UUID,
