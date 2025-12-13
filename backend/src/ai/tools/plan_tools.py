@@ -311,11 +311,15 @@ Generate the specific workout cycle, intensity guidance, volume notes, and progr
             workout_details = workout_details_result.final_output
 
             # Build phase-specific meal details
+            # Calculate day of week for phase start to help with scheduling
+            phase_start_day = phase_start.strftime('%A')  # e.g., 'Monday', 'Tuesday'
+            
             meal_phase_prompt = f"""Generate meal details for this phase:
 
 Phase Context:
 - Phase {phase_num} of {num_phases}: {phase_name}
 - Duration: {phase_weeks} weeks ({phase_start.isoformat()} to {phase_end.isoformat()})
+- Phase Starts On: {phase_start_day}, {phase_start.isoformat()}
 - Objectives: {', '.join(phase_objectives)}
 
 Overall Meal Plan:

@@ -43,6 +43,8 @@ You are NOT generating a full nutrition plan. You are generating ONE PHASE of a 
 - phase_name: Name of this phase (e.g., "Foundation Phase", "Building Phase")
 - phase_objectives: What this phase aims to achieve
 - phase_duration_weeks: How long this phase lasts
+- phase_start_date: ISO date when phase starts (e.g., '2025-12-15')
+- phase_start_day: Day of week phase starts (e.g., 'Monday', 'Tuesday')
 - dietary_restrictions: User's dietary needs
 - meal_frequency: Preferred meals per day
 
@@ -107,17 +109,19 @@ You MUST also generate practical meal prep information with EXPLICIT SCHEDULES:
 2. **grocery_shopping_schedule**: EXPLICIT schedule entries (not just a frequency string!)
    - Create list of GroceryShoppingScheduleEntry objects
    - Each entry specifies WHEN to shop using day_offset (days from plan start)
+   - **CRITICAL**: You receive phase_start_day (e.g., 'Monday') - use this to calculate day_offset correctly
    - Set repeats_every (days) to create repeating pattern, or None for one-time
+   - **day_offset Calculation**: Count forward from phase_start_day to reach target day
+     * Phase starts Monday, user wants Sunday: Sunday is 6 days after Monday → day_offset: 6
+     * Phase starts Wednesday, user wants Sunday: Sunday is 4 days after Wed → day_offset: 4
+     * Phase starts Sunday, user wants Sunday: Same day → day_offset: 0
+     * Phase starts Friday, user wants Wednesday: Wed is 5 days after Fri (Fri→Sat→Sun→Mon→Tue→Wed) → day_offset: 5
    - Examples:
-     * Weekly on Sundays: [{"day_offset": 6, "time": "10:00 AM", "repeats_every": 7}]
+     * Weekly on Sundays (phase starts Monday): [{"day_offset": 6, "time": "10:00 AM", "repeats_every": 7}]
      * Every 15 days: [{"day_offset": 0, "time": "10:00 AM", "repeats_every": 15}]
-     * Twice weekly (Sun/Wed): [
-         {"day_offset": 0, "time": "10:00 AM", "repeats_every": 7},
-         {"day_offset": 3, "time": "6:00 PM", "repeats_every": 7}
-       ]
-     * Twice monthly (1st and 15th): [
-         {"day_offset": 0, "time": "10:00 AM", "repeats_every": 30},
-         {"day_offset": 14, "time": "10:00 AM", "repeats_every": 30}
+     * Twice weekly (Sun/Wed, phase starts Monday): [
+         {"day_offset": 6, "time": "10:00 AM", "repeats_every": 7},
+         {"day_offset": 2, "time": "6:00 PM", "repeats_every": 7}
        ]
    - Support ANY frequency: weekly (7), biweekly (14), every 10 days (10), monthly (30)
    - Add helpful notes to each entry (e.g., "Big weekly shop - bring cooler bags")
@@ -144,17 +148,23 @@ You MUST also generate practical meal prep information with EXPLICIT SCHEDULES:
 4. **meal_prep_schedule**: EXPLICIT schedule entries (not just a preference string!)
    - Create list of MealPrepScheduleEntry objects
    - Each entry specifies WHEN to do a prep session using day_offset
+   - **CRITICAL**: Use the same day_offset calculation as grocery shopping (based on phase_start_day)
    - Reference which session template to use via session_index (index into meal_prep_sessions)
    - Set repeats_every to create repeating pattern, or None for one-time
+   - **day_offset Calculation** (same as grocery shopping):
+     * Phase starts Monday, user wants Sunday prep: Sunday is 6 days after Monday → day_offset: 6
+     * Phase starts Wednesday, user wants Sunday prep: Sunday is 4 days after Wed → day_offset: 4
+     * Phase starts Thursday, user wants Wednesday prep: Wed is 6 days after Thu (Thu→Fri→Sat→Sun→Mon→Tue→Wed) → day_offset: 6
    - Examples:
-     * Weekly Sunday prep: [{"day_offset": 6, "time": "2:00 PM", "session_index": 0, "repeats_every": 7}]
-     * Twice weekly (Sun/Wed): [
-         {"day_offset": 0, "time": "2:00 PM", "session_index": 0, "repeats_every": 7, "notes": "Big batch prep"},
-         {"day_offset": 3, "time": "6:00 PM", "session_index": 1, "repeats_every": 7, "notes": "Quick refresh"}
+     * Weekly Sunday prep (phase starts Monday): [{"day_offset": 6, "time": "2:00 PM", "session_index": 0, "repeats_every": 7}]
+     * Twice weekly (Sun/Wed, phase starts Monday): [
+         {"day_offset": 6, "time": "2:00 PM", "session_index": 0, "repeats_every": 7, "notes": "Big batch prep"},
+         {"day_offset": 2, "time": "6:00 PM", "session_index": 1, "repeats_every": 7, "notes": "Quick refresh"}
        ]
      * Every 10 days: [{"day_offset": 0, "time": "1:00 PM", "session_index": 0, "repeats_every": 10}]
    - Support ANY frequency pattern based on user's lifestyle
-   - Align with grocery_shopping_schedule (prep 1-2 days after shopping)
+   - **Typical pattern**: User shops first, then preps same day or next day
+   - If "grocery shop Sunday morning, meal prep Sunday afternoon": Both use same day_offset, different times
 
 5. **Individual meal prep_type**: For each meal in sample_days
    - 'batch_prepped': Cooked in meal prep session, reheated

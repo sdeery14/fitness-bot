@@ -278,12 +278,16 @@ class GroceryShoppingScheduleEntry(BaseModel):
     
     Uses day_offset from plan start to position events, and repeats_every for frequency.
     This allows any pattern: weekly (7), biweekly (14), every 15 days, irregular, etc.
+    
+    CRITICAL: day_offset is calculated from phase start day. Count forward from the phase start day of week
+    to reach the target day. Example: Phase starts Monday (day 0), Sunday shopping = day_offset 6.
+    Phase starts Wednesday, Sunday shopping = day_offset 4 (Wed→Thu→Fri→Sat→Sun).
     """
 
     model_config = {"extra": "forbid"}
 
     day_offset: int = Field(
-        description="Day offset from plan start (0 = start date, 7 = one week after, 15 = 15 days after, etc.)",
+        description="Days from phase start to first occurrence. Count forward from phase start day-of-week to target day. Example: Start Monday, want Sunday = 6. Start Wednesday, want Sunday = 4.",
         ge=0
     )
     time: str = Field(description="Time for shopping (e.g., '10:00 AM', '14:30', '6:00 PM')")
@@ -322,12 +326,16 @@ class MealPrepScheduleEntry(BaseModel):
     
     Uses day_offset from plan start to position events, and repeats_every for frequency.
     This allows any pattern: weekly (7), every 10 days, twice monthly, irregular, etc.
+    
+    CRITICAL: day_offset uses same calculation as grocery shopping. Count forward from phase start day-of-week
+    to reach target day. Example: Phase starts Monday, Sunday prep = day_offset 6. Phase starts Friday,
+    Wednesday prep = day_offset 5 (Fri→Sat→Sun→Mon→Tue→Wed).
     """
 
     model_config = {"extra": "forbid"}
 
     day_offset: int = Field(
-        description="Day offset from plan start (0 = start date, 2 = 2 days after, 6 = 6 days after for Sunday if starting Monday, etc.)",
+        description="Days from phase start to first occurrence. Count forward from phase start day-of-week to target day. Same calculation as grocery shopping.",
         ge=0
     )
     time: str = Field(description="Start time (e.g., '14:00', '2:00 PM', '7:30 PM')")
