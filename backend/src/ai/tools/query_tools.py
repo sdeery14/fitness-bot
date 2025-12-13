@@ -78,28 +78,8 @@ def _get_mcp_server() -> MCPServerStdio:
     return _mcp_server
 
 
-@function_tool
-async def query_database(description: str) -> str:
-    """Query the exercise database using natural language description.
-
-    This tool accepts a plain text description of what data is needed
-    and uses the MCP query agent to translate it to SQL and execute it
-    via the postgres-mcp server.
-
-    The query agent can handle:
-    - Simple filters (muscle groups, equipment, difficulty)
-    - Complex queries with multiple conditions
-    - Semantic/vector searches (with embeddings)
-    - Workout retrieval by ID
-    - Exercise similarity searches
-
-    Examples:
-    - "Find all exercises that target chest muscles with dumbbells"
-    - "Get beginner-friendly leg exercises"
-    - "Search for exercises similar to squats"
-    - "Find exercises for shoulder mobility"
-    - "Get exercises targeting back and biceps"
-    - "Retrieve workout with ID <uuid>"
+async def _execute_database_query(description: str) -> str:
+    """Internal helper to execute database queries via query agent.
 
     Args:
         description: Natural language description of the database query
@@ -143,6 +123,38 @@ Return the results in JSON format."""
             "error": f"Failed to query database: {str(e)}",
             "description": description
         })
+
+
+@function_tool
+async def query_database(description: str) -> str:
+    """Query the exercise database using natural language description.
+
+    This tool accepts a plain text description of what data is needed
+    and uses the MCP query agent to translate it to SQL and execute it
+    via the postgres-mcp server.
+
+    The query agent can handle:
+    - Simple filters (muscle groups, equipment, difficulty)
+    - Complex queries with multiple conditions
+    - Semantic/vector searches (with embeddings)
+    - Workout retrieval by ID
+    - Exercise similarity searches
+
+    Examples:
+    - "Find all exercises that target chest muscles with dumbbells"
+    - "Get beginner-friendly leg exercises"
+    - "Search for exercises similar to squats"
+    - "Find exercises for shoulder mobility"
+    - "Get exercises targeting back and biceps"
+    - "Retrieve workout with ID <uuid>"
+
+    Args:
+        description: Natural language description of the database query
+
+    Returns:
+        JSON string with query results or error message
+    """
+    return await _execute_database_query(description)
 
 
 @function_tool
@@ -196,8 +208,8 @@ Also check the phases, workout_plans, and meal_plans tables for structured data.
 
 Return a concise answer to the user's question with relevant details."""
 
-        # Use the existing query_database tool
-        result = await query_database(db_query)
+        # Execute the database query using the internal helper
+        result = await _execute_database_query(db_query)
         return result
 
     except Exception as e:
