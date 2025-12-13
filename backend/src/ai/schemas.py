@@ -148,6 +148,18 @@ class Meal(BaseModel):
     foods: list[MealItem] = Field(description="List of foods in this meal")
     total_calories: int = Field(description="Total meal calories", ge=0)
     notes: str | None = Field(default=None, description="Preparation tips or alternatives")
+    prep_type: str | None = Field(
+        default="quick_assembly", 
+        description="Meal preparation type: 'batch_prepped' (cooked in advance), 'fresh_cook' (cook day-of), or 'quick_assembly' (no cooking needed)"
+    )
+    prep_instructions: str | None = Field(
+        default=None,
+        description="Day-of cooking or assembly instructions if needed (for fresh_cook or quick_assembly meals)"
+    )
+    storage_notes: str | None = Field(
+        default=None,
+        description="How to store if batch-prepped (e.g., 'Store in airtight containers, refrigerate up to 4 days, reheat at 350°F for 10 min')"
+    )
 
 
 class DailyMealPlan(BaseModel):
@@ -248,6 +260,91 @@ class PhaseWorkoutDetails(BaseModel):
     )
 
 
+class GroceryItem(BaseModel):
+    """A single item to purchase at the grocery store."""
+
+    model_config = {"extra": "forbid"}
+
+    ingredient: str = Field(description="Ingredient name (e.g., 'Chicken breast', 'Brown rice')")
+    quantity: str = Field(description="Amount to buy (e.g., '2 lbs', '1 bag', '500g')")
+    category: str = Field(
+        description="Store category for organization: 'Produce', 'Meat', 'Dairy', 'Grains', 'Frozen', 'Pantry', 'Other'"
+    )
+    notes: str | None = Field(default=None, description="Shopping notes (e.g., 'boneless, skinless', 'organic preferred')")
+
+
+class GroceryShoppingScheduleEntry(BaseModel):
+    """A single grocery shopping event in the plan.
+    
+    Uses day_offset from plan start to position events, and repeats_every for frequency.
+    This allows any pattern: weekly (7), biweekly (14), every 15 days, irregular, etc.
+    """
+
+    model_config = {"extra": "forbid"}
+
+    day_offset: int = Field(
+        description="Day offset from plan start (0 = start date, 7 = one week after, 15 = 15 days after, etc.)",
+        ge=0
+    )
+    time: str = Field(description="Time for shopping (e.g., '10:00 AM', '14:30', '6:00 PM')")
+    duration_minutes: int = Field(description="Estimated shopping time in minutes", ge=15, le=180)
+    notes: str | None = Field(
+        default=None,
+        description="Shopping context (e.g., 'Big monthly shop', 'Quick produce run', 'Post-payday stock-up')"
+    )
+    repeats_every: int | None = Field(
+        default=None,
+        description="If this event repeats, how many days between occurrences (e.g., 7 for weekly, 14 for biweekly, 15 for every 15 days, None for one-time event)"
+    )
+
+
+class MealPrepSession(BaseModel):
+    """A batch meal prep session with cooking instructions."""
+
+    model_config = {"extra": "forbid"}
+
+    session_name: str = Field(description="Prep session name (e.g., 'Sunday Meal Prep', 'Wednesday Batch Cooking')")
+    duration_minutes: int = Field(description="Estimated prep time in minutes", ge=30, le=240)
+    recipes: list[str] = Field(
+        description="Meals being prepped in this session (e.g., ['Grilled Chicken', 'Brown Rice', 'Roasted Vegetables'])"
+    )
+    batch_size: int = Field(description="Number of servings to prepare", ge=1, le=14)
+    instructions: list[str] = Field(
+        description="Step-by-step batch cooking instructions (e.g., '1. Preheat oven to 400°F', '2. Season chicken breasts')"
+    )
+    storage_instructions: str = Field(
+        description="How to store prepped food (e.g., 'Divide into 4 containers, refrigerate, use within 4 days')"
+    )
+
+
+class MealPrepScheduleEntry(BaseModel):
+    """A single meal prep session in the plan.
+    
+    Uses day_offset from plan start to position events, and repeats_every for frequency.
+    This allows any pattern: weekly (7), every 10 days, twice monthly, irregular, etc.
+    """
+
+    model_config = {"extra": "forbid"}
+
+    day_offset: int = Field(
+        description="Day offset from plan start (0 = start date, 2 = 2 days after, 6 = 6 days after for Sunday if starting Monday, etc.)",
+        ge=0
+    )
+    time: str = Field(description="Start time (e.g., '14:00', '2:00 PM', '7:30 PM')")
+    session_index: int = Field(
+        description="Which prep session to execute (index into meal_prep_sessions list)",
+        ge=0
+    )
+    repeats_every: int | None = Field(
+        default=None,
+        description="Days between repetitions (7 for weekly, 10 for every 10 days, 14 for biweekly, None for one-time event)"
+    )
+    notes: str | None = Field(
+        default=None,
+        description="Context (e.g., 'Main weekly prep', 'Phase 1 bulk prep', 'Recovery week light prep', 'Mid-week refresh')"
+    )
+
+
 class PhaseMealDetails(BaseModel):
     """Phase-specific nutrition implementation details."""
 
@@ -264,6 +361,32 @@ class PhaseMealDetails(BaseModel):
     )
     phase_nutrition_focus: str = Field(
         description="Nutrition focus for this phase (e.g., 'Metabolic adaptation', 'Muscle building', 'Performance peak', 'Fat loss')"
+    )
+    grocery_list: list[GroceryItem] = Field(
+        default_factory=list,
+        description="Complete grocery list for one shopping cycle"
+    )
+    meal_prep_sessions: list[MealPrepSession] = Field(
+        default_factory=list,
+        description="Batch meal prep sessions with cooking instructions and storage guidance"
+    )
+    grocery_shopping_schedule: list[GroceryShoppingScheduleEntry] = Field(
+        default_factory=list,
+        description=(
+            "Explicit grocery shopping schedule with day offsets and repeat patterns. "
+            "Examples: Weekly Sunday = [{day_offset: 6, time: '10:00 AM', repeats_every: 7}], "
+            "Every 15 days = [{day_offset: 0, time: '2:00 PM', repeats_every: 15}], "
+            "Twice monthly = [{day_offset: 0, repeats_every: 30}, {day_offset: 14, repeats_every: 30}]"
+        )
+    )
+    meal_prep_schedule: list[MealPrepScheduleEntry] = Field(
+        default_factory=list,
+        description=(
+            "Explicit meal prep schedule with day offsets and repeat patterns. "
+            "Examples: Weekly Sunday = [{day_offset: 6, time: '14:00', session_index: 0, repeats_every: 7}], "
+            "Every 10 days = [{day_offset: 2, time: '14:00', session_index: 0, repeats_every: 10}], "
+            "Twice weekly = [{day_offset: 0, repeats_every: 7}, {day_offset: 3, repeats_every: 7}]"
+        )
     )
 
 

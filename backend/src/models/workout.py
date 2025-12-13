@@ -77,10 +77,10 @@ class Exercise(Base, UUIDMixin, TimestampMixin):
 
     # Exercise prescription (FR-022, FR-023)
     sets = Column(Integer, nullable=True)  # Null for cardio/time-based exercises
-    reps = Column(String(50), nullable=True)  # "8-12", "15", "AMRAP", null for time-based
+    reps = Column(String(200), nullable=True)  # "8-12", "15", "AMRAP", null for time-based (increased for AI-generated descriptions)
     duration_seconds = Column(Integer, nullable=True)  # For cardio/timed exercises
     rest_seconds = Column(Integer, nullable=False)  # Rest between sets
-    tempo = Column(String(50), nullable=True)  # "3-1-3-1" (eccentric-pause-concentric-pause)
+    tempo = Column(String(200), nullable=True)  # "3-1-3-1" (eccentric-pause-concentric-pause) (increased for AI-generated descriptions)
     rpe_target = Column(Integer, nullable=True)  # Rate of Perceived Exertion 1-10
 
     # Exercise instructions and alternatives (FR-050, FR-051)

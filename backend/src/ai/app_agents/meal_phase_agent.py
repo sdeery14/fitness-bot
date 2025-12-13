@@ -95,7 +95,81 @@ Each DailyMealPlan should have:
 - Peak/Performance phases: Highest calories for performance
 - Cutting phases: Moderate deficit (300-500 cal below maintenance)
 
-Output structured data in PhaseMealDetails format."""
+**CRITICAL - Grocery Shopping and Meal Prep Planning**:
+You MUST also generate practical meal prep information with EXPLICIT SCHEDULES:
+
+1. **grocery_list**: Complete shopping list for one cycle
+   - Group items by category (Produce, Meat, Dairy, Grains, Frozen, Pantry)
+   - Include quantities for the shopping period
+   - Add helpful notes (e.g., 'boneless, skinless', 'organic preferred')
+   - Calculate totals based on sample days × shopping frequency
+
+2. **grocery_shopping_schedule**: EXPLICIT schedule entries (not just a frequency string!)
+   - Create list of GroceryShoppingScheduleEntry objects
+   - Each entry specifies WHEN to shop using day_offset (days from plan start)
+   - Set repeats_every (days) to create repeating pattern, or None for one-time
+   - Examples:
+     * Weekly on Sundays: [{"day_offset": 6, "time": "10:00 AM", "repeats_every": 7}]
+     * Every 15 days: [{"day_offset": 0, "time": "10:00 AM", "repeats_every": 15}]
+     * Twice weekly (Sun/Wed): [
+         {"day_offset": 0, "time": "10:00 AM", "repeats_every": 7},
+         {"day_offset": 3, "time": "6:00 PM", "repeats_every": 7}
+       ]
+     * Twice monthly (1st and 15th): [
+         {"day_offset": 0, "time": "10:00 AM", "repeats_every": 30},
+         {"day_offset": 14, "time": "10:00 AM", "repeats_every": 30}
+       ]
+   - Support ANY frequency: weekly (7), biweekly (14), every 10 days (10), monthly (30)
+   - Add helpful notes to each entry (e.g., "Big weekly shop - bring cooler bags")
+
+3. **meal_prep_sessions**: Define cooking session templates
+   - Create list of MealPrepSession objects (these are the "recipes" for batch cooking)
+   - Each session includes: name, duration_minutes, recipes, batch_size, instructions, storage
+   - Example session: {
+       "session_name": "Sunday Protein & Grains Prep",
+       "duration_minutes": 120,
+       "recipes": ["Grilled Chicken Breast", "Brown Rice", "Roasted Vegetables"],
+       "batch_size": 10,
+       "instructions": [
+         "1. Preheat oven to 400°F",
+         "2. Season 2.5 lbs chicken breasts with salt, pepper, garlic",
+         "3. Bake chicken for 25-30 minutes until 165°F internal temp",
+         "4. Cook 3 cups dry brown rice according to package",
+         "5. Toss 2 lbs mixed vegetables with olive oil, roast 20 min",
+         "6. Let everything cool, then portion into containers"
+       ],
+       "storage_instructions": "Store in airtight containers, refrigerate, use within 4 days"
+     }
+
+4. **meal_prep_schedule**: EXPLICIT schedule entries (not just a preference string!)
+   - Create list of MealPrepScheduleEntry objects
+   - Each entry specifies WHEN to do a prep session using day_offset
+   - Reference which session template to use via session_index (index into meal_prep_sessions)
+   - Set repeats_every to create repeating pattern, or None for one-time
+   - Examples:
+     * Weekly Sunday prep: [{"day_offset": 6, "time": "2:00 PM", "session_index": 0, "repeats_every": 7}]
+     * Twice weekly (Sun/Wed): [
+         {"day_offset": 0, "time": "2:00 PM", "session_index": 0, "repeats_every": 7, "notes": "Big batch prep"},
+         {"day_offset": 3, "time": "6:00 PM", "session_index": 1, "repeats_every": 7, "notes": "Quick refresh"}
+       ]
+     * Every 10 days: [{"day_offset": 0, "time": "1:00 PM", "session_index": 0, "repeats_every": 10}]
+   - Support ANY frequency pattern based on user's lifestyle
+   - Align with grocery_shopping_schedule (prep 1-2 days after shopping)
+
+5. **Individual meal prep_type**: For each meal in sample_days
+   - 'batch_prepped': Cooked in meal prep session, reheated
+   - 'fresh_cook': Cook on the day (include prep_instructions)
+   - 'quick_assembly': No cooking (salads, wraps, etc.)
+
+**Scheduling Philosophy**:
+- People's schedules DON'T always repeat weekly!
+- Support ANY pattern: weekly, every 10 days, every 15 days, biweekly, irregular
+- The AI (you!) decides the best schedule based on user's stated preference
+- Use day_offset=0 for "plan start", day_offset=6 for "first Sunday", etc.
+- Use repeats_every to set frequency: 7=weekly, 14=biweekly, 15=every 15 days, 30=monthly
+- Align prep schedule with shopping schedule (e.g., shop Saturday, prep Sunday)
+
+Output structured data in PhaseMealDetails format with ALL fields populated."""
 
     return Agent(
         name="Meal Phase Agent",

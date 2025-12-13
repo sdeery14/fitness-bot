@@ -79,7 +79,7 @@ class ScheduleService:
         # Create schedule
         if start_date is None:
             start_date = date.today()
-        
+
         if schedule_preferences is None:
             schedule_preferences = {}
 
@@ -94,15 +94,19 @@ class ScheduleService:
         await self.db.flush()  # Get schedule.id
 
         # Load workouts for this plan
-        workouts_stmt = select(Workout).join(Workout.workout_plan).where(
-            Workout.workout_plan.has(fitness_plan_id=fitness_plan_id)
+        workouts_stmt = (
+            select(Workout)
+            .join(Workout.workout_plan)
+            .where(Workout.workout_plan.has(fitness_plan_id=fitness_plan_id))
         )
         workouts_result = await self.db.execute(workouts_stmt)
         workouts = list(workouts_result.scalars().all())
 
         # Load meals for this plan
-        meals_stmt = select(Meal).join(Meal.meal_plan).where(
-            Meal.meal_plan.has(fitness_plan_id=fitness_plan_id)
+        meals_stmt = (
+            select(Meal)
+            .join(Meal.meal_plan)
+            .where(Meal.meal_plan.has(fitness_plan_id=fitness_plan_id))
         )
         meals_result = await self.db.execute(meals_stmt)
         meals = list(meals_result.scalars().all())
@@ -113,13 +117,23 @@ class ScheduleService:
             training_cycle = None
             if plan.plan_snapshot:
                 # Try new schema structure first (phases with workout_details)
-                phases = plan.plan_snapshot.get("phases") if isinstance(plan.plan_snapshot, dict) else None
+                phases = (
+                    plan.plan_snapshot.get("phases")
+                    if isinstance(plan.plan_snapshot, dict)
+                    else None
+                )
                 if phases and isinstance(phases, list) and len(phases) > 0:
                     # Use the first phase's workout cycle for now
                     # TODO: Handle multi-phase scheduling properly
-                    workout_details = phases[0].get("workout_details", {}) if isinstance(phases[0], dict) else {}
-                    training_cycle = workout_details.get("workout_cycle") if isinstance(workout_details, dict) else None
-            
+                    workout_details = (
+                        phases[0].get("workout_details", {}) if isinstance(phases[0], dict) else {}
+                    )
+                    training_cycle = (
+                        workout_details.get("workout_cycle")
+                        if isinstance(workout_details, dict)
+                        else None
+                    )
+
             if training_cycle:
                 # Use explicit training cycle from AI agent
                 await self._generate_cycle_based_entries(
@@ -133,7 +147,7 @@ class ScheduleService:
             else:
                 # Fallback to legacy behavior if no training_cycle provided
                 split_type = schedule_preferences.get("split_type", "weekly_fixed")
-                
+
                 if split_type == "rolling":
                     await self._generate_rolling_split_entries(
                         schedule=schedule,
@@ -160,6 +174,24 @@ class ScheduleService:
                 duration_weeks=plan.duration_weeks,
             )
 
+        # Generate grocery shopping entries
+        await self._generate_grocery_shopping_entries(
+            schedule=schedule,
+            fitness_plan=plan,
+            start_date=start_date,
+            duration_weeks=plan.duration_weeks,
+            preferences=schedule_preferences,
+        )
+
+        # Generate meal prep entries
+        await self._generate_meal_prep_entries(
+            schedule=schedule,
+            fitness_plan=plan,
+            start_date=start_date,
+            duration_weeks=plan.duration_weeks,
+            preferences=schedule_preferences,
+        )
+
         await self.db.commit()
         await self.db.refresh(schedule)
         return schedule
@@ -173,10 +205,10 @@ class ScheduleService:
         preferences: dict | None,
     ) -> None:
         """Generate weekly fixed schedule (same days each week).
-        
+
         Assigns each workout to specific days of the week based on user preferences.
         Workouts repeat on the same day each week throughout the plan duration.
-        
+
         Args:
             schedule: Schedule to add entries to
             workouts: List of workouts from the plan
@@ -186,19 +218,24 @@ class ScheduleService:
         """
         # Calculate plan end date
         plan_end_date = start_date + timedelta(weeks=duration_weeks)
-        
+
         # Get user preferences
         preferred_days = preferences.get("preferred_workout_days", []) if preferences else []
         rest_days = preferences.get("rest_days", []) if preferences else []
         avoid_dates = preferences.get("avoid_dates", []) if preferences else []
         preferred_time = self._parse_preferred_time(preferences)
-        
+
         # Day name to weekday offset mapping
         day_name_to_offset = {
-            "monday": 0, "tuesday": 1, "wednesday": 2, "thursday": 3,
-            "friday": 4, "saturday": 5, "sunday": 6
+            "monday": 0,
+            "tuesday": 1,
+            "wednesday": 2,
+            "thursday": 3,
+            "friday": 4,
+            "saturday": 5,
+            "sunday": 6,
         }
-        
+
         # Create workout-to-day mapping
         workout_schedule = {}
         if preferred_days:
@@ -213,22 +250,22 @@ class ScheduleService:
                 days_between = 7 // num_workouts if num_workouts <= 7 else 1
                 for i, workout in enumerate(workouts):
                     workout_schedule[workout.id] = (i * days_between) % 7
-        
+
         # Generate entries for each workout on its assigned day
         for workout in workouts:
             day_offset = workout_schedule[workout.id]
-            
+
             # Find first occurrence of this day of week
             current_date = start_date
             while current_date.weekday() != day_offset:
                 current_date += timedelta(days=1)
-            
+
             # Repeat weekly until plan end
             while current_date <= plan_end_date:
                 # Skip if it's a rest day or avoid date
                 day_name = current_date.strftime("%A").lower()
                 date_str = current_date.isoformat()
-                
+
                 if day_name not in [d.lower() for d in rest_days] and date_str not in avoid_dates:
                     entry = ScheduleEntry(
                         schedule_id=schedule.id,
@@ -240,12 +277,12 @@ class ScheduleService:
                         completion_status="scheduled",
                     )
                     self.db.add(entry)
-                
+
                 current_date += timedelta(weeks=1)
-        
+
         # Commit all schedule entries
         await self.db.flush()
-    
+
     async def _generate_rolling_split_entries(
         self,
         schedule: Schedule,
@@ -255,11 +292,11 @@ class ScheduleService:
         preferences: dict | None,
     ) -> None:
         """Generate rolling split schedule (e.g., 4-day cycle repeats regardless of week).
-        
+
         Workouts cycle through in order, independent of calendar weeks.
         For example, a 4-day split continues: Day1, Day2, Day3, Day4, Day1, Day2...
         This is useful for powerlifting programs or when weekly structure isn't needed.
-        
+
         Args:
             schedule: Schedule to add entries to
             workouts: List of workouts from the plan
@@ -269,29 +306,29 @@ class ScheduleService:
         """
         # Calculate plan end date
         plan_end_date = start_date + timedelta(weeks=duration_weeks)
-        
+
         # Get user preferences
         rest_days_of_week = preferences.get("rest_days", []) if preferences else []
         avoid_dates = preferences.get("avoid_dates", []) if preferences else []
         preferred_time = self._parse_preferred_time(preferences)
-        
+
         # Start rolling through workouts
         current_date = start_date
         workout_idx = 0
-        
+
         while current_date <= plan_end_date:
             # Check if current date should be skipped
             day_name = current_date.strftime("%A").lower()
             date_str = current_date.isoformat()
-            
+
             # Skip rest days and avoid dates
             if day_name in [d.lower() for d in rest_days_of_week] or date_str in avoid_dates:
                 current_date += timedelta(days=1)
                 continue
-            
+
             # Assign next workout in rotation
             workout = workouts[workout_idx % len(workouts)]
-            
+
             entry = ScheduleEntry(
                 schedule_id=schedule.id,
                 entry_type="workout",
@@ -302,14 +339,14 @@ class ScheduleService:
                 completion_status="scheduled",
             )
             self.db.add(entry)
-            
+
             # Move to next workout and next day
             workout_idx += 1
             current_date += timedelta(days=1)
-        
+
         # Commit all schedule entries
         await self.db.flush()
-    
+
     async def _generate_cycle_based_entries(
         self,
         schedule: Schedule,
@@ -320,10 +357,10 @@ class ScheduleService:
         preferences: dict | None,
     ) -> None:
         """Generate schedule entries based on explicit training cycle from AI agent.
-        
+
         Uses the training_cycle structure from the workout plan to schedule workouts
         and rest days. The cycle repeats throughout the program duration.
-        
+
         Args:
             schedule: Schedule to add entries to
             workouts: List of workouts from the plan
@@ -334,37 +371,37 @@ class ScheduleService:
         """
         # Calculate plan end date
         plan_end_date = start_date + timedelta(weeks=duration_weeks)
-        
+
         # Get user preferences (handle None values from JSON)
         avoid_dates_raw = preferences.get("avoid_dates") if preferences else None
         avoid_dates = avoid_dates_raw if avoid_dates_raw is not None else []
         preferred_time = self._parse_preferred_time(preferences)
-        
+
         # Create workout ID lookup
         workout_id_map = {i: workout.id for i, workout in enumerate(workouts)}
-        
+
         # Start cycling through training cycle
         current_date = start_date
         cycle_idx = 0
-        
+
         while current_date <= plan_end_date:
             date_str = current_date.isoformat()
-            
+
             # Skip avoid dates
             if date_str in avoid_dates:
                 current_date += timedelta(days=1)
                 continue
-            
+
             # Get current cycle item
             cycle_item = training_cycle[cycle_idx % len(training_cycle)]
             item_type = cycle_item.get("type")
-            
+
             if item_type == "workout":
                 # Schedule workout
                 workout_index = cycle_item.get("workout_index")
                 if workout_index is not None and workout_index < len(workouts):
                     workout_id = workout_id_map[workout_index]
-                    
+
                     entry = ScheduleEntry(
                         schedule_id=schedule.id,
                         entry_type="workout",
@@ -375,44 +412,44 @@ class ScheduleService:
                         completion_status="scheduled",
                     )
                     self.db.add(entry)
-            
+
             elif item_type == "rest":
                 # Rest day - no workout scheduled (could add rest day entry if needed)
                 pass
-            
+
             # Move to next cycle item and next day
             cycle_idx += 1
             current_date += timedelta(days=1)
-        
+
         # Commit all schedule entries
         await self.db.flush()
-    
+
     def _parse_preferred_time(self, preferences: dict | None) -> time | None:
         """Parse preferred workout time from preferences.
-        
+
         Args:
             preferences: User preferences dict with 'preferred_time' field
-            
+
         Returns:
             time object or None if no preference
         """
         if not preferences:
             return None
-        
+
         preferred_time_str = preferences.get("preferred_time", "")
         if not preferred_time_str:
             return None
-        
+
         # Handle named time slots
         time_mappings = {
             "morning": time(7, 0),
             "afternoon": time(14, 0),
             "evening": time(18, 0),
         }
-        
+
         if preferred_time_str.lower() in time_mappings:
             return time_mappings[preferred_time_str.lower()]
-        
+
         # Try to parse specific time like "6:00 AM" or "18:30"
         try:
             # Simple parsing for "HH:MM" or "HH:MM AM/PM"
@@ -423,6 +460,30 @@ class ScheduleService:
                 return datetime.strptime(time_str, "%H:%M").time()
         except (ValueError, AttributeError):
             return None
+
+    def _parse_time_string(self, time_str: str) -> time:
+        """Parse time string in various formats to time object.
+
+        Supports formats:
+        - 12-hour: '10:00 AM', '2:30 PM', '7:00am'
+        - 24-hour: '14:30', '08:00', '19:45'
+
+        Args:
+            time_str: Time string to parse
+
+        Returns:
+            Parsed time object (defaults to 10:00 if parsing fails)
+        """
+        try:
+            time_str = time_str.strip().upper()
+            if "AM" in time_str or "PM" in time_str:
+                # Parse 12-hour format (e.g., '10:00 AM', '2:30 PM')
+                return datetime.strptime(time_str, "%I:%M %p").time()
+            else:
+                # Parse 24-hour format (e.g., '14:30', '08:00')
+                return datetime.strptime(time_str, "%H:%M").time()
+        except (ValueError, AttributeError):
+            return time(10, 0)  # Default fallback
 
     async def _generate_meal_entries(
         self,
@@ -489,8 +550,187 @@ class ScheduleService:
                 meal_rotation_index[meal_type] += 1
 
             current_date += timedelta(days=1)
-        
+
         # Commit all schedule entries
+        await self.db.flush()
+
+    async def _generate_grocery_shopping_entries(
+        self,
+        schedule: Schedule,
+        fitness_plan: FitnessPlan,
+        start_date: date,
+        duration_weeks: int,
+        preferences: dict | None,
+    ) -> None:
+        """Generate grocery shopping entries from AI-generated explicit schedule.
+
+        Uses the AI-generated grocery_shopping_schedule from the plan's meal_details.
+        Supports any frequency pattern: weekly, biweekly, every 15 days, irregular, etc.
+
+        Args:
+            schedule: Schedule to add entries to
+            fitness_plan: The fitness plan (contains AI-generated schedule)
+            start_date: Schedule start date
+            duration_weeks: Total plan duration in weeks
+            preferences: User scheduling preferences dict (mostly unused now)
+        """
+        # Extract AI-generated schedule from plan_snapshot
+        shopping_schedule = []
+        grocery_items = []
+
+        if fitness_plan.plan_snapshot and isinstance(fitness_plan.plan_snapshot, dict):
+            phases = fitness_plan.plan_snapshot.get("phases", [])
+            if phases and len(phases) > 0:
+                phase_data = phases[0]
+                if isinstance(phase_data, dict):
+                    meal_details = phase_data.get("meal_details", {})
+                    if isinstance(meal_details, dict):
+                        shopping_schedule = meal_details.get("grocery_shopping_schedule", [])
+                        grocery_items = meal_details.get("grocery_list", [])
+
+        if not shopping_schedule:
+            return  # No schedule generated by AI
+
+        plan_end_date = start_date + timedelta(weeks=duration_weeks)
+
+        # Process each shopping schedule entry
+        for schedule_entry in shopping_schedule:
+            day_offset = schedule_entry.get("day_offset", 0)
+            time_str = schedule_entry.get("time", "10:00 AM")
+            repeats_every = schedule_entry.get("repeats_every")  # Can be None for one-time events
+            notes = schedule_entry.get("notes", "")
+
+            # Parse time
+            shopping_time = self._parse_time_string(time_str)
+
+            # Calculate first occurrence
+            first_date = start_date + timedelta(days=day_offset)
+
+            if repeats_every is None:
+                # One-time shopping event
+                if first_date <= plan_end_date:
+                    entry = ScheduleEntry(
+                        schedule_id=schedule.id,
+                        entry_type="grocery_shopping",
+                        entry_date=first_date,
+                        entry_time=shopping_time,
+                        grocery_list={
+                            "items": grocery_items,
+                            "shopping_date": first_date.isoformat(),
+                            "notes": notes,
+                        },
+                        completion_status="scheduled",
+                    )
+                    self.db.add(entry)
+            else:
+                # Repeating shopping event
+                current_date = first_date
+                while current_date <= plan_end_date:
+                    entry = ScheduleEntry(
+                        schedule_id=schedule.id,
+                        entry_type="grocery_shopping",
+                        entry_date=current_date,
+                        entry_time=shopping_time,
+                        grocery_list={
+                            "items": grocery_items,
+                            "shopping_date": current_date.isoformat(),
+                            "notes": notes,
+                        },
+                        completion_status="scheduled",
+                    )
+                    self.db.add(entry)
+
+                    # Move to next occurrence
+                    current_date += timedelta(days=repeats_every)
+
+        await self.db.flush()
+
+    async def _generate_meal_prep_entries(
+        self,
+        schedule: Schedule,
+        fitness_plan: FitnessPlan,
+        start_date: date,
+        duration_weeks: int,
+        preferences: dict | None,
+    ) -> None:
+        """Generate meal prep entries from AI-generated explicit schedule.
+
+        Uses the AI-generated meal_prep_schedule from the plan's meal_details.
+        Supports any frequency pattern: weekly, every 10 days, biweekly, irregular, etc.
+
+        Args:
+            schedule: Schedule to add entries to
+            fitness_plan: The fitness plan (contains AI-generated schedule)
+            start_date: Schedule start date
+            duration_weeks: Total plan duration in weeks
+            preferences: User scheduling preferences dict (mostly unused now)
+        """
+        # Extract AI-generated schedule from plan_snapshot
+        prep_schedule = []
+        prep_sessions = []
+
+        if fitness_plan.plan_snapshot and isinstance(fitness_plan.plan_snapshot, dict):
+            phases = fitness_plan.plan_snapshot.get("phases", [])
+            if phases and len(phases) > 0:
+                phase_data = phases[0]
+                if isinstance(phase_data, dict):
+                    meal_details = phase_data.get("meal_details", {})
+                    if isinstance(meal_details, dict):
+                        prep_schedule = meal_details.get("meal_prep_schedule", [])
+                        prep_sessions = meal_details.get("meal_prep_sessions", [])
+
+        if not prep_schedule or not prep_sessions:
+            return  # No schedule generated by AI
+
+        plan_end_date = start_date + timedelta(weeks=duration_weeks)
+
+        # Process each prep schedule entry
+        for schedule_entry in prep_schedule:
+            day_offset = schedule_entry.get("day_offset", 0)
+            time_str = schedule_entry.get("time", "14:00")
+            session_index = schedule_entry.get("session_index", 0)
+            repeats_every = schedule_entry.get("repeats_every")  # Can be None for one-time events
+            notes = schedule_entry.get("notes", "")
+
+            # Validate session index
+            if session_index >= len(prep_sessions):
+                continue
+
+            session = prep_sessions[session_index]
+            prep_time = self._parse_time_string(time_str)
+
+            # Calculate first occurrence
+            first_date = start_date + timedelta(days=day_offset)
+
+            if repeats_every is None:
+                # One-time prep session
+                if first_date <= plan_end_date:
+                    entry = ScheduleEntry(
+                        schedule_id=schedule.id,
+                        entry_type="meal_prep",
+                        entry_date=first_date,
+                        entry_time=prep_time,
+                        prep_instructions={**session, "notes": notes},
+                        completion_status="scheduled",
+                    )
+                    self.db.add(entry)
+            else:
+                # Repeating prep session
+                current_date = first_date
+                while current_date <= plan_end_date:
+                    entry = ScheduleEntry(
+                        schedule_id=schedule.id,
+                        entry_type="meal_prep",
+                        entry_date=current_date,
+                        entry_time=prep_time,
+                        prep_instructions={**session, "notes": notes},
+                        completion_status="scheduled",
+                    )
+                    self.db.add(entry)
+
+                    # Move to next occurrence
+                    current_date += timedelta(days=repeats_every)
+
         await self.db.flush()
 
     async def get_schedule_by_plan(
@@ -509,10 +749,8 @@ class ScheduleService:
             select(Schedule)
             .where(Schedule.fitness_plan_id == fitness_plan_id)
             .options(
-                selectinload(Schedule.entries)
-                .selectinload(ScheduleEntry.workout),
-                selectinload(Schedule.entries)
-                .selectinload(ScheduleEntry.meal),
+                selectinload(Schedule.entries).selectinload(ScheduleEntry.workout),
+                selectinload(Schedule.entries).selectinload(ScheduleEntry.meal),
             )
         )
 
@@ -691,13 +929,10 @@ class ScheduleService:
             raise ValueError("Schedule not found")
 
         # Update all incomplete entries
-        update_stmt = (
-            select(ScheduleEntry)
-            .where(
-                and_(
-                    ScheduleEntry.schedule_id == schedule_id,
-                    ScheduleEntry.completion_status.in_(["scheduled", "rescheduled"]),
-                )
+        update_stmt = select(ScheduleEntry).where(
+            and_(
+                ScheduleEntry.schedule_id == schedule_id,
+                ScheduleEntry.completion_status.in_(["scheduled", "rescheduled"]),
             )
         )
         update_result = await self.db.execute(update_stmt)
@@ -780,7 +1015,11 @@ class ScheduleService:
                 and_(
                     ScheduleEntry.schedule_id == schedule.id,
                     ScheduleEntry.entry_date >= disruption.start_date,
-                    ScheduleEntry.entry_date <= (disruption.end_date or disruption.start_date + timedelta(days=disruption_days)),
+                    ScheduleEntry.entry_date
+                    <= (
+                        disruption.end_date
+                        or disruption.start_date + timedelta(days=disruption_days)
+                    ),
                     ScheduleEntry.completion_status.in_(["scheduled", "rescheduled"]),
                 )
             )
@@ -811,18 +1050,25 @@ class ScheduleService:
 
         if strategy == "reschedule":
             # Move items to nearest available slots after disruption ends
-            resume_date = (disruption.end_date or disruption.start_date + timedelta(days=disruption_days)) + timedelta(days=1)
+            resume_date = (
+                disruption.end_date or disruption.start_date + timedelta(days=disruption_days)
+            ) + timedelta(days=1)
 
             # Reschedule workouts
             current_workout_date = resume_date
             for entry in affected_workouts:
                 entry.entry_date = current_workout_date
                 entry.completion_status = "rescheduled"
-                rescheduled_workouts.append({
-                    "original_date": str(entry.entry_date - timedelta(days=(current_workout_date - entry.entry_date).days)),
-                    "new_date": str(current_workout_date),
-                    "workout_id": str(entry.workout_id),
-                })
+                rescheduled_workouts.append(
+                    {
+                        "original_date": str(
+                            entry.entry_date
+                            - timedelta(days=(current_workout_date - entry.entry_date).days)
+                        ),
+                        "new_date": str(current_workout_date),
+                        "workout_id": str(entry.workout_id),
+                    }
+                )
                 current_workout_date += timedelta(days=2)  # Space out workouts
 
             # Reschedule meals - spread across available days
@@ -830,11 +1076,16 @@ class ScheduleService:
             for entry in affected_meals:
                 entry.entry_date = current_meal_date
                 entry.completion_status = "rescheduled"
-                rescheduled_meals.append({
-                    "original_date": str(entry.entry_date - timedelta(days=(current_meal_date - entry.entry_date).days)),
-                    "new_date": str(current_meal_date),
-                    "meal_id": str(entry.meal_id),
-                })
+                rescheduled_meals.append(
+                    {
+                        "original_date": str(
+                            entry.entry_date
+                            - timedelta(days=(current_meal_date - entry.entry_date).days)
+                        ),
+                        "new_date": str(current_meal_date),
+                        "meal_id": str(entry.meal_id),
+                    }
+                )
                 current_meal_date += timedelta(days=1)
 
             # Calculate if timeline extension needed
@@ -850,19 +1101,25 @@ class ScheduleService:
             # Mark affected items as skipped
             for entry in affected_entries:
                 entry.completion_status = "skipped"
-                entry.skipped_reason = f"Disruption: {disruption.disruption_type} ({disruption.severity})"
+                entry.skipped_reason = (
+                    f"Disruption: {disruption.disruption_type} ({disruption.severity})"
+                )
                 if entry.entry_type == "workout":
-                    rescheduled_workouts.append({
-                        "original_date": str(entry.entry_date),
-                        "status": "skipped",
-                        "workout_id": str(entry.workout_id),
-                    })
+                    rescheduled_workouts.append(
+                        {
+                            "original_date": str(entry.entry_date),
+                            "status": "skipped",
+                            "workout_id": str(entry.workout_id),
+                        }
+                    )
                 else:
-                    rescheduled_meals.append({
-                        "original_date": str(entry.entry_date),
-                        "status": "skipped",
-                        "meal_id": str(entry.meal_id),
-                    })
+                    rescheduled_meals.append(
+                        {
+                            "original_date": str(entry.entry_date),
+                            "status": "skipped",
+                            "meal_id": str(entry.meal_id),
+                        }
+                    )
 
         elif strategy == "extend_timeline":
             # Extend timeline by disruption duration and shift all future entries
@@ -874,21 +1131,31 @@ class ScheduleService:
                 entry.entry_date = entry.entry_date + timedelta(days=timeline_extension_days)
                 entry.completion_status = "rescheduled"
                 if entry.entry_type == "workout":
-                    rescheduled_workouts.append({
-                        "original_date": str(entry.entry_date - timedelta(days=timeline_extension_days)),
-                        "new_date": str(entry.entry_date),
-                        "workout_id": str(entry.workout_id),
-                    })
+                    rescheduled_workouts.append(
+                        {
+                            "original_date": str(
+                                entry.entry_date - timedelta(days=timeline_extension_days)
+                            ),
+                            "new_date": str(entry.entry_date),
+                            "workout_id": str(entry.workout_id),
+                        }
+                    )
                 else:
-                    rescheduled_meals.append({
-                        "original_date": str(entry.entry_date - timedelta(days=timeline_extension_days)),
-                        "new_date": str(entry.entry_date),
-                        "meal_id": str(entry.meal_id),
-                    })
+                    rescheduled_meals.append(
+                        {
+                            "original_date": str(
+                                entry.entry_date - timedelta(days=timeline_extension_days)
+                            ),
+                            "new_date": str(entry.entry_date),
+                            "meal_id": str(entry.meal_id),
+                        }
+                    )
 
         # Update schedule metadata
         schedule.last_recalculated_at = datetime.now(UTC)
-        schedule.recalculation_reason = f"Disruption: {disruption.disruption_type} ({disruption.severity})"
+        schedule.recalculation_reason = (
+            f"Disruption: {disruption.disruption_type} ({disruption.severity})"
+        )
 
         await self.db.commit()
 

@@ -13,7 +13,7 @@ from pydantic import BaseModel, ConfigDict, Field
 class ScheduleEntryBase(BaseModel):
     """Base schema for schedule entries."""
 
-    entry_type: str = Field(..., description="Type of entry: 'workout' or 'meal'")
+    entry_type: str = Field(..., description="Type of entry: 'workout', 'meal', 'grocery_shopping', or 'meal_prep'")
     entry_date: date = Field(..., description="Date scheduled for this entry")
     entry_time: time | None = Field(None, description="Optional time for meal entries")
 
@@ -23,6 +23,8 @@ class ScheduleEntryCreate(ScheduleEntryBase):
 
     workout_id: UUID | None = None
     meal_id: UUID | None = None
+    grocery_list: dict | None = Field(None, description="Shopping list for grocery_shopping entries")
+    prep_instructions: dict | None = Field(None, description="Cooking instructions for meal_prep entries")
 
 
 class ScheduleEntryRead(ScheduleEntryBase):
@@ -32,6 +34,8 @@ class ScheduleEntryRead(ScheduleEntryBase):
     schedule_id: UUID
     workout_id: UUID | None = None
     meal_id: UUID | None = None
+    grocery_list: dict | None = Field(None, description="Shopping list for grocery_shopping entries")
+    prep_instructions: dict | None = Field(None, description="Cooking instructions for meal_prep entries")
     completion_status: str = Field(..., description="Status: scheduled, completed, skipped, rescheduled")
     completed_at: datetime | None = None
     user_notes: str | None = None

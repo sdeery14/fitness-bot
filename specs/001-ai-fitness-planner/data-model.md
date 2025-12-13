@@ -556,20 +556,26 @@ CREATE INDEX idx_schedules_fitness_plan ON schedules(fitness_plan_id);
 
 ### 10. ScheduleEntry
 
-Represents a specific workout or meal scheduled for a particular date/time.
+Represents a specific workout, meal, grocery shopping trip, or meal prep session scheduled for a particular date/time.
 
 ```sql
 CREATE TABLE schedule_entries (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     schedule_id UUID NOT NULL REFERENCES schedules(id) ON DELETE CASCADE,
     
-    entry_type VARCHAR(50) NOT NULL,  -- workout, meal
+    entry_type VARCHAR(50) NOT NULL,  -- workout, meal, grocery_shopping, meal_prep
     entry_date DATE NOT NULL,
     entry_time TIME,  -- Optional, for meal timing
     
     -- Reference to actual workout or meal
     workout_id UUID REFERENCES workouts(id) ON DELETE SET NULL,
     meal_id UUID REFERENCES meals(id) ON DELETE SET NULL,
+    
+    -- Grocery shopping data (for entry_type='grocery_shopping')
+    grocery_list JSONB,  -- {"items": [{"ingredient": "Chicken breast", "quantity": "2 lbs", "category": "Meat"}, ...]}
+    
+    -- Meal prep instructions (for entry_type='meal_prep')
+    prep_instructions JSONB,  -- {"recipes": [...], "duration_minutes": 90, "instructions": [...], "storage": "..."}
     
     -- Completion tracking
     completion_status VARCHAR(50) DEFAULT 'scheduled',  -- scheduled, completed, skipped, rescheduled
@@ -583,8 +589,10 @@ CREATE TABLE schedule_entries (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     
     CONSTRAINT valid_entry_reference CHECK (
-        (entry_type = 'workout' AND workout_id IS NOT NULL AND meal_id IS NULL) OR
-        (entry_type = 'meal' AND meal_id IS NOT NULL AND workout_id IS NULL)
+        (entry_type = 'workout' AND workout_id IS NOT NULL AND meal_id IS NULL AND grocery_list IS NULL AND prep_instructions IS NULL) OR
+        (entry_type = 'meal' AND meal_id IS NOT NULL AND workout_id IS NULL AND grocery_list IS NULL AND prep_instructions IS NULL) OR
+        (entry_type = 'grocery_shopping' AND workout_id IS NULL AND meal_id IS NULL AND grocery_list IS NOT NULL AND prep_instructions IS NULL) OR
+        (entry_type = 'meal_prep' AND workout_id IS NULL AND meal_id IS NULL AND grocery_list IS NULL AND prep_instructions IS NOT NULL)
     )
 );
 
@@ -597,13 +605,52 @@ CREATE INDEX idx_schedule_entries_meal ON schedule_entries(meal_id);
 ```
 
 **Attributes**:
-- `entry_type`: Discriminator for workout vs meal
+- `entry_type`: Discriminator for workout, meal, grocery_shopping, or meal_prep
 - `entry_date`: Scheduled date
-- `entry_time`: Optional time (important for meals)
+- `entry_time`: Optional time (important for meals, grocery shopping, meal prep)
+- `grocery_list`: JSON object with shopping list items (for grocery_shopping entries)
+- `prep_instructions`: JSON object with batch cooking instructions (for meal_prep entries)
 - `completion_status`: Tracks lifecycle
 
+**grocery_list JSONB Structure**:
+```json
+{
+  "items": [
+    {
+      "ingredient": "Chicken breast",
+      "quantity": "2 lbs",
+      "category": "Meat",
+      "notes": "boneless, skinless"
+    },
+    {
+      "ingredient": "Brown rice",
+      "quantity": "2 bags",
+      "category": "Grains"
+    }
+  ],
+  "shopping_date": "2025-12-15"
+}
+```
+
+**prep_instructions JSONB Structure**:
+```json
+{
+  "session_name": "Sunday Meal Prep",
+  "duration_minutes": 120,
+  "recipes": ["Grilled Chicken", "Brown Rice", "Roasted Vegetables"],
+  "batch_size": 10,
+  "instructions": [
+    "1. Preheat oven to 400°F",
+    "2. Season chicken breasts",
+    "3. Cook rice according to package",
+    "4. Roast vegetables for 20 minutes"
+  ],
+  "storage_instructions": "Store in airtight containers, refrigerate, use within 4 days"
+}
+```
+
 **Validation Rules**:
-- Exactly one of `workout_id` or `meal_id` must be set based on `entry_type`
+- Exactly one of `workout_id`, `meal_id`, `grocery_list`, or `prep_instructions` must be set based on `entry_type`
 - `completed_at` only set when `completion_status = 'completed'`
 
 **Relationships**:
