@@ -276,19 +276,16 @@ class GroceryItem(BaseModel):
 class GroceryShoppingScheduleEntry(BaseModel):
     """A single grocery shopping event in the plan.
     
-    Uses day_offset from plan start to position events, and repeats_every for frequency.
+    Uses target_day_name to specify which day of week, and repeats_every for frequency.
     This allows any pattern: weekly (7), biweekly (14), every 15 days, irregular, etc.
     
-    CRITICAL: day_offset is calculated from phase start day. Count forward from the phase start day of week
-    to reach the target day. Example: Phase starts Monday (day 0), Sunday shopping = day_offset 6.
-    Phase starts Wednesday, Sunday shopping = day_offset 4 (Wed→Thu→Fri→Sat→Sun).
+    The schedule service will automatically calculate the correct date based on phase start date.
     """
 
     model_config = {"extra": "forbid"}
 
-    day_offset: int = Field(
-        description="Days from phase start to first occurrence. Count forward from phase start day-of-week to target day. Example: Start Monday, want Sunday = 6. Start Wednesday, want Sunday = 4.",
-        ge=0
+    target_day_name: str = Field(
+        description="Target day of week for shopping: 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', or 'Sunday'. The schedule service will calculate the correct date.",
     )
     time: str = Field(description="Time for shopping (e.g., '10:00 AM', '14:30', '6:00 PM')")
     duration_minutes: int = Field(description="Estimated shopping time in minutes", ge=15, le=180)
@@ -324,19 +321,16 @@ class MealPrepSession(BaseModel):
 class MealPrepScheduleEntry(BaseModel):
     """A single meal prep session in the plan.
     
-    Uses day_offset from plan start to position events, and repeats_every for frequency.
+    Uses target_day_name to specify which day of week, and repeats_every for frequency.
     This allows any pattern: weekly (7), every 10 days, twice monthly, irregular, etc.
     
-    CRITICAL: day_offset uses same calculation as grocery shopping. Count forward from phase start day-of-week
-    to reach target day. Example: Phase starts Monday, Sunday prep = day_offset 6. Phase starts Friday,
-    Wednesday prep = day_offset 5 (Fri→Sat→Sun→Mon→Tue→Wed).
+    The schedule service will automatically calculate the correct date based on phase start date.
     """
 
     model_config = {"extra": "forbid"}
 
-    day_offset: int = Field(
-        description="Days from phase start to first occurrence. Count forward from phase start day-of-week to target day. Same calculation as grocery shopping.",
-        ge=0
+    target_day_name: str = Field(
+        description="Target day of week for meal prep: 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', or 'Sunday'. The schedule service will calculate the correct date.",
     )
     time: str = Field(description="Start time (e.g., '14:00', '2:00 PM', '7:30 PM')")
     session_index: int = Field(
@@ -381,19 +375,19 @@ class PhaseMealDetails(BaseModel):
     grocery_shopping_schedule: list[GroceryShoppingScheduleEntry] = Field(
         default_factory=list,
         description=(
-            "Explicit grocery shopping schedule with day offsets and repeat patterns. "
-            "Examples: Weekly Sunday = [{day_offset: 6, time: '10:00 AM', repeats_every: 7}], "
-            "Every 15 days = [{day_offset: 0, time: '2:00 PM', repeats_every: 15}], "
-            "Twice monthly = [{day_offset: 0, repeats_every: 30}, {day_offset: 14, repeats_every: 30}]"
+            "Explicit grocery shopping schedule with target day names and repeat patterns. "
+            "Examples: Weekly Sunday = [{target_day_name: 'Sunday', time: '10:00 AM', repeats_every: 7}], "
+            "Every 15 days = [{target_day_name: 'Saturday', time: '2:00 PM', repeats_every: 15}], "
+            "Twice monthly = [{target_day_name: 'Sunday', repeats_every: 30}, {target_day_name: 'Monday', repeats_every: 30}]"
         )
     )
     meal_prep_schedule: list[MealPrepScheduleEntry] = Field(
         default_factory=list,
         description=(
-            "Explicit meal prep schedule with day offsets and repeat patterns. "
-            "Examples: Weekly Sunday = [{day_offset: 6, time: '14:00', session_index: 0, repeats_every: 7}], "
-            "Every 10 days = [{day_offset: 2, time: '14:00', session_index: 0, repeats_every: 10}], "
-            "Twice weekly = [{day_offset: 0, repeats_every: 7}, {day_offset: 3, repeats_every: 7}]"
+            "Explicit meal prep schedule with target day names and repeat patterns. "
+            "Examples: Weekly Sunday = [{target_day_name: 'Sunday', time: '14:00', session_index: 0, repeats_every: 7}], "
+            "Every 10 days = [{target_day_name: 'Wednesday', time: '14:00', session_index: 0, repeats_every: 10}], "
+            "Twice weekly = [{target_day_name: 'Sunday', repeats_every: 7}, {target_day_name: 'Wednesday', repeats_every: 7}]"
         )
     )
 

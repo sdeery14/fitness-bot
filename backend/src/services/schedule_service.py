@@ -25,6 +25,45 @@ class ScheduleService:
         """
         self.db = db
 
+    @staticmethod
+    def _calculate_day_offset(start_date: date, target_day_name: str) -> int:
+        """Calculate day offset from start date to target day of week.
+
+        Args:
+            start_date: Phase start date
+            target_day_name: Target day name ('Monday', 'Tuesday', etc.)
+
+        Returns:
+            Number of days from start_date to reach target day of week
+
+        Example:
+            start_date = 2025-12-13 (Saturday)
+            target_day_name = 'Sunday'
+            Result: 1 (Saturday + 1 day = Sunday)
+
+            start_date = 2025-12-13 (Saturday)
+            target_day_name = 'Wednesday'
+            Result: 4 (Saturday + 4 days = Wednesday)
+        """
+        day_names = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+        
+        # Convert to lowercase for case-insensitive comparison
+        target_day_lower = target_day_name.strip().lower()
+        day_map = {name.lower(): idx for idx, name in enumerate(day_names)}
+        
+        if target_day_lower not in day_map:
+            raise ValueError(f"Invalid day name: {target_day_name}. Must be one of {day_names}")
+        
+        # Get day of week for start_date (0=Monday, 6=Sunday)
+        start_day_idx = start_date.weekday()
+        target_day_idx = day_map[target_day_lower]
+        
+        # Calculate offset
+        if target_day_idx >= start_day_idx:
+            return target_day_idx - start_day_idx
+        else:
+            return (7 - start_day_idx) + target_day_idx
+
     async def create_schedule(
         self,
         user_id: UUID,
@@ -608,7 +647,14 @@ class ScheduleService:
 
         # Process each shopping schedule entry
         for schedule_entry in shopping_schedule:
-            day_offset = schedule_entry.get("day_offset", 0)
+            target_day_name = schedule_entry.get("target_day_name")
+            if not target_day_name:
+                # Fallback to old day_offset format if present
+                day_offset = schedule_entry.get("day_offset", 0)
+            else:
+                # Calculate day_offset from target day name
+                day_offset = self._calculate_day_offset(start_date, target_day_name)
+            
             time_str = schedule_entry.get("time", "10:00 AM")
             repeats_every = schedule_entry.get("repeats_every")  # Can be None for one-time events
             notes = schedule_entry.get("notes", "")
@@ -712,7 +758,14 @@ class ScheduleService:
 
         # Process each prep schedule entry
         for schedule_entry in prep_schedule:
-            day_offset = schedule_entry.get("day_offset", 0)
+            target_day_name = schedule_entry.get("target_day_name")
+            if not target_day_name:
+                # Fallback to old day_offset format if present
+                day_offset = schedule_entry.get("day_offset", 0)
+            else:
+                # Calculate day_offset from target day name
+                day_offset = self._calculate_day_offset(start_date, target_day_name)
+            
             time_str = schedule_entry.get("time", "14:00")
             session_index = schedule_entry.get("session_index", 0)
             repeats_every = schedule_entry.get("repeats_every")  # Can be None for one-time events
