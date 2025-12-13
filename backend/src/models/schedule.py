@@ -28,6 +28,8 @@ from src.models import Base, TimestampMixin
 
 if TYPE_CHECKING:
     from .fitness_plan import FitnessPlan
+    from .grocery_trip import GroceryShoppingTrip
+    from .meal_prep import MealPrepSession
     from .meal import Meal
     from .user import User
     from .workout import Workout
@@ -111,14 +113,16 @@ class ScheduleEntry(Base, TimestampMixin):
     meal_id: Mapped[UUID | None] = mapped_column(
         PGUUID(as_uuid=True), ForeignKey("meals.id", ondelete="SET NULL"), nullable=True
     )
-
-    # Grocery shopping data (for entry_type='grocery_shopping')
-    # Structure: {"items": [{"ingredient": "Chicken breast", "quantity": "2 lbs", "category": "Meat", "fdc_id": 12345}, ...]}
-    grocery_list: Mapped[dict | None] = mapped_column(JSON, nullable=True)
-
-    # Meal prep instructions (for entry_type='meal_prep')
-    # Structure: {\"recipes\": [{\"meal_name\": \"Grilled Chicken\", \"batch_size\": 4, \"steps\": [...], \"storage\": \"...\"}], \"duration_minutes\": 90}
-    prep_instructions: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    
+    # Reference to grocery shopping trip (for entry_type='grocery_shopping')
+    grocery_trip_id: Mapped[UUID | None] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("grocery_shopping_trips.id", ondelete="SET NULL"), nullable=True
+    )
+    
+    # Reference to meal prep session (for entry_type='meal_prep')
+    meal_prep_session_id: Mapped[UUID | None] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("meal_prep_sessions.id", ondelete="SET NULL"), nullable=True
+    )
 
     # Completion tracking
     completion_status: Mapped[str] = mapped_column(
@@ -134,13 +138,19 @@ class ScheduleEntry(Base, TimestampMixin):
     schedule: Mapped["Schedule"] = relationship("Schedule", back_populates="entries")
     workout: Mapped["Workout | None"] = relationship("Workout", foreign_keys=[workout_id])
     meal: Mapped["Meal | None"] = relationship("Meal", foreign_keys=[meal_id])
+    grocery_trip: Mapped["GroceryShoppingTrip | None"] = relationship(
+        "GroceryShoppingTrip", back_populates="schedule_entries", foreign_keys=[grocery_trip_id]
+    )
+    meal_prep_session: Mapped["MealPrepSession | None"] = relationship(
+        "MealPrepSession", back_populates="schedule_entries", foreign_keys=[meal_prep_session_id]
+    )
 
     __table_args__ = (
         CheckConstraint(
-            "(entry_type = 'workout' AND workout_id IS NOT NULL AND meal_id IS NULL AND grocery_list IS NULL AND prep_instructions IS NULL) OR "
-            "(entry_type = 'meal' AND meal_id IS NOT NULL AND workout_id IS NULL AND grocery_list IS NULL AND prep_instructions IS NULL) OR "
-            "(entry_type = 'grocery_shopping' AND workout_id IS NULL AND meal_id IS NULL AND grocery_list IS NOT NULL AND prep_instructions IS NULL) OR "
-            "(entry_type = 'meal_prep' AND workout_id IS NULL AND meal_id IS NULL AND grocery_list IS NULL AND prep_instructions IS NOT NULL)",
+            "(entry_type = 'workout' AND workout_id IS NOT NULL AND meal_id IS NULL AND grocery_trip_id IS NULL AND meal_prep_session_id IS NULL) OR "
+            "(entry_type = 'meal' AND meal_id IS NOT NULL AND workout_id IS NULL AND grocery_trip_id IS NULL AND meal_prep_session_id IS NULL) OR "
+            "(entry_type = 'grocery_shopping' AND workout_id IS NULL AND meal_id IS NULL AND grocery_trip_id IS NOT NULL AND meal_prep_session_id IS NULL) OR "
+            "(entry_type = 'meal_prep' AND workout_id IS NULL AND meal_id IS NULL AND grocery_trip_id IS NULL AND meal_prep_session_id IS NOT NULL)",
             name="valid_entry_reference",
         ),
         Index("idx_schedule_entries_schedule", "schedule_id"),
@@ -149,6 +159,8 @@ class ScheduleEntry(Base, TimestampMixin):
         Index("idx_schedule_entries_status", "completion_status"),
         Index("idx_schedule_entries_workout", "workout_id"),
         Index("idx_schedule_entries_meal", "meal_id"),
+        Index("idx_schedule_entries_grocery_trip", "grocery_trip_id"),
+        Index("idx_schedule_entries_meal_prep", "meal_prep_session_id"),
     )
 
     def __repr__(self) -> str:

@@ -23,8 +23,8 @@ class ScheduleEntryCreate(ScheduleEntryBase):
 
     workout_id: UUID | None = None
     meal_id: UUID | None = None
-    grocery_list: dict | None = Field(None, description="Shopping list for grocery_shopping entries")
-    prep_instructions: dict | None = Field(None, description="Cooking instructions for meal_prep entries")
+    grocery_trip_id: UUID | None = Field(None, description="Reference to grocery shopping trip")
+    meal_prep_session_id: UUID | None = Field(None, description="Reference to meal prep session")
 
 
 class ScheduleEntryRead(ScheduleEntryBase):
@@ -34,8 +34,8 @@ class ScheduleEntryRead(ScheduleEntryBase):
     schedule_id: UUID
     workout_id: UUID | None = None
     meal_id: UUID | None = None
-    grocery_list: dict | None = Field(None, description="Shopping list for grocery_shopping entries")
-    prep_instructions: dict | None = Field(None, description="Cooking instructions for meal_prep entries")
+    grocery_trip_id: UUID | None = Field(None, description="Reference to grocery shopping trip")
+    meal_prep_session_id: UUID | None = Field(None, description="Reference to meal prep session")
     completion_status: str = Field(..., description="Status: scheduled, completed, skipped, rescheduled")
     completed_at: datetime | None = None
     user_notes: str | None = None
@@ -46,6 +46,10 @@ class ScheduleEntryRead(ScheduleEntryBase):
     # Optional related data (populated via joins)
     workout_name: str | None = None
     meal_name: str | None = None
+    
+    # Nested objects for grocery and meal prep (for backward compatibility with frontend)
+    grocery_list: dict | None = Field(None, description="Populated from grocery_trip relationship")
+    prep_instructions: dict | None = Field(None, description="Populated from meal_prep_session relationship")
 
     model_config = ConfigDict(from_attributes=True)
 

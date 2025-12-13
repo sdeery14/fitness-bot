@@ -231,6 +231,23 @@ async def get_upcoming_schedule(
         if date_key not in grouped_by_date:
             grouped_by_date[date_key] = []
 
+        # Build grocery_list and prep_instructions from relationships for backward compatibility
+        grocery_list = None
+        if e.grocery_trip:
+            grocery_list = e.grocery_trip.items
+            
+        prep_instructions = None
+        if e.meal_prep_session:
+            prep_instructions = {
+                "session_name": e.meal_prep_session.session_name,
+                "recipes": e.meal_prep_session.recipes,
+                "duration_minutes": e.meal_prep_session.duration_minutes,
+                "batch_size": e.meal_prep_session.batch_size,
+                "instructions": e.meal_prep_session.instructions,
+                "storage_instructions": e.meal_prep_session.storage_instructions,
+                "notes": e.meal_prep_session.notes or e.user_notes
+            }
+        
         grouped_by_date[date_key].append(
             ScheduleEntryRead(
                 id=e.id,
@@ -242,8 +259,10 @@ async def get_upcoming_schedule(
                 completed_at=e.completed_at,
                 workout_id=e.workout_id,
                 meal_id=e.meal_id,
-                grocery_list=e.grocery_list,
-                prep_instructions=e.prep_instructions,
+                grocery_trip_id=e.grocery_trip_id,
+                meal_prep_session_id=e.meal_prep_session_id,
+                grocery_list=grocery_list,
+                prep_instructions=prep_instructions,
                 workout_name=e.workout.name if e.workout else None,
                 meal_name=e.meal.name if e.meal else None,
                 user_notes=e.user_notes,
@@ -254,28 +273,48 @@ async def get_upcoming_schedule(
         )
 
     # Convert all entries
-    entry_reads = [
-        ScheduleEntryRead(
-            id=e.id,
-            schedule_id=e.schedule_id,
-            entry_type=e.entry_type,
-            entry_date=e.entry_date,
-            entry_time=e.entry_time,
-            completion_status=e.completion_status,
-            completed_at=e.completed_at,
-            workout_id=e.workout_id,
-            meal_id=e.meal_id,
-            grocery_list=e.grocery_list,
-            prep_instructions=e.prep_instructions,
-            workout_name=e.workout.name if e.workout else None,
-            meal_name=e.meal.name if e.meal else None,
-            user_notes=e.user_notes,
-            skipped_reason=e.skipped_reason,
-            created_at=e.created_at,
-            updated_at=e.updated_at,
+    entry_reads = []
+    for e in entries:
+        # Build grocery_list and prep_instructions from relationships for backward compatibility
+        grocery_list = None
+        if e.grocery_trip:
+            grocery_list = e.grocery_trip.items
+            
+        prep_instructions = None
+        if e.meal_prep_session:
+            prep_instructions = {
+                "session_name": e.meal_prep_session.session_name,
+                "recipes": e.meal_prep_session.recipes,
+                "duration_minutes": e.meal_prep_session.duration_minutes,
+                "batch_size": e.meal_prep_session.batch_size,
+                "instructions": e.meal_prep_session.instructions,
+                "storage_instructions": e.meal_prep_session.storage_instructions,
+                "notes": e.meal_prep_session.notes or e.user_notes
+            }
+        
+        entry_reads.append(
+            ScheduleEntryRead(
+                id=e.id,
+                schedule_id=e.schedule_id,
+                entry_type=e.entry_type,
+                entry_date=e.entry_date,
+                entry_time=e.entry_time,
+                completion_status=e.completion_status,
+                completed_at=e.completed_at,
+                workout_id=e.workout_id,
+                meal_id=e.meal_id,
+                grocery_trip_id=e.grocery_trip_id,
+                meal_prep_session_id=e.meal_prep_session_id,
+                grocery_list=grocery_list,
+                prep_instructions=prep_instructions,
+                workout_name=e.workout.name if e.workout else None,
+                meal_name=e.meal.name if e.meal else None,
+                user_notes=e.user_notes,
+                skipped_reason=e.skipped_reason,
+                created_at=e.created_at,
+                updated_at=e.updated_at,
+            )
         )
-        for e in entries
-    ]
 
     return UpcomingScheduleResponse(
         start_date=date.today(),
