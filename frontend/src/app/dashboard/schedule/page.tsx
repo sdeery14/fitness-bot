@@ -2,7 +2,7 @@
  * Schedule Page - Full calendar view of workouts and meals
  * 
  * Features:
- * - 14-day calendar view
+ * - Monthly calendar view (7 days past + 30 days ahead)
  * - Daily schedule details
  * - Filter by activity type
  * - Navigation controls

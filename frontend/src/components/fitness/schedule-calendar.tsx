@@ -39,13 +39,20 @@ interface DaySchedule {
 
 export function ScheduleCalendar({ days = 14 }: ScheduleCalendarProps) {
   const router = useRouter();
-  const { upcomingSchedule, upcomingLoading, upcomingError, fetchUpcomingSchedule } = useSchedule();
-  const [currentDays, setCurrentDays] = useState(days);
+  const { upcomingSchedule, upcomingLoading, upcomingError, fetchScheduleRange } = useSchedule();
+  const [currentMonth, setCurrentMonth] = useState(new Date());
   const [groupedSchedule, setGroupedSchedule] = useState<DaySchedule[]>([]);
 
   useEffect(() => {
-    fetchUpcomingSchedule(currentDays);
-  }, [currentDays, fetchUpcomingSchedule]);
+    // Get first and last day of current month
+    const firstDay = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1);
+    const lastDay = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1);
+    
+    const startDate = firstDay.toISOString().split('T')[0];
+    const endDate = lastDay.toISOString().split('T')[0];
+    
+    fetchScheduleRange(startDate, endDate);
+  }, [currentMonth, fetchScheduleRange]);
 
   useEffect(() => {
     if (upcomingSchedule) {
@@ -81,13 +88,15 @@ export function ScheduleCalendar({ days = 14 }: ScheduleCalendarProps) {
     }
   }, [upcomingSchedule]);
 
-  const handlePreviousWeek = () => {
-    setCurrentDays((prev) => Math.max(7, prev - 7));
+  const handlePreviousMonth = () => {
+    setCurrentMonth((prev) => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
   };
 
-  const handleNextWeek = () => {
-    setCurrentDays((prev) => prev + 7);
+  const handleNextMonth = () => {
+    setCurrentMonth((prev) => new Date(prev.getFullYear(), prev.getMonth() + 1, 1));
   };
+
+  const currentMonthName = currentMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 
   const isToday = (dateString: string) => {
     const today = new Date().toISOString().split('T')[0];
@@ -95,7 +104,9 @@ export function ScheduleCalendar({ days = 14 }: ScheduleCalendarProps) {
   };
 
   const isPast = (dateString: string) => {
-    const date = new Date(dateString);
+    // Parse date string without timezone conversion (YYYY-MM-DD format)
+    const [year, month, day] = dateString.split('-').map(Number);
+    const date = new Date(year, month - 1, day);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     return date < today;
@@ -143,10 +154,10 @@ export function ScheduleCalendar({ days = 14 }: ScheduleCalendarProps) {
       <Card>
         <CardHeader>
           <CardTitle>Schedule Calendar</CardTitle>
-          <CardDescription>Next {currentDays} days</CardDescription>
+          <CardDescription>{currentMonthName}</CardDescription>
         </CardHeader>
         <CardContent>
-          <p className="text-muted-foreground">No scheduled activities in the next {currentDays} days.</p>
+          <p className="text-muted-foreground">No scheduled activities for {currentMonthName}.</p>
         </CardContent>
       </Card>
     );
@@ -158,16 +169,13 @@ export function ScheduleCalendar({ days = 14 }: ScheduleCalendarProps) {
         <div className="flex items-center justify-between">
           <div>
             <CardTitle>Schedule Calendar</CardTitle>
-            <CardDescription>
-              {new Date(upcomingSchedule.start_date).toLocaleDateString()} -{' '}
-              {new Date(upcomingSchedule.end_date).toLocaleDateString()}
-            </CardDescription>
+            <CardDescription>{currentMonthName}</CardDescription>
           </div>
           <div className="flex gap-2">
-            <Button variant="outline" size="icon" onClick={handlePreviousWeek}>
+            <Button variant="outline" size="icon" onClick={handlePreviousMonth}>
               <ChevronLeft className="h-4 w-4" />
             </Button>
-            <Button variant="outline" size="icon" onClick={handleNextWeek}>
+            <Button variant="outline" size="icon" onClick={handleNextMonth}>
               <ChevronRight className="h-4 w-4" />
             </Button>
           </div>
@@ -230,13 +238,19 @@ export function ScheduleCalendar({ days = 14 }: ScheduleCalendarProps) {
                     <div className="flex items-center justify-between">
                       <div>
                         <CardTitle className="text-lg">
-                          {new Date(day.date).toLocaleDateString('en-US', { weekday: 'short' })}
+                          {(() => {
+                            const [y, m, d] = day.date.split('-').map(Number);
+                            return new Date(y, m - 1, d).toLocaleDateString('en-US', { weekday: 'short' });
+                          })()}
                         </CardTitle>
                         <CardDescription>
-                          {new Date(day.date).toLocaleDateString('en-US', {
-                            month: 'short',
-                            day: 'numeric',
-                          })}
+                          {(() => {
+                            const [y, m, d] = day.date.split('-').map(Number);
+                            return new Date(y, m - 1, d).toLocaleDateString('en-US', {
+                              month: 'short',
+                              day: 'numeric',
+                            });
+                          })()}
                         </CardDescription>
                       </div>
                       {todayClass && (

@@ -173,22 +173,56 @@ async def get_today_schedule(
 async def get_upcoming_schedule(
     user_id: CurrentUserId,
     db: DatabaseSession,
-    days: int = 14,
+    days: int | None = None,
+    include_past_days: int | None = None,
+    start_date: date | None = None,
+    end_date: date | None = None,
 ):
-    """Get upcoming schedule for the next N days.
+    """Get schedule for a date range or upcoming days.
 
-    Returns scheduled activities for the specified number of days ahead.
+    Can be used in two modes:
+    1. Date range mode: Provide start_date and end_date for a specific month/period
+    2. Rolling window mode: Provide days and include_past_days for a rolling view
 
     Args:
-        days: Number of days to look ahead (1-30, default 14)
+        start_date: Optional start date for date range mode
+        end_date: Optional end date for date range mode
+        days: Number of days to look ahead (rolling mode, default 14)
+        include_past_days: Number of past days to include (rolling mode, default 7)
         user_id: Current authenticated user ID
         db: Database session
 
     Returns:
-        Upcoming schedule grouped by date
+        Schedule entries grouped by date
     """
     service = ScheduleService(db)
-    entries = await service.get_upcoming_schedule(user_id=user_id, days=days)
+    
+    # Date range mode: if start_date or end_date provided
+    if start_date is not None or end_date is not None:
+        if start_date is None:
+            start_date = date.today().replace(day=1)  # First day of current month
+        if end_date is None:
+            # Last day of the month
+            next_month = start_date.replace(day=28) + timedelta(days=4)
+            end_date = next_month.replace(day=1)
+        
+        entries = await service.get_schedule_range(
+            user_id=user_id,
+            start_date=start_date,
+            end_date=end_date
+        )
+    else:
+        # Rolling window mode
+        if days is None:
+            days = 14
+        if include_past_days is None:
+            include_past_days = 7
+        
+        entries = await service.get_upcoming_schedule(
+            user_id=user_id,
+            days=days,
+            include_past_days=include_past_days
+        )
 
     # Group entries by date
     grouped_by_date: dict[str, list[ScheduleEntryRead]] = {}

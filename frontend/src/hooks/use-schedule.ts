@@ -101,6 +101,45 @@ export function useSchedule() {
   );
 
   /**
+   * Fetch schedule for a specific date range (e.g., current month)
+   * @param startDate - Start date (YYYY-MM-DD)
+   * @param endDate - End date (YYYY-MM-DD)
+   */
+  const fetchScheduleRange = useCallback(
+    async (startDate: string, endDate: string) => {
+      setUpcomingLoading(true);
+      setUpcomingError(null);
+
+      try {
+        const token = localStorage.getItem('access_token');
+        const response = await fetch(
+          `${API_BASE}/schedules/upcoming?start_date=${startDate}&end_date=${endDate}`,
+          {
+            headers: {
+              'Content-Type': 'application/json',
+              ...(token && { Authorization: `Bearer ${token}` }),
+            },
+          }
+        );
+
+        if (!response.ok) {
+          throw new Error(`Failed to fetch schedule range: ${response.statusText}`);
+        }
+
+        const data: UpcomingSchedule = await response.json();
+        setUpcomingSchedule(data);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        setUpcomingError(message);
+        console.error('Error fetching schedule range:', error);
+      } finally {
+        setUpcomingLoading(false);
+      }
+    },
+    [setUpcomingSchedule, setUpcomingLoading, setUpcomingError]
+  );
+
+  /**
    * Mark entry as complete
    * @param entryId - Schedule entry ID
    * @param notes - Optional user notes
@@ -200,6 +239,7 @@ export function useSchedule() {
     upcomingLoading,
     upcomingError,
     fetchUpcomingSchedule,
+    fetchScheduleRange,
 
     // Actions
     markComplete,

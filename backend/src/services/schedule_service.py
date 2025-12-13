@@ -793,18 +793,56 @@ class ScheduleService:
         result = await self.db.execute(stmt)
         return list(result.scalars().all())
 
+    async def get_schedule_range(
+        self,
+        user_id: UUID,
+        start_date: date,
+        end_date: date,
+    ) -> list[ScheduleEntry]:
+        """Get schedule entries for a specific date range.
+
+        Args:
+            user_id: User's UUID
+            start_date: Start date (inclusive)
+            end_date: End date (exclusive)
+
+        Returns:
+            List of schedule entries ordered by date and time
+        """
+        stmt = (
+            select(ScheduleEntry)
+            .join(Schedule)
+            .where(
+                and_(
+                    Schedule.user_id == user_id,
+                    ScheduleEntry.entry_date >= start_date,
+                    ScheduleEntry.entry_date < end_date,
+                )
+            )
+            .options(
+                selectinload(ScheduleEntry.workout),
+                selectinload(ScheduleEntry.meal),
+            )
+            .order_by(ScheduleEntry.entry_date, ScheduleEntry.entry_time, ScheduleEntry.entry_type)
+        )
+
+        result = await self.db.execute(stmt)
+        return list(result.scalars().all())
+
     async def get_upcoming_schedule(
         self,
         user_id: UUID,
         days: int = 14,
         start_date: date | None = None,
+        include_past_days: int = 7,
     ) -> list[ScheduleEntry]:
-        """Get schedule entries for the next N days.
+        """Get schedule entries for the next N days, optionally including past days.
 
         Args:
             user_id: User's UUID
             days: Number of days to look ahead (default 14)
             start_date: Optional start date (defaults to today)
+            include_past_days: Number of past days to include (default 7)
 
         Returns:
             List of schedule entries ordered by date and time
@@ -812,6 +850,8 @@ class ScheduleService:
         if start_date is None:
             start_date = date.today()
 
+        # Include past days in the query
+        actual_start_date = start_date - timedelta(days=include_past_days)
         end_date = start_date + timedelta(days=days)
 
         stmt = (
@@ -820,7 +860,7 @@ class ScheduleService:
             .where(
                 and_(
                     Schedule.user_id == user_id,
-                    ScheduleEntry.entry_date >= start_date,
+                    ScheduleEntry.entry_date >= actual_start_date,
                     ScheduleEntry.entry_date < end_date,
                 )
             )
