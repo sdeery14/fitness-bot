@@ -18,6 +18,9 @@ import {
   Pause,
   Play,
   Trash2,
+  ShoppingCart,
+  ChefHat,
+  Package,
 } from "lucide-react";
 import {
   AlertDialog,
@@ -989,6 +992,168 @@ export default function PlanPage() {
                                                           )}
                                                         </div>
                                                       ))}
+                                                    </div>
+                                                  </details>
+                                                ))}
+                                              </div>
+                                            </div>
+                                          )}
+
+                                          {/* Grocery Shopping Schedule */}
+                                          {phase.meal_details.grocery_shopping_schedule && phase.meal_details.grocery_shopping_schedule.length > 0 && (
+                                            <div className="border-t pt-3">
+                                              <p className="text-xs font-semibold text-gray-700 uppercase mb-2 flex items-center gap-1">
+                                                <ShoppingCart className="h-3 w-3" />
+                                                Grocery Shopping Schedule
+                                              </p>
+                                              <div className="space-y-2">
+                                                {phase.meal_details.grocery_shopping_schedule.map((entry: any, idx: number) => (
+                                                  <div key={idx} className="p-2 bg-green-50 rounded border border-green-200">
+                                                    <div className="flex items-center justify-between mb-1">
+                                                      <span className="text-xs font-medium text-green-900">
+                                                        Day {entry.day_offset + 1} @ {entry.time}
+                                                      </span>
+                                                      {entry.repeats_every && (
+                                                        <Badge variant="secondary" className="text-xs">
+                                                          Every {entry.repeats_every} days
+                                                        </Badge>
+                                                      )}
+                                                    </div>
+                                                    {entry.notes && (
+                                                      <p className="text-xs text-green-700">{entry.notes}</p>
+                                                    )}
+                                                  </div>
+                                                ))}
+                                              </div>
+                                            </div>
+                                          )}
+
+                                          {/* Grocery List */}
+                                          {phase.meal_details.grocery_list && phase.meal_details.grocery_list.length > 0 && (
+                                            <div className="border-t pt-3">
+                                              <p className="text-xs font-semibold text-gray-700 uppercase mb-2">Shopping List</p>
+                                              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                                {/* Group items by category */}
+                                                {(() => {
+                                                  const grouped = phase.meal_details.grocery_list.reduce((acc: any, item: any) => {
+                                                    if (!acc[item.category]) acc[item.category] = [];
+                                                    acc[item.category].push(item);
+                                                    return acc;
+                                                  }, {});
+                                                  const categories = ['Produce', 'Meat', 'Dairy', 'Grains', 'Frozen', 'Pantry', 'Other'];
+                                                  const sortedCategories = Object.keys(grouped).sort((a, b) => {
+                                                    const aIndex = categories.indexOf(a);
+                                                    const bIndex = categories.indexOf(b);
+                                                    if (aIndex === -1 && bIndex === -1) return a.localeCompare(b);
+                                                    if (aIndex === -1) return 1;
+                                                    if (bIndex === -1) return -1;
+                                                    return aIndex - bIndex;
+                                                  });
+                                                  return sortedCategories.map((category) => (
+                                                    <div key={category} className="space-y-1">
+                                                      <p className="text-xs font-semibold text-gray-600 uppercase">{category}</p>
+                                                      <ul className="space-y-0.5 ml-3">
+                                                        {grouped[category].map((item: any, idx: number) => (
+                                                          <li key={idx} className="text-xs text-gray-700 flex justify-between">
+                                                            <span>{item.ingredient}</span>
+                                                            <span className="text-gray-500">{item.quantity}</span>
+                                                          </li>
+                                                        ))}
+                                                      </ul>
+                                                    </div>
+                                                  ));
+                                                })()}
+                                              </div>
+                                            </div>
+                                          )}
+
+                                          {/* Meal Prep Schedule */}
+                                          {phase.meal_details.meal_prep_schedule && phase.meal_details.meal_prep_schedule.length > 0 && (
+                                            <div className="border-t pt-3">
+                                              <p className="text-xs font-semibold text-gray-700 uppercase mb-2 flex items-center gap-1">
+                                                <ChefHat className="h-3 w-3" />
+                                                Meal Prep Schedule
+                                              </p>
+                                              <div className="space-y-2">
+                                                {phase.meal_details.meal_prep_schedule.map((entry: any, idx: number) => {
+                                                  const session = phase.meal_details.meal_prep_sessions?.[entry.session_index];
+                                                  return (
+                                                    <div key={idx} className="p-2 bg-purple-50 rounded border border-purple-200">
+                                                      <div className="flex items-center justify-between mb-1">
+                                                        <div className="flex items-center gap-2">
+                                                          <span className="text-xs font-medium text-purple-900">
+                                                            Day {entry.day_offset + 1} @ {entry.time}
+                                                          </span>
+                                                          {session && (
+                                                            <span className="text-xs text-purple-700">• {session.session_name}</span>
+                                                          )}
+                                                        </div>
+                                                        {entry.repeats_every && (
+                                                          <Badge variant="secondary" className="text-xs">
+                                                            Every {entry.repeats_every} days
+                                                          </Badge>
+                                                        )}
+                                                      </div>
+                                                      {entry.notes && (
+                                                        <p className="text-xs text-purple-700">{entry.notes}</p>
+                                                      )}
+                                                    </div>
+                                                  );
+                                                })}
+                                              </div>
+                                            </div>
+                                          )}
+
+                                          {/* Meal Prep Sessions */}
+                                          {phase.meal_details.meal_prep_sessions && phase.meal_details.meal_prep_sessions.length > 0 && (
+                                            <div className="border-t pt-3">
+                                              <p className="text-xs font-semibold text-gray-700 uppercase mb-2">Prep Session Templates</p>
+                                              <div className="space-y-3">
+                                                {phase.meal_details.meal_prep_sessions.map((session: any, idx: number) => (
+                                                  <details key={idx} className="group/session">
+                                                    <summary className="p-2 bg-purple-50 rounded border border-purple-200 cursor-pointer hover:bg-purple-100 text-sm">
+                                                      <div className="flex items-center justify-between">
+                                                        <span className="font-medium text-purple-900">{session.session_name}</span>
+                                                        <div className="flex items-center gap-2 text-xs text-purple-700">
+                                                          <Package className="h-3 w-3" />
+                                                          <span>{session.batch_size} servings</span>
+                                                          <Clock className="h-3 w-3" />
+                                                          <span>{session.duration_minutes} min</span>
+                                                        </div>
+                                                      </div>
+                                                    </summary>
+                                                    <div className="mt-2 p-3 bg-white rounded border border-gray-200 space-y-2">
+                                                      {session.recipes && session.recipes.length > 0 && (
+                                                        <div>
+                                                          <p className="text-xs font-semibold text-gray-700 mb-1">Recipes:</p>
+                                                          <ul className="space-y-0.5 ml-3">
+                                                            {session.recipes.map((recipe: string, rIdx: number) => (
+                                                              <li key={rIdx} className="text-xs text-gray-700">• {recipe}</li>
+                                                            ))}
+                                                          </ul>
+                                                        </div>
+                                                      )}
+                                                      {session.instructions && session.instructions.length > 0 && (
+                                                        <div>
+                                                          <p className="text-xs font-semibold text-gray-700 mb-1">Instructions:</p>
+                                                          <ol className="space-y-1">
+                                                            {session.instructions.map((instruction: string, iIdx: number) => (
+                                                              <li key={iIdx} className="text-xs text-gray-700">
+                                                                {iIdx + 1}. {instruction}
+                                                              </li>
+                                                            ))}
+                                                          </ol>
+                                                        </div>
+                                                      )}
+                                                      {session.storage_instructions && (
+                                                        <div className="bg-amber-50 rounded p-2 border border-amber-200">
+                                                          <p className="text-xs font-semibold text-amber-900 mb-0.5 flex items-center gap-1">
+                                                            <Package className="h-3 w-3" />
+                                                            Storage:
+                                                          </p>
+                                                          <p className="text-xs text-amber-900">{session.storage_instructions}</p>
+                                                        </div>
+                                                      )}
                                                     </div>
                                                   </details>
                                                 ))}
