@@ -10,15 +10,40 @@
 
 import { create } from 'zustand';
 
+export interface GroceryItem {
+  ingredient: string;
+  quantity: string;
+  category: string;
+  notes?: string;
+}
+
+export interface GroceryList {
+  items: GroceryItem[];
+  shopping_date: string;
+  notes?: string;
+}
+
+export interface PrepInstructions {
+  session_name: string;
+  duration_minutes: number;
+  recipes: string[];
+  batch_size: number;
+  instructions: string[];
+  storage_instructions: string;
+  notes?: string;
+}
+
 export interface ScheduleEntry {
   id: string;
-  entry_type: 'workout' | 'meal';
+  entry_type: 'workout' | 'meal' | 'grocery_shopping' | 'meal_prep';
   entry_date: string;
   entry_time: string | null;
   workout_id: string | null;
   meal_id: string | null;
   workout_name: string | null;
   meal_name: string | null;
+  grocery_list: GroceryList | null;
+  prep_instructions: PrepInstructions | null;
   completion_status: 'scheduled' | 'completed' | 'skipped' | 'rescheduled';
   completed_at: string | null;
   user_notes: string | null;

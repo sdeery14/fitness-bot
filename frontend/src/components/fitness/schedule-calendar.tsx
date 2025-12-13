@@ -19,7 +19,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
-import { CheckCircle2, XCircle, Clock, Dumbbell, Utensils, ChevronLeft, ChevronRight } from 'lucide-react';
+import { CheckCircle2, XCircle, Clock, Dumbbell, Utensils, ShoppingCart, ChefHat, ChevronLeft, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface ScheduleCalendarProps {
@@ -31,6 +31,8 @@ interface DaySchedule {
   entries: ScheduleEntry[];
   workoutCount: number;
   mealCount: number;
+  groceryCount: number;
+  prepCount: number;
   completedCount: number;
   skippedCount: number;
 }
@@ -54,6 +56,8 @@ export function ScheduleCalendar({ days = 14 }: ScheduleCalendarProps) {
           existing.entries.push(entry);
           if (entry.entry_type === 'workout') existing.workoutCount++;
           if (entry.entry_type === 'meal') existing.mealCount++;
+          if (entry.entry_type === 'grocery_shopping') existing.groceryCount++;
+          if (entry.entry_type === 'meal_prep') existing.prepCount++;
           if (entry.completion_status === 'completed') existing.completedCount++;
           if (entry.completion_status === 'skipped') existing.skippedCount++;
         } else {
@@ -62,6 +66,8 @@ export function ScheduleCalendar({ days = 14 }: ScheduleCalendarProps) {
             entries: [entry],
             workoutCount: entry.entry_type === 'workout' ? 1 : 0,
             mealCount: entry.entry_type === 'meal' ? 1 : 0,
+            groceryCount: entry.entry_type === 'grocery_shopping' ? 1 : 0,
+            prepCount: entry.entry_type === 'meal_prep' ? 1 : 0,
             completedCount: entry.completion_status === 'completed' ? 1 : 0,
             skippedCount: entry.completion_status === 'skipped' ? 1 : 0,
           });
@@ -170,17 +176,29 @@ export function ScheduleCalendar({ days = 14 }: ScheduleCalendarProps) {
       <CardContent>
         <div className="space-y-4">
           {/* Summary Stats */}
-          <div className="grid grid-cols-3 gap-4 pb-4 border-b">
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-4 pb-4 border-b">
             <div>
-              <div className="text-sm text-muted-foreground">Total Workouts</div>
+              <div className="text-sm text-muted-foreground">Workouts</div>
               <div className="text-lg font-semibold">
                 {groupedSchedule.reduce((sum, day) => sum + day.workoutCount, 0)}
               </div>
             </div>
             <div>
-              <div className="text-sm text-muted-foreground">Total Meals</div>
+              <div className="text-sm text-muted-foreground">Meals</div>
               <div className="text-lg font-semibold">
                 {groupedSchedule.reduce((sum, day) => sum + day.mealCount, 0)}
+              </div>
+            </div>
+            <div>
+              <div className="text-sm text-muted-foreground">Grocery Trips</div>
+              <div className="text-lg font-semibold">
+                {groupedSchedule.reduce((sum, day) => sum + day.groceryCount, 0)}
+              </div>
+            </div>
+            <div>
+              <div className="text-sm text-muted-foreground">Meal Prep</div>
+              <div className="text-lg font-semibold">
+                {groupedSchedule.reduce((sum, day) => sum + day.prepCount, 0)}
               </div>
             </div>
             <div>
@@ -230,15 +248,31 @@ export function ScheduleCalendar({ days = 14 }: ScheduleCalendarProps) {
                   </CardHeader>
                   <CardContent className="space-y-3">
                     {/* Activity Counts */}
-                    <div className="flex items-center gap-3 text-sm">
-                      <div className="flex items-center gap-1">
-                        <Dumbbell className="h-4 w-4 text-blue-500" />
-                        <span>{day.workoutCount}</span>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <Utensils className="h-4 w-4 text-orange-500" />
-                        <span>{day.mealCount}</span>
-                      </div>
+                    <div className="flex items-center gap-2 text-sm flex-wrap">
+                      {day.workoutCount > 0 && (
+                        <div className="flex items-center gap-1">
+                          <Dumbbell className="h-4 w-4 text-blue-500" />
+                          <span>{day.workoutCount}</span>
+                        </div>
+                      )}
+                      {day.mealCount > 0 && (
+                        <div className="flex items-center gap-1">
+                          <Utensils className="h-4 w-4 text-orange-500" />
+                          <span>{day.mealCount}</span>
+                        </div>
+                      )}
+                      {day.groceryCount > 0 && (
+                        <div className="flex items-center gap-1">
+                          <ShoppingCart className="h-4 w-4 text-green-500" />
+                          <span>{day.groceryCount}</span>
+                        </div>
+                      )}
+                      {day.prepCount > 0 && (
+                        <div className="flex items-center gap-1">
+                          <ChefHat className="h-4 w-4 text-purple-500" />
+                          <span>{day.prepCount}</span>
+                        </div>
+                      )}
                     </div>
 
                     {/* Completion Status */}
@@ -285,13 +319,24 @@ export function ScheduleCalendar({ days = 14 }: ScheduleCalendarProps) {
                           className="flex items-center justify-between text-xs text-muted-foreground"
                         >
                           <div className="flex items-center gap-1 truncate">
-                            {entry.entry_type === 'workout' ? (
+                            {entry.entry_type === 'workout' && (
                               <Dumbbell className="h-3 w-3 text-blue-500 flex-shrink-0" />
-                            ) : (
+                            )}
+                            {entry.entry_type === 'meal' && (
                               <Utensils className="h-3 w-3 text-orange-500 flex-shrink-0" />
                             )}
+                            {entry.entry_type === 'grocery_shopping' && (
+                              <ShoppingCart className="h-3 w-3 text-green-500 flex-shrink-0" />
+                            )}
+                            {entry.entry_type === 'meal_prep' && (
+                              <ChefHat className="h-3 w-3 text-purple-500 flex-shrink-0" />
+                            )}
                             <span className="truncate">
-                              {entry.workout?.name || entry.meal?.name || entry.entry_type}
+                              {entry.workout?.name || 
+                               entry.meal?.name || 
+                               entry.entry_type === 'grocery_shopping' ? 'Grocery Shopping' : 
+                               entry.entry_type === 'meal_prep' ? entry.prep_instructions?.session_name || 'Meal Prep' :
+                               entry.entry_type}
                             </span>
                           </div>
                           {entry.completion_status === 'completed' && (

@@ -6,8 +6,10 @@ import type { ScheduleEntry } from '@/store/schedule-store';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Dumbbell, Utensils, CheckCircle2, XCircle, Clock } from 'lucide-react';
+import { Dumbbell, Utensils, ShoppingCart, ChefHat, CheckCircle2, XCircle, Clock } from 'lucide-react';
 import Link from 'next/link';
+import { GroceryShoppingCard } from '@/components/fitness/grocery-shopping-card';
+import { MealPrepCard } from '@/components/fitness/meal-prep-card';
 
 export function TodaySchedule() {
   const { upcomingSchedule, upcomingLoading, upcomingError, fetchUpcomingSchedule } = useSchedule();
@@ -27,6 +29,8 @@ export function TodaySchedule() {
 
   const workouts = dayEntries.filter(e => e.entry_type === 'workout');
   const meals = dayEntries.filter(e => e.entry_type === 'meal');
+  const groceryShopping = dayEntries.filter(e => e.entry_type === 'grocery_shopping');
+  const mealPrep = dayEntries.filter(e => e.entry_type === 'meal_prep');
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -90,7 +94,7 @@ export function TodaySchedule() {
       </Card>
 
       {/* Summary Stats */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
@@ -116,8 +120,30 @@ export function TodaySchedule() {
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
+              <ShoppingCart className="h-4 w-4 text-green-500" />
+              Grocery
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-2xl font-bold">{groceryShopping.length}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
+              <ChefHat className="h-4 w-4 text-purple-500" />
+              Prep
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-2xl font-bold">{mealPrep.length}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
               <CheckCircle2 className="h-4 w-4 text-green-500" />
-              Completed
+              Done
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -225,6 +251,42 @@ export function TodaySchedule() {
                   )}
                 </Card>
               </Link>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Grocery Shopping Section */}
+      {groceryShopping.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <ShoppingCart className="h-5 w-5" />
+              Grocery Shopping
+            </CardTitle>
+            <CardDescription>{groceryShopping.length} trip{groceryShopping.length !== 1 ? 's' : ''} scheduled</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {groceryShopping.map((entry) => (
+              <GroceryShoppingCard key={entry.id} entry={entry} compact />
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Meal Prep Section */}
+      {mealPrep.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <ChefHat className="h-5 w-5" />
+              Meal Prep Sessions
+            </CardTitle>
+            <CardDescription>{mealPrep.length} session{mealPrep.length !== 1 ? 's' : ''} scheduled</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {mealPrep.map((entry) => (
+              <MealPrepCard key={entry.id} entry={entry} compact />
             ))}
           </CardContent>
         </Card>

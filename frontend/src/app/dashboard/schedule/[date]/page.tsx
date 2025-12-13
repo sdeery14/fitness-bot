@@ -8,8 +8,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowLeft, Dumbbell, Utensils, CheckCircle2, XCircle, Clock } from 'lucide-react';
+import { ArrowLeft, Dumbbell, Utensils, ShoppingCart, ChefHat, CheckCircle2, XCircle, Clock } from 'lucide-react';
 import Link from 'next/link';
+import { GroceryShoppingCard } from '@/components/fitness/grocery-shopping-card';
+import { MealPrepCard } from '@/components/fitness/meal-prep-card';
 
 export default function DayDetailPage() {
   const params = useParams();
@@ -31,6 +33,8 @@ export default function DayDetailPage() {
 
   const workouts = dayEntries.filter(e => e.entry_type === 'workout');
   const meals = dayEntries.filter(e => e.entry_type === 'meal');
+  const groceryShopping = dayEntries.filter(e => e.entry_type === 'grocery_shopping');
+  const mealPrep = dayEntries.filter(e => e.entry_type === 'meal_prep');
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -95,7 +99,7 @@ export default function DayDetailPage() {
       </div>
 
       {/* Summary Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         <Card>
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
@@ -121,8 +125,30 @@ export default function DayDetailPage() {
         <Card>
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
+              <ShoppingCart className="h-5 w-5 text-green-500" />
+              Grocery
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-3xl font-bold">{groceryShopping.length}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <ChefHat className="h-5 w-5 text-purple-500" />
+              Prep
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-3xl font-bold">{mealPrep.length}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
               <CheckCircle2 className="h-5 w-5 text-green-500" />
-              Completed
+              Done
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -230,6 +256,42 @@ export default function DayDetailPage() {
                   )}
                 </Card>
               </Link>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Grocery Shopping Section */}
+      {groceryShopping.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <ShoppingCart className="h-5 w-5" />
+              Grocery Shopping
+            </CardTitle>
+            <CardDescription>{groceryShopping.length} trip{groceryShopping.length !== 1 ? 's' : ''} scheduled</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {groceryShopping.map((entry) => (
+              <GroceryShoppingCard key={entry.id} entry={entry} />
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Meal Prep Section */}
+      {mealPrep.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <ChefHat className="h-5 w-5" />
+              Meal Prep Sessions
+            </CardTitle>
+            <CardDescription>{mealPrep.length} session{mealPrep.length !== 1 ? 's' : ''} scheduled</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {mealPrep.map((entry) => (
+              <MealPrepCard key={entry.id} entry={entry} />
             ))}
           </CardContent>
         </Card>
