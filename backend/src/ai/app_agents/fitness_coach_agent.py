@@ -1,10 +1,10 @@
-"""Conversation Agent for user interaction and requirement extraction.
+"""Fitness Coach Agent for ongoing user support and plan management.
 
 This agent is responsible for:
-- Starting conversations with users about fitness goals
-- Asking clarifying questions about preferences and constraints
-- Extracting structured requirements for plan generation
-- Calling build_fitness_plan tool when requirements are complete
+- Helping users with their existing fitness plans
+- Answering questions about workouts, nutrition, and progress
+- Assisting with plan modifications and adjustments
+- Supporting users who want to create a new plan
 - Retrieving user's active plan details for context-aware conversations
 - Maintaining conversational context throughout the interaction
 
@@ -16,19 +16,19 @@ from src.ai.agent import create_model_settings
 from src.ai.tools.plan_tools import build_fitness_plan, get_active_fitness_plan
 
 
-def create_conversation_agent() -> Agent:
-    """Create the Conversation Agent for requirement extraction.
+def create_fitness_coach_agent() -> Agent:
+    """Create the Fitness Coach Agent for ongoing support and plan management.
 
-    This agent guides users through the fitness planning process by:
-    1. Understanding their primary fitness goal
-    2. Asking targeted questions to clarify constraints
-    3. Validating that sufficient information has been gathered
-    4. Structuring the requirements for downstream agents
+    This agent provides ongoing support to users with existing plans by:
+    1. Answering questions about their current fitness plan
+    2. Helping with progress tracking and adjustments
+    3. Assisting with plan modifications when needed
+    4. Supporting users who want to create a completely new plan
 
-    The agent aims to collect complete information in 3-7 conversational turns.
+    The agent maintains a supportive, coaching relationship throughout.
 
     Returns:
-        Agent configured for conversational requirement extraction
+        Agent configured for fitness coaching and plan management
     """
     instructions = """You are an expert fitness coach helping users manage their fitness journey.
 
@@ -121,4 +121,4 @@ Continue supporting their journey, then call build_fitness_plan when ready to ge
 
 
 # Create singleton instance
-conversation_agent = create_conversation_agent()
+fitness_coach_agent = create_fitness_coach_agent()

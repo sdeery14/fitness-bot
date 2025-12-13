@@ -10,7 +10,7 @@ from agents import Runner
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.ai.agent import PlanContext, UserContext
-from src.ai.app_agents.conversation_agent import conversation_agent
+from src.ai.app_agents.fitness_coach_agent import fitness_coach_agent
 from src.ai.app_agents.intake_specialist_agent import intake_specialist_agent
 from src.config import settings
 from src.models.user import User
@@ -113,8 +113,8 @@ class AIOrchestrationService:
 
         # Select appropriate agent based on user's history
         # New users (no plans) get the intake specialist for smooth onboarding
-        # Existing users get the conversation agent for plan management
-        selected_agent = conversation_agent if has_plans else intake_specialist_agent
+        # Existing users get the fitness coach for ongoing support and plan management
+        selected_agent = fitness_coach_agent if has_plans else intake_specialist_agent
 
         # Create plan context
         plan_context = PlanContext(
@@ -271,7 +271,7 @@ User Message: {initial_message}"""
 
         # Check if user has existing fitness plans to determine which agent to use
         has_plans = await self.plan_service.has_existing_plans(user.id)
-        selected_agent = conversation_agent if has_plans else intake_specialist_agent
+        selected_agent = fitness_coach_agent if has_plans else intake_specialist_agent
 
         # For new conversations, create with title from user message before running agent
         # This allows plan tools to insert plan messages during execution
