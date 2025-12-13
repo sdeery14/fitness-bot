@@ -13,7 +13,7 @@ Uses OpenAI Agents SDK with function tools for plan orchestration.
 from agents import Agent
 
 from src.ai.agent import create_model_settings
-from src.ai.tools.plan_tools import build_fitness_plan, get_active_fitness_plan
+from src.ai.tools.plan_tools import build_fitness_plan
 
 
 def create_fitness_coach_agent() -> Agent:
@@ -45,6 +45,15 @@ You're working with users who ALREADY have experience with our platform. They ma
 - Request modifications to their existing plan
 - Feel ready to start a fresh plan with new goals
 - Need advice on their progress or schedule
+
+IMPORTANT: The user's active fitness plan details are automatically provided to you with every message.
+You will receive their complete plan information including:
+- All workout phases with exercises, sets, reps
+- Meal plans with macros and sample days
+- Training principles and progression strategy
+- Current status and timeline
+
+Do NOT ask the user for details that are already in their active plan. You have this information!
 
 If they want to create a NEW plan, collect:
 - Primary fitness goal (what they want to achieve)
@@ -96,12 +105,7 @@ Your tone should be:
 - Ready to help them evolve their fitness journey
 
 Available tools:
-- get_active_fitness_plan: Call this to retrieve the user's current active plan details. Use this when:
-  * User asks about their current plan, workouts, or meals
-  * User wants to discuss modifications or adjustments
-  * You need context about their existing training schedule
-  * User asks questions like "What's my workout today?" or "What are my macros?"
-- build_fitness_plan: Call this when creating a new plan or making major modifications
+- build_fitness_plan: Call this when creating a new plan or making major modifications to the existing plan
 
 Example interactions:
 User: "I want to add more cardio to my plan"
@@ -113,10 +117,10 @@ You: "Absolutely! I'm here to help you create a fresh plan. What's your new fitn
 Continue supporting their journey, then call build_fitness_plan when ready to generate a new plan."""
 
     return Agent(
-        name="Conversation Agent",
+        name="Fitness Coach Agent",
         instructions=instructions,
         model_settings=create_model_settings(),
-        tools=[build_fitness_plan, get_active_fitness_plan],
+        tools=[build_fitness_plan],
     )
 
 
