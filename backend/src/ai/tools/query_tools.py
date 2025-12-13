@@ -8,13 +8,12 @@ Architecture:
 """
 import json
 import os
-from contextvars import ContextVar
 
 from agents import Runner, function_tool
 from agents.mcp import MCPServerStdio
 
-# Context variable to store the MCP server instance
-_mcp_server_context: ContextVar[MCPServerStdio | None] = ContextVar("mcp_server", default=None)
+# Module-level variable to store the MCP server instance (initialized at startup)
+_mcp_server: MCPServerStdio | None = None
 
 
 def _get_database_uri() -> str:
@@ -31,36 +30,52 @@ def _get_database_uri() -> str:
     return database_url.replace("postgresql+asyncpg://", "postgresql://")
 
 
-async def _get_or_create_mcp_server() -> MCPServerStdio:
-    """Get the existing MCP server or create a new one.
+async def initialize_mcp_server() -> None:
+    """Initialize the MCP server on application startup.
 
-    The MCP server is created as a subprocess running postgres-mcp via stdio.
-    It persists for the duration of the application.
+    This should be called once during FastAPI lifespan startup.
+    Creates a subprocess running postgres-mcp via stdio that persists
+    for the entire application lifetime.
+    """
+    global _mcp_server
+    
+    if _mcp_server is not None:
+        return  # Already initialized
+
+    # Create new MCP server with stdio transport
+    database_uri = _get_database_uri()
+    _mcp_server = MCPServerStdio(
+        name="Postgres MCP",
+        params={
+            "command": "npx",
+            "args": ["-y", "@modelcontextprotocol/server-postgres", database_uri, "--access-mode=restricted"],
+        },
+    )
+    
+    # Initialize the server (enter async context)
+    await _mcp_server.__aenter__()
+
+    # Lazy import to avoid circular dependency
+    from src.ai.app_agents.query_agent import query_agent
+    # Add the MCP server to the query agent
+    query_agent.mcp_servers = [_mcp_server]
+
+
+def _get_mcp_server() -> MCPServerStdio:
+    """Get the initialized MCP server.
 
     Returns:
-        MCPServerStdio instance connected to postgres-mcp
+        MCPServerStdio instance
+
+    Raises:
+        RuntimeError: If server not initialized (call initialize_mcp_server first)
     """
-    server = _mcp_server_context.get()
-    if server is None:
-        # Create new MCP server with stdio transport
-        database_uri = _get_database_uri()
-        server = MCPServerStdio(
-            name="Postgres MCP",
-            params={
-                "command": "npx",  # Use npx to run the globally installed package
-                "args": ["-y", "@modelcontextprotocol/server-postgres", database_uri, "--access-mode=restricted"],
-            },
+    if _mcp_server is None:
+        raise RuntimeError(
+            "MCP server not initialized. "
+            "Ensure initialize_mcp_server() is called during application startup."
         )
-        # Initialize the server
-        await server.__aenter__()
-        _mcp_server_context.set(server)
-
-        # Lazy import to avoid circular dependency
-        from src.ai.app_agents.query_agent import query_agent
-        # Add the MCP server to the query agent
-        query_agent.mcp_servers = [server]
-
-    return server
+    return _mcp_server
 
 
 @function_tool
@@ -93,8 +108,8 @@ async def query_database(description: str) -> str:
         JSON string with query results or error message
     """
     try:
-        # Ensure MCP server is initialized
-        await _get_or_create_mcp_server()
+        # Get the initialized MCP server (raises if not initialized)
+        _get_mcp_server()
 
         # Lazy import to avoid circular dependency
         from src.ai.app_agents.query_agent import query_agent
@@ -269,12 +284,15 @@ async def update_fitness_plan(change_description: str) -> str:
         })
 
 
-async def cleanup_mcp_server():
+async def cleanup_mcp_server() -> None:
     """Clean up the MCP server connection.
 
-    Should be called when the application shuts down.
+    This should be called once during FastAPI lifespan shutdown.
+    Properly closes the MCP server subprocess and cleans up resources.
     """
-    server = _mcp_server_context.get()
-    if server is not None:
-        await server.__aexit__(None, None, None)
-        _mcp_server_context.set(None)
+    global _mcp_server
+    
+    if _mcp_server is not None:
+        # Exit the async context manager (closes subprocess)
+        await _mcp_server.__aexit__(None, None, None)
+        _mcp_server = None

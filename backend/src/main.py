@@ -22,8 +22,16 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Application lifespan events."""
     # Startup
     await redis_client.connect()
+    
+    # Initialize MCP server for database queries
+    from src.ai.tools.query_tools import initialize_mcp_server
+    await initialize_mcp_server()
+    
     yield
+    
     # Shutdown
+    from src.ai.tools.query_tools import cleanup_mcp_server
+    await cleanup_mcp_server()
     await redis_client.close()
 
 
