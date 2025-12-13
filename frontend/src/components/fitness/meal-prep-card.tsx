@@ -89,7 +89,7 @@ export function MealPrepCard({ entry, showStatus = true, compact = false }: Meal
   }
 
   return (
-    <Card>
+    <Card className="cursor-pointer hover:shadow-md transition-all">
       <CardHeader>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">

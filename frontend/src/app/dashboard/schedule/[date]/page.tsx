@@ -10,8 +10,6 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ArrowLeft, Dumbbell, Utensils, ShoppingCart, ChefHat, CheckCircle2, XCircle, Clock } from 'lucide-react';
 import Link from 'next/link';
-import { GroceryShoppingCard } from '@/components/fitness/grocery-shopping-card';
-import { MealPrepCard } from '@/components/fitness/meal-prep-card';
 
 export default function DayDetailPage() {
   const params = useParams();
@@ -273,7 +271,41 @@ export default function DayDetailPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             {groceryShopping.map((entry) => (
-              <GroceryShoppingCard key={entry.id} entry={entry} />
+              <Link
+                key={entry.id}
+                href={`/dashboard/schedule/grocery/${entry.id}`}
+                className="block"
+              >
+                <Card className="cursor-pointer hover:shadow-md transition-all">
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        {getStatusIcon(entry.completion_status)}
+                        <div>
+                          <CardTitle className="text-lg">Grocery Shopping</CardTitle>
+                          {entry.entry_time && (
+                            <CardDescription>
+                              {new Date(`2000-01-01T${entry.entry_time}`).toLocaleTimeString('en-US', {
+                                hour: 'numeric',
+                                minute: '2-digit',
+                              })}
+                            </CardDescription>
+                          )}
+                        </div>
+                      </div>
+                      {getStatusBadge(entry.completion_status)}
+                    </div>
+                  </CardHeader>
+                  {entry.grocery_list && (
+                    <CardContent>
+                      <p className="text-sm text-muted-foreground">
+                        {entry.grocery_list.items.length} items
+                        {entry.grocery_list.notes && ` • ${entry.grocery_list.notes}`}
+                      </p>
+                    </CardContent>
+                  )}
+                </Card>
+              </Link>
             ))}
           </CardContent>
         </Card>
@@ -291,7 +323,42 @@ export default function DayDetailPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             {mealPrep.map((entry) => (
-              <MealPrepCard key={entry.id} entry={entry} />
+              <Link
+                key={entry.id}
+                href={`/dashboard/schedule/prep/${entry.id}`}
+                className="block"
+              >
+                <Card className="cursor-pointer hover:shadow-md transition-all">
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        {getStatusIcon(entry.completion_status)}
+                        <div>
+                          <CardTitle className="text-lg">
+                            {entry.prep_instructions?.session_name || 'Meal Prep Session'}
+                          </CardTitle>
+                          {entry.entry_time && (
+                            <CardDescription>
+                              {new Date(`2000-01-01T${entry.entry_time}`).toLocaleTimeString('en-US', {
+                                hour: 'numeric',
+                                minute: '2-digit',
+                              })}
+                            </CardDescription>
+                          )}
+                        </div>
+                      </div>
+                      {getStatusBadge(entry.completion_status)}
+                    </div>
+                  </CardHeader>
+                  {entry.prep_instructions && (
+                    <CardContent>
+                      <p className="text-sm text-muted-foreground">
+                        {entry.prep_instructions.duration_minutes} min • {entry.prep_instructions.batch_size} servings
+                      </p>
+                    </CardContent>
+                  )}
+                </Card>
+              </Link>
             ))}
           </CardContent>
         </Card>
