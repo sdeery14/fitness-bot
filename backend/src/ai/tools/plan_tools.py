@@ -49,9 +49,274 @@ def clear_plan_tools_context() -> None:
     _conversation_id_context.set(None)
 
 
+def _validate_and_parse_phases(phase_inputs: list) -> tuple[list[dict], date, date, int]:
+    """Validate and parse phase dates into structured data.
+
+    Args:
+        phase_inputs: List of PhaseInput objects with name, start_date, end_date
+
+    Returns:
+        Tuple of (phase_data, plan_start_date, plan_end_date, total_duration_weeks)
+
+    Raises:
+        ValueError: If phase dates are invalid or inconsistent
+    """
+    if not phase_inputs:
+        raise ValueError("At least one phase is required.")
+
+    phase_data = []
+    for idx, phase_input in enumerate(phase_inputs, 1):
+        try:
+            phase_start = datetime.strptime(phase_input.start_date, "%Y-%m-%d").date()
+            phase_end = datetime.strptime(phase_input.end_date, "%Y-%m-%d").date()
+        except ValueError as e:
+            raise ValueError(
+                f"Invalid date format in phase {idx} ('{phase_input.name}'). Use YYYY-MM-DD."
+            ) from e
+
+        # Validate phase dates
+        if phase_end <= phase_start:
+            raise ValueError(
+                f"Phase {idx} ('{phase_input.name}'): end_date must be after start_date."
+            )
+
+        # Calculate phase duration
+        phase_days = (phase_end - phase_start).days
+        phase_weeks = (phase_days + 6) // 7  # Round up
+
+        if phase_weeks < 2:
+            raise ValueError(
+                f"Phase {idx} ('{phase_input.name}'): duration too short ({phase_weeks} weeks). Minimum 2 weeks."
+            )
+        if phase_weeks > 16:
+            raise ValueError(
+                f"Phase {idx} ('{phase_input.name}'): duration too long ({phase_weeks} weeks). Maximum 16 weeks."
+            )
+
+        phase_data.append({
+            "name": phase_input.name,
+            "start_date": phase_start,
+            "end_date": phase_end,
+            "duration_weeks": phase_weeks,
+        })
+
+    # Validate phase continuity (each phase should start when previous ends)
+    for i in range(1, len(phase_data)):
+        prev_end = phase_data[i - 1]["end_date"]
+        curr_start = phase_data[i]["start_date"]
+        # Allow a gap of 0-1 days (same day or next day)
+        gap_days = (curr_start - prev_end).days
+        if gap_days < 0:
+            raise ValueError(
+                f"Phase overlap detected: '{phase_data[i-1]['name']}' ends {prev_end.isoformat()} but '{phase_data[i]['name']}' starts {curr_start.isoformat()}."
+            )
+        if gap_days > 1:
+            raise ValueError(
+                f"Phase gap detected: '{phase_data[i-1]['name']}' ends {prev_end.isoformat()} but '{phase_data[i]['name']}' starts {curr_start.isoformat()} ({gap_days} day gap)."
+            )
+
+    # Calculate total plan duration from phases
+    # Plan start = first phase start, Plan end = last phase end
+    start_date = phase_data[0]["start_date"]
+    end_date = phase_data[-1]["end_date"]
+    total_days = (end_date - start_date).days
+    actual_duration_weeks = (total_days + 6) // 7  # Round up
+
+    # Validate total duration
+    if actual_duration_weeks < 4:
+        raise ValueError(
+            f"Total plan duration too short: {actual_duration_weeks} weeks. Minimum 4 weeks required."
+        )
+    if actual_duration_weeks > 52:
+        raise ValueError(
+            f"Total plan duration too long: {actual_duration_weeks} weeks. Maximum 52 weeks allowed."
+        )
+
+    return phase_data, start_date, end_date, actual_duration_weeks
+
+
 def _get_conversation_id() -> UUID | None:
     """Get the conversation ID from context."""
     return _conversation_id_context.get()
+
+
+async def _build_phase_with_agents(
+    phase_info: dict,
+    phase_num: int,
+    total_phases: int,
+    requirements,  # FitnessPlanInput
+):
+    """Build a single phase by calling workout and meal agents.
+
+    Args:
+        phase_info: Dict with name, start_date, end_date, duration_weeks
+        phase_num: Current phase number (1-indexed)
+        total_phases: Total number of phases in plan
+        requirements: FitnessPlanInput with user requirements
+
+    Returns:
+        PhaseOutput with workout and meal details
+    """
+    from src.ai.schemas import PhaseOutput
+
+    phase_name = phase_info["name"]
+    phase_start = phase_info["start_date"]
+    phase_end = phase_info["end_date"]
+    phase_weeks = phase_info["duration_weeks"]
+
+    # Determine phase-specific objectives
+    phase_objectives = _get_phase_objectives(
+        phase_name, requirements.primary_goal, phase_num, total_phases
+    )
+
+    # Build phase-specific workout details
+    workout_phase_prompt = f"""Generate workout details for this phase:
+
+Phase Context:
+- Phase {phase_num} of {total_phases}: {phase_name}
+- Duration: {phase_weeks} weeks ({phase_start.isoformat()} to {phase_end.isoformat()})
+- Objectives: {', '.join(phase_objectives)}
+
+Overall Workout Plan:
+{requirements.workout_plan_description}
+
+User Context:
+- Fitness Level: {requirements.fitness_level}
+- Workout Frequency: {requirements.workout_frequency} days/week
+- Equipment: {requirements.equipment_access}
+- Time per Session: {requirements.time_per_session} minutes
+- Injuries/Conditions: {', '.join(requirements.injuries_or_conditions) if requirements.injuries_or_conditions else 'None'}
+
+Generate the specific workout cycle, intensity guidance, volume notes, and progression strategy for this phase."""
+
+    workout_details_result = await Runner.run(
+        starting_agent=workout_phase_agent,
+        input=workout_phase_prompt,
+        session=None,
+    )
+    workout_details = workout_details_result.final_output
+
+    # Build phase-specific meal details
+    # Calculate day of week for phase start to help with scheduling
+    phase_start_day = phase_start.strftime('%A')  # e.g., 'Monday', 'Tuesday'
+    
+    meal_phase_prompt = f"""Generate meal details for this phase:
+
+Phase Context:
+- Phase {phase_num} of {total_phases}: {phase_name}
+- Duration: {phase_weeks} weeks ({phase_start.isoformat()} to {phase_end.isoformat()})
+- Phase Starts On: {phase_start_day}, {phase_start.isoformat()}
+- Objectives: {', '.join(phase_objectives)}
+
+Overall Meal Plan:
+{requirements.meal_plan_description}
+
+User Context:
+- Dietary Restrictions: {', '.join(requirements.dietary_restrictions) if requirements.dietary_restrictions else 'None'}
+- Meal Frequency: {requirements.meal_frequency} meals/day
+- Primary Goal: {requirements.primary_goal}
+
+Generate the specific calorie target, macro split, sample meal plans, and nutrition focus for this phase."""
+
+    meal_details_result = await Runner.run(
+        starting_agent=meal_phase_agent,
+        input=meal_phase_prompt,
+        session=None,
+    )
+    meal_details = meal_details_result.final_output
+
+    # Create phase output
+    return PhaseOutput(
+        phase_number=phase_num,
+        name=phase_name,
+        objectives=phase_objectives,
+        start_date=phase_start.isoformat(),
+        end_date=phase_end.isoformat(),
+        duration_weeks=phase_weeks,
+        workout_details=workout_details,
+        meal_details=meal_details,
+    )
+
+
+async def _save_plan_to_database(
+    fitness_plan_output,  # FitnessPlanOutput
+    requirements,  # FitnessPlanInput
+    start_date: date,
+) -> str:
+    """Save fitness plan to database and add conversation message.
+
+    Args:
+        fitness_plan_output: FitnessPlanOutput to save
+        requirements: FitnessPlanInput with user requirements
+        start_date: Plan start date
+
+    Returns:
+        Plan ID string (UUID or error message)
+    """
+    user_id = _user_id_context.get()
+    db_session = _db_session_context.get()
+
+    if not user_id or not db_session:
+        return "pending_save_no_context"
+
+    try:
+        from datetime import datetime as dt
+
+        from src.services.conversation_service import ConversationService
+        from src.services.plan_service import PlanService
+
+        # Create plan service
+        plan_service = PlanService(db_session)
+
+        # Prepare requirements dict
+        requirements_dict = {
+            "fitness_level": requirements.fitness_level,
+            "workout_frequency": requirements.workout_frequency,
+            "equipment_access": requirements.equipment_access,
+            "time_per_session": requirements.time_per_session,
+            "dietary_restrictions": requirements.dietary_restrictions,
+            "meal_frequency": requirements.meal_frequency,
+            "injuries_or_conditions": requirements.injuries_or_conditions,
+            "schedule_preferences": requirements.schedule_preferences.model_dump(),
+        }
+
+        # Create fitness plan record with parsed dates
+        start_datetime = dt.combine(start_date, dt.min.time())
+
+        fitness_plan = await plan_service.create_plan(
+            user_id=user_id,
+            goal=requirements.primary_goal,
+            requirements=requirements_dict,
+            duration_weeks=fitness_plan_output.duration_weeks,
+            start_date=start_datetime,
+        )
+
+        # Prepare plan output with requirements included
+        plan_output_dict = fitness_plan_output.model_dump()
+        plan_output_dict["requirements"] = requirements_dict
+
+        # Save the complete generated plan data
+        await plan_service.save_generated_plan(
+            plan_id=fitness_plan.id,
+            plan_output=plan_output_dict,
+        )
+
+        # Insert a plan message into the conversation for rich display
+        conversation_id = _get_conversation_id()
+        if conversation_id:
+            conv_service = ConversationService(db_session)
+            await conv_service.add_message(
+                conversation_id=conversation_id,
+                sender_type="plan",
+                message_content=f"Fitness Plan Created: {fitness_plan_output.duration_weeks}-week plan",
+                plan_id=fitness_plan.id,
+            )
+
+        return str(fitness_plan.id)
+
+    except Exception as save_error:
+        print(f"Warning: Failed to save plan to database: {save_error}")
+        return f"not_saved_{save_error}"
 
 
 def _parse_and_validate_dates(
@@ -232,172 +497,23 @@ async def build_fitness_plan(requirements: FitnessPlanInput) -> str:
         ValueError: If plan generation fails
     """
     try:
-        # Import schemas
-        from src.ai.schemas import (
-            FitnessPlanOutput,
-            PhaseOutput,
+        from src.ai.schemas import FitnessPlanOutput
+
+        # 1. Validate and parse phase dates
+        phase_data, start_date, end_date, actual_duration_weeks = _validate_and_parse_phases(
+            requirements.phases
         )
-
-        # Validate that we have at least one phase
-        if not requirements.phases:
-            raise ValueError("At least one phase is required.")
-
-        # Parse and validate phase dates
-        phase_data = []
-        for idx, phase_input in enumerate(requirements.phases, 1):
-            try:
-                phase_start = datetime.strptime(phase_input.start_date, "%Y-%m-%d").date()
-                phase_end = datetime.strptime(phase_input.end_date, "%Y-%m-%d").date()
-            except ValueError as e:
-                raise ValueError(
-                    f"Invalid date format in phase {idx} ('{phase_input.name}'). Use YYYY-MM-DD."
-                ) from e
-
-            # Validate phase dates
-            if phase_end <= phase_start:
-                raise ValueError(
-                    f"Phase {idx} ('{phase_input.name}'): end_date must be after start_date."
-                )
-
-            # Calculate phase duration
-            phase_days = (phase_end - phase_start).days
-            phase_weeks = (phase_days + 6) // 7  # Round up
-
-            if phase_weeks < 2:
-                raise ValueError(
-                    f"Phase {idx} ('{phase_input.name}'): duration too short ({phase_weeks} weeks). Minimum 2 weeks."
-                )
-            if phase_weeks > 16:
-                raise ValueError(
-                    f"Phase {idx} ('{phase_input.name}'): duration too long ({phase_weeks} weeks). Maximum 16 weeks."
-                )
-
-            phase_data.append({
-                "name": phase_input.name,
-                "start_date": phase_start,
-                "end_date": phase_end,
-                "duration_weeks": phase_weeks,
-            })
-
-        # Validate phase continuity (each phase should start when previous ends)
-        for i in range(1, len(phase_data)):
-            prev_end = phase_data[i - 1]["end_date"]
-            curr_start = phase_data[i]["start_date"]
-            # Allow a gap of 0-1 days (same day or next day)
-            gap_days = (curr_start - prev_end).days
-            if gap_days < 0:
-                raise ValueError(
-                    f"Phase overlap detected: '{phase_data[i-1]['name']}' ends {prev_end.isoformat()} but '{phase_data[i]['name']}' starts {curr_start.isoformat()}."
-                )
-            if gap_days > 1:
-                raise ValueError(
-                    f"Phase gap detected: '{phase_data[i-1]['name']}' ends {prev_end.isoformat()} but '{phase_data[i]['name']}' starts {curr_start.isoformat()} ({gap_days} day gap)."
-                )
-
-        # Calculate total plan duration from phases
-        # Plan start = first phase start, Plan end = last phase end
-        start_date = phase_data[0]["start_date"]
-        end_date = phase_data[-1]["end_date"]
-        total_days = (end_date - start_date).days
-        actual_duration_weeks = (total_days + 6) // 7  # Round up
-
-        # Validate total duration
-        if actual_duration_weeks < 4:
-            raise ValueError(
-                f"Total plan duration too short: {actual_duration_weeks} weeks. Minimum 4 weeks required."
-            )
-        if actual_duration_weeks > 52:
-            raise ValueError(
-                f"Total plan duration too long: {actual_duration_weeks} weeks. Maximum 52 weeks allowed."
-            )
-
         num_phases = len(phase_data)
 
-        # Use metadata provided by conversation agent (already validated Pydantic models)
-        workout_metadata = requirements.workout_metadata
-        meal_metadata = requirements.meal_metadata
-
-        # Build phases using phase-specific agents
+        # 2. Build phases using phase-specific agents
         phases = []
         for phase_num, phase_info in enumerate(phase_data, 1):
-            phase_name = phase_info["name"]
-            phase_start = phase_info["start_date"]
-            phase_end = phase_info["end_date"]
-            phase_weeks = phase_info["duration_weeks"]
-
-            # Determine phase-specific adjustments
-            phase_objectives = _get_phase_objectives(phase_name, requirements.primary_goal, phase_num, num_phases)
-
-            # Build phase-specific workout details
-            workout_phase_prompt = f"""Generate workout details for this phase:
-
-Phase Context:
-- Phase {phase_num} of {num_phases}: {phase_name}
-- Duration: {phase_weeks} weeks ({phase_start.isoformat()} to {phase_end.isoformat()})
-- Objectives: {', '.join(phase_objectives)}
-
-Overall Workout Plan:
-{requirements.workout_plan_description}
-
-User Context:
-- Fitness Level: {requirements.fitness_level}
-- Workout Frequency: {requirements.workout_frequency} days/week
-- Equipment: {requirements.equipment_access}
-- Time per Session: {requirements.time_per_session} minutes
-- Injuries/Conditions: {', '.join(requirements.injuries_or_conditions) if requirements.injuries_or_conditions else 'None'}
-
-Generate the specific workout cycle, intensity guidance, volume notes, and progression strategy for this phase."""
-
-            workout_details_result = await Runner.run(
-                starting_agent=workout_phase_agent,
-                input=workout_phase_prompt,
-                session=None,
-            )
-            workout_details = workout_details_result.final_output
-
-            # Build phase-specific meal details
-            # Calculate day of week for phase start to help with scheduling
-            phase_start_day = phase_start.strftime('%A')  # e.g., 'Monday', 'Tuesday'
-            
-            meal_phase_prompt = f"""Generate meal details for this phase:
-
-Phase Context:
-- Phase {phase_num} of {num_phases}: {phase_name}
-- Duration: {phase_weeks} weeks ({phase_start.isoformat()} to {phase_end.isoformat()})
-- Phase Starts On: {phase_start_day}, {phase_start.isoformat()}
-- Objectives: {', '.join(phase_objectives)}
-
-Overall Meal Plan:
-{requirements.meal_plan_description}
-
-User Context:
-- Dietary Restrictions: {', '.join(requirements.dietary_restrictions) if requirements.dietary_restrictions else 'None'}
-- Meal Frequency: {requirements.meal_frequency} meals/day
-- Primary Goal: {requirements.primary_goal}
-
-Generate the specific calorie target, macro split, sample meal plans, and nutrition focus for this phase."""
-
-            meal_details_result = await Runner.run(
-                starting_agent=meal_phase_agent,
-                input=meal_phase_prompt,
-                session=None,
-            )
-            meal_details = meal_details_result.final_output
-
-            # Create phase output with new structure
-            phase_output = PhaseOutput(
-                phase_number=phase_num,
-                name=phase_name,
-                objectives=phase_objectives,
-                start_date=phase_start.isoformat(),
-                end_date=phase_end.isoformat(),
-                duration_weeks=phase_weeks,
-                workout_details=workout_details,
-                meal_details=meal_details,
+            phase_output = await _build_phase_with_agents(
+                phase_info, phase_num, num_phases, requirements
             )
             phases.append(phase_output)
 
-        # Create comprehensive multi-phase fitness plan output
+        # 3. Create comprehensive multi-phase fitness plan output
         phase_summary = " + ".join([f"{p.name} ({p.duration_weeks}w)" for p in phases])
 
         fitness_plan_output = FitnessPlanOutput(
@@ -406,8 +522,8 @@ Generate the specific calorie target, macro split, sample meal plans, and nutrit
             end_date=end_date.isoformat(),
             duration_weeks=actual_duration_weeks,
             fitness_level=requirements.fitness_level,
-            workout_metadata=workout_metadata,
-            meal_metadata=meal_metadata,
+            workout_metadata=requirements.workout_metadata,
+            meal_metadata=requirements.meal_metadata,
             phases=phases,
             key_principles=[
                 "Progressive overload: Gradually increase intensity over time",
@@ -430,83 +546,16 @@ Generate the specific calorie target, macro split, sample meal plans, and nutrit
         # Validate plan completeness
         fitness_plan_output.validate_completeness()
 
-        # Get user_id and db_session from context
-        user_id = _user_id_context.get()
-        db_session = _db_session_context.get()
+        # 4. Save plan to database
+        plan_id = await _save_plan_to_database(fitness_plan_output, requirements, start_date)
 
-        # Save plan to database if user_id and db_session are available
-        plan_id = "pending_save"
-        if user_id and db_session:
-            try:
-                from src.services.plan_service import PlanService
-
-                # Create plan service
-                plan_service = PlanService(db_session)
-
-                # Prepare requirements dict
-                requirements_dict = {
-                    "fitness_level": requirements.fitness_level,
-                    "workout_frequency": requirements.workout_frequency,
-                    "equipment_access": requirements.equipment_access,
-                    "time_per_session": requirements.time_per_session,
-                    "dietary_restrictions": requirements.dietary_restrictions,
-                    "meal_frequency": requirements.meal_frequency,
-                    "injuries_or_conditions": requirements.injuries_or_conditions,
-                    "schedule_preferences": requirements.schedule_preferences.model_dump(),
-                }
-
-                # Create fitness plan record with parsed dates
-                # Convert date to datetime for database
-                from datetime import datetime as dt
-                start_datetime = dt.combine(start_date, dt.min.time())
-
-                fitness_plan = await plan_service.create_plan(
-                    user_id=user_id,
-                    goal=requirements.primary_goal,
-                    requirements=requirements_dict,
-                    duration_weeks=fitness_plan_output.duration_weeks,
-                    start_date=start_datetime,
-                )
-
-                # Prepare plan output with requirements included
-                plan_output_dict = fitness_plan_output.model_dump()
-                plan_output_dict["requirements"] = requirements_dict
-
-                # Save the complete generated plan data
-                await plan_service.save_generated_plan(
-                    plan_id=fitness_plan.id,
-                    plan_output=plan_output_dict,
-                )
-
-                plan_id = str(fitness_plan.id)
-
-                # Insert a plan message into the conversation for rich display
-                conversation_id = _get_conversation_id()
-                if conversation_id:
-                    from src.services.conversation_service import ConversationService
-                    conv_service = ConversationService(db_session)
-                    
-                    await conv_service.add_message(
-                        conversation_id=conversation_id,
-                        sender_type="plan",
-                        message_content=f"Fitness Plan Created: {fitness_plan_output.duration_weeks}-week plan",
-                        plan_id=fitness_plan.id,
-                    )
-
-            except Exception as save_error:
-                # Log the error but don't fail the entire operation
-                # The plan was generated successfully, we just couldn't save it
-                print(f"Warning: Failed to save plan to database: {save_error}")
-                plan_id = f"not_saved_{save_error}"
-
-        result_dict = {
+        # 5. Return result
+        return json.dumps({
             "fitness_plan": fitness_plan_output.model_dump(),
             "status": "success",
             "message": f"Successfully created a {fitness_plan_output.duration_weeks}-week fitness plan for {requirements.primary_goal} with {num_phases} phase(s)!",
             "plan_id": plan_id,
-        }
-
-        return json.dumps(result_dict, indent=2)
+        }, indent=2)
 
     except Exception as e:
         error_dict = {
