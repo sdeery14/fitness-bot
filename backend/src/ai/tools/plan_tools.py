@@ -154,6 +154,16 @@ class MealPlanInput(BaseModel):
     preferences: str = Field(default="", description="Additional dietary preferences")
 
 
+class PhaseInput(BaseModel):
+    """Input for a single phase with explicit dates."""
+
+    model_config = {"extra": "forbid"}
+
+    name: str = Field(description="Phase name (e.g., 'Foundation Phase', 'Building Phase', 'Peak Performance')")
+    start_date: str = Field(description="Phase start date in YYYY-MM-DD format")
+    end_date: str = Field(description="Phase end date in YYYY-MM-DD format")
+
+
 class FitnessPlanInput(BaseModel):
     """Input parameters for complete fitness plan generation."""
 
@@ -173,18 +183,8 @@ class FitnessPlanInput(BaseModel):
     injuries_or_conditions: list[str] = Field(
         default_factory=list, description="Injuries or health conditions"
     )
-    start_date: str = Field(
-        description="Plan start date in YYYY-MM-DD format (e.g., '2025-12-15'). Use 'today' for current date."
-    )
-    end_date: str | None = Field(
-        default=None,
-        description="Target end date in YYYY-MM-DD format if user has a specific goal date (e.g., race day, event, vacation). If None, calculate from start_date + duration_weeks."
-    )
-    duration_weeks: int = Field(
-        default=12, description="Total program duration in weeks (used if end_date not specified)", ge=4, le=52
-    )
-    phases: list[str] = Field(
-        description="List of phase names for the fitness plan. ALWAYS include at least one phase. Every plan should have logical progression phases (e.g., Foundation → Building → Peak). Examples: ['Foundation Phase', 'Building Phase', 'Peak Performance Phase'] or ['Bulk Phase', 'Cut Phase'] or ['Base Building', 'Race Preparation', 'Taper']. Phase names should be descriptive and aligned with the training goal. Even short plans benefit from phases like ['Adaptation', 'Development'].",
+    phases: list[PhaseInput] = Field(
+        description="List of phases with explicit start and end dates. Each phase MUST have: name, start_date (YYYY-MM-DD), and end_date (YYYY-MM-DD). The first phase's start_date is the plan start date. The last phase's end_date is the plan end date. Examples: [{name: 'Foundation Phase', start_date: '2025-12-13', end_date: '2026-01-09'}, {name: 'Building Phase', start_date: '2026-01-10', end_date: '2026-02-06'}]. Phases should be contiguous with no gaps. IMPORTANT: Always use explicit dates in YYYY-MM-DD format. Never use 'today' or relative dates.",
         min_length=1
     )
     workout_plan_description: str = Field(
@@ -238,35 +238,80 @@ async def build_fitness_plan(requirements: FitnessPlanInput) -> str:
             PhaseOutput,
         )
 
-        # Parse and validate dates
-        start_date, end_date, actual_duration_weeks = _parse_and_validate_dates(
-            requirements.start_date,
-            requirements.end_date,
-            requirements.duration_weeks,
-        )
+        # Validate that we have at least one phase
+        if not requirements.phases:
+            raise ValueError("At least one phase is required.")
 
-        # Determine phases (always provided by AI)
-        phase_descriptions = requirements.phases
-        num_phases = len(phase_descriptions)
+        # Parse and validate phase dates
+        phase_data = []
+        for idx, phase_input in enumerate(requirements.phases, 1):
+            try:
+                phase_start = datetime.strptime(phase_input.start_date, "%Y-%m-%d").date()
+                phase_end = datetime.strptime(phase_input.end_date, "%Y-%m-%d").date()
+            except ValueError as e:
+                raise ValueError(
+                    f"Invalid date format in phase {idx} ('{phase_input.name}'). Use YYYY-MM-DD."
+                ) from e
 
-        # Split duration across phases
-        if num_phases == 1:
-            phase_durations = [actual_duration_weeks]
-        else:
-            # Distribute duration evenly across phases (AI can override later)
-            weeks_per_phase = actual_duration_weeks // num_phases
-            remainder = actual_duration_weeks % num_phases
-            phase_durations = [weeks_per_phase] * num_phases
-            # Add remainder weeks to last phase
-            phase_durations[-1] += remainder
+            # Validate phase dates
+            if phase_end <= phase_start:
+                raise ValueError(
+                    f"Phase {idx} ('{phase_input.name}'): end_date must be after start_date."
+                )
 
-        # Calculate phase date ranges
-        phase_dates = []
-        current_start = start_date
-        for phase_weeks in phase_durations:
-            phase_end = current_start + timedelta(weeks=phase_weeks)
-            phase_dates.append((current_start, phase_end))
-            current_start = phase_end
+            # Calculate phase duration
+            phase_days = (phase_end - phase_start).days
+            phase_weeks = (phase_days + 6) // 7  # Round up
+
+            if phase_weeks < 2:
+                raise ValueError(
+                    f"Phase {idx} ('{phase_input.name}'): duration too short ({phase_weeks} weeks). Minimum 2 weeks."
+                )
+            if phase_weeks > 16:
+                raise ValueError(
+                    f"Phase {idx} ('{phase_input.name}'): duration too long ({phase_weeks} weeks). Maximum 16 weeks."
+                )
+
+            phase_data.append({
+                "name": phase_input.name,
+                "start_date": phase_start,
+                "end_date": phase_end,
+                "duration_weeks": phase_weeks,
+            })
+
+        # Validate phase continuity (each phase should start when previous ends)
+        for i in range(1, len(phase_data)):
+            prev_end = phase_data[i - 1]["end_date"]
+            curr_start = phase_data[i]["start_date"]
+            # Allow a gap of 0-1 days (same day or next day)
+            gap_days = (curr_start - prev_end).days
+            if gap_days < 0:
+                raise ValueError(
+                    f"Phase overlap detected: '{phase_data[i-1]['name']}' ends {prev_end.isoformat()} but '{phase_data[i]['name']}' starts {curr_start.isoformat()}."
+                )
+            if gap_days > 1:
+                raise ValueError(
+                    f"Phase gap detected: '{phase_data[i-1]['name']}' ends {prev_end.isoformat()} but '{phase_data[i]['name']}' starts {curr_start.isoformat()} ({gap_days} day gap)."
+                )
+
+        # Calculate total plan duration from phases
+        # Plan start = first phase start, Plan end = last phase end
+        start_date = phase_data[0]["start_date"]
+        end_date = phase_data[-1]["end_date"]
+        total_days = (end_date - start_date).days
+        actual_duration_weeks = (total_days + 6) // 7  # Round up
+
+        # Validate total duration
+        if actual_duration_weeks < 4:
+            raise ValueError(
+                f"Total plan duration too short: {actual_duration_weeks} weeks. Minimum 4 weeks required."
+            )
+        if actual_duration_weeks > 52:
+            raise ValueError(
+                f"Total plan duration too long: {actual_duration_weeks} weeks. Maximum 52 weeks allowed."
+            )
+
+        num_phases = len(phase_data)
 
         # Use metadata provided by conversation agent (already validated Pydantic models)
         workout_metadata = requirements.workout_metadata
@@ -274,11 +319,11 @@ async def build_fitness_plan(requirements: FitnessPlanInput) -> str:
 
         # Build phases using phase-specific agents
         phases = []
-        for phase_num, (phase_desc, phase_weeks, (phase_start, phase_end)) in enumerate(
-            zip(phase_descriptions, phase_durations, phase_dates, strict=True), 1
-        ):
-            # Parse phase description (format: "Phase Name - X weeks" or just "Phase Name")
-            phase_name = phase_desc.split(" -")[0].strip() if " -" in phase_desc else phase_desc
+        for phase_num, phase_info in enumerate(phase_data, 1):
+            phase_name = phase_info["name"]
+            phase_start = phase_info["start_date"]
+            phase_end = phase_info["end_date"]
+            phase_weeks = phase_info["duration_weeks"]
 
             # Determine phase-specific adjustments
             phase_objectives = _get_phase_objectives(phase_name, requirements.primary_goal, phase_num, num_phases)
