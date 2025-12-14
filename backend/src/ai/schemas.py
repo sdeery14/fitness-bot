@@ -466,8 +466,14 @@ class FitnessPlanOutput(BaseModel):
         description="One or more phases in the program. Each phase has its own workout plan, meal plan, and objectives. Examples: [Bulk Phase, Cut Phase] or [Foundation Phase] for single-phase plans.",
         min_length=1
     )
-    key_principles: list[str] = Field(description="Key principles for success (3-5 items)")
-    success_metrics: list[str] = Field(description="How to measure progress (3-5 metrics)")
+    key_principles: list[str] = Field(
+        default_factory=list,
+        description="Optional key principles for success. Can be omitted if not adding value beyond phase objectives."
+    )
+    success_metrics: list[str] = Field(
+        default_factory=list,
+        description="Optional progress tracking metrics. Can be omitted if not adding value beyond phase objectives."
+    )
     important_notes: str = Field(description="Critical information about the plan")
 
     def validate_completeness(self) -> bool:

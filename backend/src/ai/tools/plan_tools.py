@@ -525,21 +525,6 @@ async def build_fitness_plan(requirements: FitnessPlanInput) -> str:
             workout_metadata=requirements.workout_metadata,
             meal_metadata=requirements.meal_metadata,
             phases=phases,
-            key_principles=[
-                "Progressive overload: Gradually increase intensity over time",
-                "Consistency: Follow the plan regularly for best results",
-                "Recovery: Prioritize sleep (7-9 hours) and rest days",
-                "Nutrition: Fuel your body according to the meal plan",
-                "Adaptation: Adjust based on progress and how you feel",
-                "Phase transitions: Each phase builds on the previous one",
-            ],
-            success_metrics=[
-                "Track workout performance (weight, reps, or time improvements)",
-                "Monitor body measurements weekly (weight, body fat, measurements)",
-                "Assess energy levels and recovery quality",
-                "Check adherence rate (aim for 80%+ consistency)",
-                "Evaluate how you feel overall (mood, strength, confidence)",
-            ],
             important_notes=f"This {actual_duration_weeks}-week plan runs from {start_date.isoformat()} to {end_date.isoformat()} and is designed for {requirements.fitness_level} level with {num_phases} phase(s). Each phase has specific objectives and will transition automatically. Adjust weights and intensity based on your progress. Listen to your body and take extra rest if needed.",
         )
 
