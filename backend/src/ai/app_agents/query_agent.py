@@ -62,13 +62,17 @@ Key Tables (ACCURATE SCHEMA - USE THESE EXACT COLUMN NAMES):
 - fitness_plans: User's fitness plans
   Columns: id (uuid), user_id (uuid), goal_type (varchar), goal_description (text),
   target_weight_kg (varchar), target_date (timestamptz), duration_weeks (int),
-  start_date (timestamptz), end_date (timestamptz), status (enum), plan_snapshot (json),
+  start_date (timestamptz), end_date (timestamptz), status (enum),
   parent_plan_id (uuid), version (int), version_notes (text),
+  key_principles (json), success_metrics (json), important_notes (text),
   created_at (timestamptz), updated_at (timestamptz)
   
-  * plan_snapshot contains the complete plan as JSON with workout_plan and meal_plan nested inside
+  * Plan data stored in normalized tables: phases, workout_plans, workouts, exercises, meal_plans, meals
   * status can be: 'draft', 'active', 'paused', 'completed', 'abandoned', 'replaced'
   * parent_plan_id links to previous version of plan (for plan versioning)
+  * key_principles: Core principles guiding the plan (array of strings)
+  * success_metrics: How to measure success (array of strings)
+  * important_notes: Critical information and warnings
 
 - phases: Training phases within a fitness plan
   Columns: id (uuid), fitness_plan_id (uuid), phase_number (int), name (varchar),
@@ -78,12 +82,18 @@ Key Tables (ACCURATE SCHEMA - USE THESE EXACT COLUMN NAMES):
 - workout_plans: Workout plan metadata
   Columns: id (uuid), fitness_plan_id (uuid), frequency_per_week (int),
   progression_strategy (varchar), workout_plan_details (json),
+  phase_progression_notes (text), equipment_used (json),
   created_at (timestamptz), updated_at (timestamptz)
+  
+  * phase_progression_notes: How phases progress in intensity/volume
+  * equipment_used: Required equipment (array of strings)
 
 - meal_plans: Meal plan metadata
   Columns: id (uuid), fitness_plan_id (uuid), daily_calorie_target (int),
   macronutrient_distribution (json), protein_grams_target (int),
   carbs_grams_target (int), fats_grams_target (int), meals_per_day (int),
+  dietary_approach (varchar), macro_strategy (varchar), meal_timing (varchar),
+  hydration_guidance (varchar), phase_nutrition_notes (varchar),
   created_at (timestamptz), updated_at (timestamptz)
   
   ⚠️ CRITICAL: Use these EXACT column names:
@@ -91,6 +101,12 @@ Key Tables (ACCURATE SCHEMA - USE THESE EXACT COLUMN NAMES):
   - protein_grams_target (NOT protein_g)
   - carbs_grams_target (NOT carbs_g)
   - fats_grams_target (NOT fat_g)
+  
+  * dietary_approach: Diet philosophy/approach
+  * macro_strategy: Macro distribution strategy
+  * meal_timing: Meal timing guidance
+  * hydration_guidance: Water intake guidelines
+  * phase_nutrition_notes: How nutrition changes across phases
 
 - workouts: Individual workout sessions
   Columns: id (uuid), workout_plan_id (uuid), phase_id (uuid), name (varchar),
@@ -167,14 +183,7 @@ Common Query Examples (USE EXACT COLUMN NAMES):
    JOIN fitness_plans fp ON mp.fitness_plan_id = fp.id
    WHERE fp.user_id = 'uuid-here' AND fp.status = 'active'
 
-5. **Query plan_snapshot JSON**:
-   SELECT plan_snapshot->'workout_plan' AS workout_plan,
-          plan_snapshot->'meal_plan' AS meal_plan,
-          plan_snapshot->'phases' AS phases
-   FROM fitness_plans
-   WHERE user_id = 'uuid-here' AND status = 'active'
-
-6. **Get all workouts in a phase**:
+5. **Get all workouts in a phase**:
    SELECT * FROM workouts WHERE phase_id = 'uuid-here'
 
 7. **Get exercises for a workout**:
@@ -188,10 +197,6 @@ CRITICAL REMINDERS:
   - protein_grams_target (NOT protein_g)
   - carbs_grams_target (NOT carbs_g)
   - fats_grams_target (NOT fat_g)
-
-⚠️ fitness_plans.plan_snapshot is a JSON column containing the full plan
-  - Access nested data with -> or ->>
-  - Example: plan_snapshot->'workout_plan'->'workouts'
 
 ⚠️ All timestamps are timestamptz (with timezone)
 ⚠️ All IDs are uuid type

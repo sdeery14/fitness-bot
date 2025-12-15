@@ -23,29 +23,36 @@ async def check_prep_schedule():
     )
     
     async with async_session() as session:
-        # Get the fitness plan to see what the AI generated
+        # Get the fitness plan and its meal prep sessions from normalized tables
+        from src.models.meal_prep import MealPrepSession
+        from src.models.fitness_plan import Phase
+        
         stmt = select(FitnessPlan).order_by(FitnessPlan.created_at.desc()).limit(1)
         result = await session.execute(stmt)
         plan = result.scalar_one_or_none()
         
-        if plan and plan.plan_snapshot:
-            phases = plan.plan_snapshot.get("phases", [])
-            if phases and len(phases) > 0:
-                meal_details = phases[0].get("meal_details", {})
-                prep_schedule = meal_details.get("meal_prep_schedule", [])
-                prep_sessions = meal_details.get("meal_prep_sessions", [])
+        if plan:
+            # Get phases for this plan
+            phases_stmt = select(Phase).where(Phase.fitness_plan_id == plan.id).order_by(Phase.phase_number)
+            phases_result = await session.execute(phases_stmt)
+            phases = list(phases_result.scalars().all())
+            
+            print("\n=== MEAL PREP SESSIONS FROM DATABASE ===")
+            for phase in phases:
+                # Get meal prep sessions for this phase
+                prep_stmt = select(MealPrepSession).where(MealPrepSession.phase_id == phase.id)
+                prep_result = await session.execute(prep_stmt)
+                prep_sessions = list(prep_result.scalars().all())
                 
-                print("\n=== AI-GENERATED MEAL PREP SCHEDULE ===")
-                print(f"\nSession Templates ({len(prep_sessions)}):")
-                for i, session in enumerate(prep_sessions):
-                    print(f"  [{i}] {session.get('session_name', 'N/A')}")
-                
-                print(f"\nSchedule Entries ({len(prep_schedule)}):")
-                for entry in prep_schedule:
-                    session_idx = entry.get("session_index", 0)
-                    session_name = prep_sessions[session_idx].get("session_name", "N/A") if session_idx < len(prep_sessions) else "Invalid"
-                    print(f"  Day {entry.get('day_offset', 0):2d} @ {entry.get('time', 'N/A'):8s} - Session [{session_idx}] {session_name}")
-                    print(f"       Repeats: every {entry.get('repeats_every', 'N/A')} days")
+                if prep_sessions:
+                    print(f"\nPhase {phase.phase_number}: {phase.name}")
+                    print(f"Sessions ({len(prep_sessions)}):")
+                    for session in prep_sessions:
+                        print(f"  - {session.session_name}")
+                        print(f"    Target Day: {session.target_day_name}")
+                        print(f"    Time: {session.time}")
+                        print(f"    Duration: {session.duration_minutes} min")
+                        print(f"    Repeats: every {session.repeats_every} days" if session.repeats_every else "    Repeats: One-time")
         
         # Get actual schedule entries
         stmt = (
@@ -59,12 +66,20 @@ async def check_prep_schedule():
         entries = result.scalars().all()
         
         print(f"\n\n=== ACTUAL SCHEDULE ENTRIES ===")
-        print(f"\n{'Date':<15} {'Day Name':<12} {'Session Name':<50}")
+        print(f"\n{'Date':<15} {'Day Name':<12} {'Session':<50}")
         print("=" * 80)
         
         for entry in entries:
             day_name = entry.entry_date.strftime("%A")
-            session_name = entry.prep_instructions.get("session_name", "N/A")
+            # Get the meal prep session details if linked
+            if entry.meal_prep_session_id:
+                from src.models.meal_prep import MealPrepSession
+                session_stmt = select(MealPrepSession).where(MealPrepSession.id == entry.meal_prep_session_id)
+                session_result = await session.execute(session_stmt)
+                session = session_result.scalar_one_or_none()
+                session_name = session.session_name if session else "Unknown"
+            else:
+                session_name = "N/A"
             print(f"{entry.entry_date} {day_name:<12} {session_name:<50}")
     
     await engine.dispose()

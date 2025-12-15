@@ -36,29 +36,37 @@ async def initialize_mcp_server() -> None:
     This should be called once during FastAPI lifespan startup.
     Creates a subprocess running postgres-mcp via stdio that persists
     for the entire application lifetime.
+    
+    MCP server initialization is optional - if it fails, the app will continue without it.
     """
     global _mcp_server
     
     if _mcp_server is not None:
         return  # Already initialized
 
-    # Create new MCP server with stdio transport
-    database_uri = _get_database_uri()
-    _mcp_server = MCPServerStdio(
-        name="Postgres MCP",
-        params={
-            "command": "npx",
-            "args": ["-y", "@modelcontextprotocol/server-postgres", database_uri, "--access-mode=restricted"],
-        },
-    )
-    
-    # Initialize the server (enter async context)
-    await _mcp_server.__aenter__()
+    try:
+        # Create new MCP server with stdio transport
+        database_uri = _get_database_uri()
+        _mcp_server = MCPServerStdio(
+            name="Postgres MCP",
+            params={
+                "command": "npx",
+                "args": ["-y", "@modelcontextprotocol/server-postgres", database_uri, "--access-mode=restricted"],
+            },
+        )
+        
+        # Initialize the server (enter async context)
+        await _mcp_server.__aenter__()
 
-    # Lazy import to avoid circular dependency
-    from src.ai.app_agents.query_agent import query_agent
-    # Add the MCP server to the query agent
-    query_agent.mcp_servers = [_mcp_server]
+        # Lazy import to avoid circular dependency
+        from src.ai.app_agents.query_agent import query_agent
+        # Add the MCP server to the query agent
+        query_agent.mcp_servers = [_mcp_server]
+        
+        print("✓ MCP server initialized successfully")
+    except Exception as e:
+        print(f"⚠ MCP server initialization failed (app will continue without it): {e}")
+        _mcp_server = None
 
 
 def _get_mcp_server() -> MCPServerStdio:
@@ -197,12 +205,13 @@ async def query_fitness_plan(query: str) -> str:
 User's question: {query}
 
 Retrieve relevant information from the fitness_plans table and related tables (phases, workouts, meals).
-The plan data is stored in the plan_snapshot JSONB column which contains:
-- workout_plan: training details with workouts, exercises, sets/reps
-- meal_plan: nutrition details with meal timing, macros, sample days
+The plan data is stored in normalized tables:
 - phases: phase progression with dates and objectives
-- key_principles: important guidelines
-- success_metrics: progress tracking metrics
+- workout_plans: workout plan metadata
+- workouts: individual workout sessions
+- exercises: exercise details within workouts
+- meal_plans: meal plan metadata
+- meals: individual meal details
 
 Also check the phases, workout_plans, and meal_plans tables for structured data.
 
@@ -286,7 +295,7 @@ async def update_fitness_plan(change_description: str) -> str:
             "parent_plan_id": str(active_plan.id),
             "version": new_plan.version,
             "changes": change_description,
-            "note": "The new plan has been created. You should now modify the plan_snapshot to reflect the requested changes."
+            "note": "The new plan has been created with normalized data structure (phases, workouts, meals in separate tables)."
         }, indent=2)
 
     except Exception as e:

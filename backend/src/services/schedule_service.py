@@ -95,6 +95,8 @@ class ScheduleService:
         Raises:
             ValueError: If plan not found or already has a schedule
         """
+        print(f"DEBUG create_schedule: start_date type: {type(start_date)}, value: {start_date}")
+        
         # Check if schedule already exists for this plan
         existing_stmt = select(Schedule).where(Schedule.fitness_plan_id == fitness_plan_id)
         existing_result = await self.db.execute(existing_stmt)
@@ -150,28 +152,15 @@ class ScheduleService:
         meals_result = await self.db.execute(meals_stmt)
         meals = list(meals_result.scalars().all())
 
-        # Generate schedule entries for workouts using training cycle from plan_snapshot
+        # Generate schedule entries for workouts using training cycle from phase details
         if workouts:
-            # Extract training_cycle from plan_snapshot if available
+            # Extract training_cycle from first phase's phase_details
             training_cycle = None
-            if plan.plan_snapshot:
-                # Try new schema structure first (phases with workout_details)
-                phases = (
-                    plan.plan_snapshot.get("phases")
-                    if isinstance(plan.plan_snapshot, dict)
-                    else None
-                )
-                if phases and isinstance(phases, list) and len(phases) > 0:
-                    # Use the first phase's workout cycle for now
-                    # TODO: Handle multi-phase scheduling properly
-                    workout_details = (
-                        phases[0].get("workout_details", {}) if isinstance(phases[0], dict) else {}
-                    )
-                    training_cycle = (
-                        workout_details.get("workout_cycle")
-                        if isinstance(workout_details, dict)
-                        else None
-                    )
+            if plan.phases and len(plan.phases) > 0:
+                first_phase = plan.phases[0]
+                if first_phase.phase_details and isinstance(first_phase.phase_details, dict):
+                    # Check if workout_cycle is stored in phase_details
+                    training_cycle = first_phase.phase_details.get("workout_cycle")
 
             if training_cycle:
                 # Use explicit training cycle from AI agent
@@ -184,7 +173,7 @@ class ScheduleService:
                     preferences=schedule_preferences,
                 )
             else:
-                # Fallback to legacy behavior if no training_cycle provided
+                # Fallback to weekly fixed schedule if no training_cycle provided
                 split_type = schedule_preferences.get("split_type", "weekly_fixed")
 
                 if split_type == "rolling":
@@ -403,7 +392,7 @@ class ScheduleService:
         Args:
             schedule: Schedule to add entries to
             workouts: List of workouts from the plan
-            training_cycle: List of cycle items (workout or rest) from plan_snapshot
+            training_cycle: List of cycle items (workout or rest) from phase.phase_details
             start_date: Schedule start date
             duration_weeks: Total plan duration in weeks
             preferences: User scheduling preferences dict
@@ -601,100 +590,92 @@ class ScheduleService:
         duration_weeks: int,
         preferences: dict | None,
     ) -> None:
-        """Generate grocery shopping entries from AI-generated explicit schedule.
+        """Generate grocery shopping entries from normalized database tables.
 
-        Uses the AI-generated grocery_shopping_schedule from the plan's meal_details.
-        Supports any frequency pattern: weekly, biweekly, every 15 days, irregular, etc.
-        Creates GroceryShoppingTrip entities and links them to schedule entries.
+        Reads GroceryShoppingTrip records linked to phases and creates schedule entries
+        based on their target_day_name, time, and repeats_every fields.
 
         Args:
             schedule: Schedule to add entries to
-            fitness_plan: The fitness plan (contains AI-generated schedule)
+            fitness_plan: The fitness plan (contains phases with grocery trips)
             start_date: Schedule start date
             duration_weeks: Total plan duration in weeks
             preferences: User scheduling preferences dict (mostly unused now)
         """
+        from sqlalchemy import select
+
+        from src.models.fitness_plan import Phase
         from src.models.grocery_trip import GroceryShoppingTrip
-        
-        # Extract AI-generated schedule from plan_snapshot
-        shopping_schedule = []
-        grocery_items = []
 
-        if fitness_plan.plan_snapshot and isinstance(fitness_plan.plan_snapshot, dict):
-            phases = fitness_plan.plan_snapshot.get("phases", [])
-            if phases and len(phases) > 0:
-                phase_data = phases[0]
-                if isinstance(phase_data, dict):
-                    meal_details = phase_data.get("meal_details", {})
-                    if isinstance(meal_details, dict):
-                        shopping_schedule = meal_details.get("grocery_shopping_schedule", [])
-                        grocery_items = meal_details.get("grocery_list", [])
+        # Get all phases for this plan with their grocery trips
+        phases_stmt = (
+            select(Phase)
+            .where(Phase.fitness_plan_id == fitness_plan.id)
+            .order_by(Phase.phase_number)
+        )
+        phases_result = await self.db.execute(phases_stmt)
+        phases = phases_result.scalars().all()
 
-        if not shopping_schedule:
-            return  # No schedule generated by AI
+        if not phases:
+            return
 
         plan_end_date = start_date + timedelta(weeks=duration_weeks)
 
-        # Create a single grocery trip template that will be reused
-        grocery_trip = GroceryShoppingTrip(
-            name="Weekly Grocery Shopping",
-            items={"items": grocery_items},
-            estimated_duration_minutes=60,
-            notes="Standard weekly grocery shopping trip"
-        )
-        self.db.add(grocery_trip)
-        await self.db.flush()  # Get the ID
+        # Process grocery trips from all phases
+        for phase in phases:
+            # Get grocery trips for this phase
+            trips_stmt = select(GroceryShoppingTrip).where(
+                GroceryShoppingTrip.phase_id == phase.id
+            )
+            trips_result = await self.db.execute(trips_stmt)
+            grocery_trips = trips_result.scalars().all()
 
-        # Process each shopping schedule entry
-        for schedule_entry in shopping_schedule:
-            target_day_name = schedule_entry.get("target_day_name")
-            if not target_day_name:
-                # Fallback to old day_offset format if present
-                day_offset = schedule_entry.get("day_offset", 0)
-            else:
+            for grocery_trip in grocery_trips:
+                if not grocery_trip.target_day_name:
+                    continue  # Skip trips without schedule info
+
                 # Calculate day_offset from target day name
-                day_offset = self._calculate_day_offset(start_date, target_day_name)
-            
-            time_str = schedule_entry.get("time", "10:00 AM")
-            repeats_every = schedule_entry.get("repeats_every")  # Can be None for one-time events
-            notes = schedule_entry.get("notes", "")
+                day_offset = self._calculate_day_offset(start_date, grocery_trip.target_day_name)
 
-            # Parse time
-            shopping_time = self._parse_time_string(time_str)
+                # Use phase start date as base for calculation
+                # Convert datetime to date for consistent comparisons
+                phase_start = phase.start_date.date() if isinstance(phase.start_date, datetime) else phase.start_date
+                phase_end = phase.end_date.date() if isinstance(phase.end_date, datetime) else phase.end_date
+                first_date = phase_start + timedelta(days=day_offset)
 
-            # Calculate first occurrence
-            first_date = start_date + timedelta(days=day_offset)
+                # Default time if not specified
+                shopping_time = grocery_trip.time if grocery_trip.time else datetime.strptime("10:00", "%H:%M").time()
 
-            if repeats_every is None:
-                # One-time shopping event
-                if first_date <= plan_end_date:
-                    entry = ScheduleEntry(
-                        schedule_id=schedule.id,
-                        entry_type="grocery_shopping",
-                        entry_date=first_date,
-                        entry_time=shopping_time,
-                        grocery_trip_id=grocery_trip.id,
-                        user_notes=notes,
-                        completion_status="scheduled",
-                    )
-                    self.db.add(entry)
-            else:
-                # Repeating shopping event
-                current_date = first_date
-                while current_date <= plan_end_date:
-                    entry = ScheduleEntry(
-                        schedule_id=schedule.id,
-                        entry_type="grocery_shopping",
-                        entry_date=current_date,
-                        entry_time=shopping_time,
-                        grocery_trip_id=grocery_trip.id,
-                        user_notes=notes,
-                        completion_status="scheduled",
-                    )
-                    self.db.add(entry)
+                if grocery_trip.repeats_every is None:
+                    # One-time shopping event
+                    if first_date <= plan_end_date and first_date <= phase_end:
+                        entry = ScheduleEntry(
+                            schedule_id=schedule.id,
+                            entry_type="grocery_shopping",
+                            entry_date=first_date,
+                            entry_time=shopping_time,
+                            grocery_trip_id=grocery_trip.id,
+                            user_notes=grocery_trip.notes or "",
+                            completion_status="scheduled",
+                        )
+                        self.db.add(entry)
+                else:
+                    # Repeating shopping event within phase boundaries
+                    current_date = first_date
+                    while current_date <= min(plan_end_date, phase_end):
+                        entry = ScheduleEntry(
+                            schedule_id=schedule.id,
+                            entry_type="grocery_shopping",
+                            entry_date=current_date,
+                            entry_time=shopping_time,
+                            grocery_trip_id=grocery_trip.id,
+                            user_notes=grocery_trip.notes or "",
+                            completion_status="scheduled",
+                        )
+                        self.db.add(entry)
 
-                    # Move to next occurrence
-                    current_date += timedelta(days=repeats_every)
+                        # Move to next occurrence
+                        current_date += timedelta(days=grocery_trip.repeats_every)
 
         await self.db.flush()
 
@@ -706,111 +687,92 @@ class ScheduleService:
         duration_weeks: int,
         preferences: dict | None,
     ) -> None:
-        """Generate meal prep entries from AI-generated explicit schedule.
+        """Generate meal prep entries from normalized database tables.
 
-        Uses the AI-generated meal_prep_schedule from the plan's meal_details.
-        Supports any frequency pattern: weekly, every 10 days, biweekly, irregular, etc.
+        Reads MealPrepSession records linked to phases and creates schedule entries
+        based on their target_day_name, time, and repeats_every fields.
 
         Args:
             schedule: Schedule to add entries to
-            fitness_plan: The fitness plan (contains AI-generated schedule)
+            fitness_plan: The fitness plan (contains phases with meal prep sessions)
             start_date: Schedule start date
             duration_weeks: Total plan duration in weeks
             preferences: User scheduling preferences dict (mostly unused now)
         """
-        # Extract AI-generated schedule from plan_snapshot
-        prep_schedule = []
-        prep_sessions = []
+        from sqlalchemy import select
 
-        if fitness_plan.plan_snapshot and isinstance(fitness_plan.plan_snapshot, dict):
-            phases = fitness_plan.plan_snapshot.get("phases", [])
-            if phases and len(phases) > 0:
-                phase_data = phases[0]
-                if isinstance(phase_data, dict):
-                    meal_details = phase_data.get("meal_details", {})
-                    if isinstance(meal_details, dict):
-                        prep_schedule = meal_details.get("meal_prep_schedule", [])
-                        prep_sessions = meal_details.get("meal_prep_sessions", [])
-
-        if not prep_schedule or not prep_sessions:
-            return  # No schedule generated by AI
-
+        from src.models.fitness_plan import Phase
         from src.models.meal_prep import MealPrepSession
-        
+
+        # Get all phases for this plan with their meal prep sessions
+        phases_stmt = (
+            select(Phase)
+            .where(Phase.fitness_plan_id == fitness_plan.id)
+            .order_by(Phase.phase_number)
+        )
+        phases_result = await self.db.execute(phases_stmt)
+        phases = phases_result.scalars().all()
+
+        if not phases:
+            return
+
         plan_end_date = start_date + timedelta(weeks=duration_weeks)
 
-        # Create MealPrepSession entities for each unique session
-        session_entities = {}
-        for idx, session in enumerate(prep_sessions):
-            prep_session = MealPrepSession(
-                session_name=session.get("session_name", f"Meal Prep Session {idx + 1}"),
-                recipes=session.get("recipes", []),
-                duration_minutes=session.get("duration_minutes", 120),
-                batch_size=session.get("batch_size", 5),
-                instructions=session.get("instructions", []),
-                storage_instructions=session.get("storage_instructions", ""),
-                notes=session.get("notes", "")
+        # Process meal prep sessions from all phases
+        for phase in phases:
+            # Get meal prep sessions for this phase
+            sessions_stmt = select(MealPrepSession).where(
+                MealPrepSession.phase_id == phase.id
             )
-            self.db.add(prep_session)
-            session_entities[idx] = prep_session
-        
-        await self.db.flush()  # Get all IDs
+            sessions_result = await self.db.execute(sessions_stmt)
+            prep_sessions = sessions_result.scalars().all()
 
-        # Process each prep schedule entry
-        for schedule_entry in prep_schedule:
-            target_day_name = schedule_entry.get("target_day_name")
-            if not target_day_name:
-                # Fallback to old day_offset format if present
-                day_offset = schedule_entry.get("day_offset", 0)
-            else:
+            for prep_session in prep_sessions:
+                if not prep_session.target_day_name:
+                    continue  # Skip sessions without schedule info
+
                 # Calculate day_offset from target day name
-                day_offset = self._calculate_day_offset(start_date, target_day_name)
-            
-            time_str = schedule_entry.get("time", "14:00")
-            session_index = schedule_entry.get("session_index", 0)
-            repeats_every = schedule_entry.get("repeats_every")  # Can be None for one-time events
-            notes = schedule_entry.get("notes", "")
+                day_offset = self._calculate_day_offset(start_date, prep_session.target_day_name)
 
-            # Validate session index
-            if session_index not in session_entities:
-                continue
+                # Use phase start date as base for calculation
+                # Convert datetime to date for consistent comparisons
+                phase_start = phase.start_date.date() if isinstance(phase.start_date, datetime) else phase.start_date
+                phase_end = phase.end_date.date() if isinstance(phase.end_date, datetime) else phase.end_date
+                first_date = phase_start + timedelta(days=day_offset)
 
-            prep_session = session_entities[session_index]
-            prep_time = self._parse_time_string(time_str)
+                # Default time if not specified
+                prep_time = prep_session.time if prep_session.time else datetime.strptime("14:00", "%H:%M").time()
 
-            # Calculate first occurrence
-            first_date = start_date + timedelta(days=day_offset)
+                if prep_session.repeats_every is None:
+                    # One-time prep session
+                    if first_date <= plan_end_date and first_date <= phase_end:
+                        entry = ScheduleEntry(
+                            schedule_id=schedule.id,
+                            entry_type="meal_prep",
+                            entry_date=first_date,
+                            entry_time=prep_time,
+                            meal_prep_session_id=prep_session.id,
+                            user_notes=prep_session.notes or "",
+                            completion_status="scheduled",
+                        )
+                        self.db.add(entry)
+                else:
+                    # Repeating prep session within phase boundaries
+                    current_date = first_date
+                    while current_date <= min(plan_end_date, phase_end):
+                        entry = ScheduleEntry(
+                            schedule_id=schedule.id,
+                            entry_type="meal_prep",
+                            entry_date=current_date,
+                            entry_time=prep_time,
+                            meal_prep_session_id=prep_session.id,
+                            user_notes=prep_session.notes or "",
+                            completion_status="scheduled",
+                        )
+                        self.db.add(entry)
 
-            if repeats_every is None:
-                # One-time prep session
-                if first_date <= plan_end_date:
-                    entry = ScheduleEntry(
-                        schedule_id=schedule.id,
-                        entry_type="meal_prep",
-                        entry_date=first_date,
-                        entry_time=prep_time,
-                        meal_prep_session_id=prep_session.id,
-                        user_notes=notes,
-                        completion_status="scheduled",
-                    )
-                    self.db.add(entry)
-            else:
-                # Repeating prep session
-                current_date = first_date
-                while current_date <= plan_end_date:
-                    entry = ScheduleEntry(
-                        schedule_id=schedule.id,
-                        entry_type="meal_prep",
-                        entry_date=current_date,
-                        entry_time=prep_time,
-                        meal_prep_session_id=prep_session.id,
-                        user_notes=notes,
-                        completion_status="scheduled",
-                    )
-                    self.db.add(entry)
-
-                    # Move to next occurrence
-                    current_date += timedelta(days=repeats_every)
+                        # Move to next occurrence
+                        current_date += timedelta(days=prep_session.repeats_every)
 
         await self.db.flush()
 

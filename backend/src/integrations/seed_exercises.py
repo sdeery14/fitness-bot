@@ -90,7 +90,7 @@ async def create_seed_user_and_plan(session: AsyncSession) -> tuple[str, str, st
             start_date=now,
             end_date=now,
             status="active",
-            plan_snapshot={},
+            # plan_snapshot removed - using normalized tables
         )
         session.add(plan)
         await session.flush()
