@@ -455,11 +455,16 @@ async def get_plan(
         phase_duration_weeks = phase.phase_details.get("duration_weeks", 0) if phase.phase_details else 0
         
         phases_data.append({
+            "id": str(phase.id),
             "phase_number": phase.phase_number,
-            "phase_name": phase.name,
+            "name": phase.name,
+            "phase_name": phase.name,  # Keep for backward compatibility
+            "start_date": phase.start_date.isoformat() if phase.start_date else None,
+            "end_date": phase.end_date.isoformat() if phase.end_date else None,
             "duration_weeks": phase_duration_weeks,
             "description": ", ".join(phase.objectives) if phase.objectives else "",
             "objectives": phase.objectives,
+            "phase_details": phase.phase_details or {},
             "workout_details": workout_details,
             "meal_details": meal_details,
         })

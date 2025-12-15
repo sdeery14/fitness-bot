@@ -169,7 +169,7 @@ export default function PlanPage() {
       const planToSelect = activePlan || plans[0] || null;
       
       if (planToSelect) {
-        selectPlan(planToSelect);
+        selectPlan(planToSelect, token);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load plans");
@@ -202,60 +202,85 @@ export default function PlanPage() {
     }
   };
 
-  const selectPlan = (plan: FitnessPlan) => {
+  const selectPlan = async (plan: FitnessPlan, token?: string) => {
+    // Set basic plan data immediately
     setSelectedPlan(plan);
 
-    // Fetch schedule data for this plan
-    if (accessToken) {
-      fetchScheduleData(plan.id, accessToken);
-    }
+    const authToken = token || accessToken;
+    if (!authToken) return;
 
-    // Extract phases from plan snapshot if available
-    if (plan.phases) {
-      setPhases(plan.phases);
-    } else {
-      setPhases([]);
-    }
-
-    // Derive phase status from plan data
-    if (plan.phases) {
-      const today = new Date();
-      const currentPhase = plan.phases.find((p: Phase) => {
-        const start = new Date(p.start_date);
-        const end = new Date(p.end_date);
-        return start <= today && today <= end;
+    try {
+      // Fetch full plan details with all metadata
+      const detailsRes = await fetch(`${API_URL}/fitness-plans/${plan.id}`, {
+        headers: {
+          Authorization: `Bearer ${authToken}`,
+        },
       });
 
-      if (currentPhase) {
-        const endDate = new Date(currentPhase.end_date);
-        const daysRemaining = Math.ceil(
-          (endDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
-        );
+      if (detailsRes.ok) {
+        const detailsData = await detailsRes.json();
+        const fullPlan = detailsData.data;
+        console.log('Full plan data fetched:', fullPlan);
+        setSelectedPlan(fullPlan);
 
-        const currentIndex = plan.phases.findIndex(
-          (p: Phase) => p.id === currentPhase.id
-        );
-        const nextPhase =
-          currentIndex < plan.phases.length - 1
-            ? plan.phases[currentIndex + 1]
-            : null;
+        // Extract phases from full plan data
+        if (fullPlan.phases) {
+          setPhases(fullPlan.phases);
+        } else {
+          setPhases([]);
+        }
 
-        setPhaseStatus({
-          has_phases: true,
-          current_phase: {
-            ...currentPhase,
-            days_remaining: daysRemaining,
-          },
-          next_phase: nextPhase,
-          is_complete: daysRemaining <= 2,
-          should_transition: daysRemaining <= 2 && nextPhase !== null,
-        });
+        // Derive phase status from full plan data
+        if (fullPlan.phases) {
+          const today = new Date();
+          const currentPhase = fullPlan.phases.find((p: Phase) => {
+            const start = new Date(p.start_date);
+            const end = new Date(p.end_date);
+            return start <= today && today <= end;
+          });
+
+          if (currentPhase) {
+            const endDate = new Date(currentPhase.end_date);
+            const daysRemaining = Math.ceil(
+              (endDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
+            );
+
+            const currentIndex = fullPlan.phases.findIndex(
+              (p: Phase) => p.id === currentPhase.id
+            );
+            const nextPhase =
+              currentIndex < fullPlan.phases.length - 1
+                ? fullPlan.phases[currentIndex + 1]
+                : null;
+
+            setPhaseStatus({
+              has_phases: true,
+              current_phase: {
+                ...currentPhase,
+                days_remaining: daysRemaining,
+              },
+              next_phase: nextPhase,
+              is_complete: daysRemaining <= 2,
+              should_transition: daysRemaining <= 2 && nextPhase !== null,
+            });
+          } else {
+            setPhaseStatus(null);
+          }
+        } else {
+          setPhaseStatus(null);
+        }
       } else {
-        setPhaseStatus(null);
+        console.error('Failed to fetch plan details:', detailsRes.status, detailsRes.statusText);
+        const errorText = await detailsRes.text();
+        console.error('Error response:', errorText);
       }
-    } else {
-      setPhaseStatus(null);
+    } catch (err) {
+      console.error("Error fetching plan details:", err);
+      setError(err instanceof Error ? err.message : "Failed to load plan details");
     }
+
+    // Fetch schedule data for this plan
+    fetchScheduleData(plan.id, authToken);
   };
 
   const handleActivatePlan = async (plan: FitnessPlan) => {
