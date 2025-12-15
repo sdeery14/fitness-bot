@@ -48,7 +48,7 @@ class ScheduleEntryRead(ScheduleEntryBase):
     meal_name: str | None = None
     
     # Nested objects for grocery and meal prep (for backward compatibility with frontend)
-    grocery_list: dict | None = Field(None, description="Populated from grocery_trip relationship")
+    grocery_list: list | dict | None = Field(None, description="Populated from grocery_trip relationship - can be list or dict")
     prep_instructions: dict | None = Field(None, description="Populated from meal_prep_session relationship")
 
     model_config = ConfigDict(from_attributes=True)

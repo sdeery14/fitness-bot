@@ -32,7 +32,7 @@ class GroceryShoppingTrip(Base):
     
     # Shopping list as JSON array of categorized items
     # Structure: [{"category": "Produce", "items": [{"name": "Bananas", "quantity": "6", "notes": "ripe"}]}]
-    items: Mapped[dict] = mapped_column(JSON, nullable=False)
+    items: Mapped[list] = mapped_column(JSON, nullable=False)
     
     estimated_duration_minutes: Mapped[int | None] = mapped_column(Integer, nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
