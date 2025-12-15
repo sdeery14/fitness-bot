@@ -1,4 +1,5 @@
 """Plan service for fitness plan management and persistence."""
+
 from datetime import UTC, datetime
 from uuid import UUID
 
@@ -68,6 +69,7 @@ class PlanService:
 
         # Create plan
         from datetime import timedelta
+
         if start_date is None:
             start_date = datetime.now(UTC)
         end_date = start_date + timedelta(weeks=duration_weeks)
@@ -80,7 +82,7 @@ class PlanService:
             start_date=start_date,
             end_date=end_date,
             status="active",  # Set to active immediately upon creation
-            plan_snapshot={},  # Initialize empty, will be populated when plan is generated
+
         )
 
         self.db.add(plan)
@@ -158,7 +160,7 @@ class PlanService:
         - Incremented version number
         - parent_plan_id pointing to the original
         - 'active' status (parent plan will be marked 'replaced')
-        - Same plan_snapshot (to be modified by caller)
+        - All related data copied from parent plan
 
         Args:
             parent_plan_id: UUID of the plan to create a version from
@@ -186,7 +188,6 @@ class PlanService:
             start_date=parent_plan.start_date,
             end_date=parent_plan.end_date,
             status="active",
-            plan_snapshot=parent_plan.plan_snapshot.copy() if parent_plan.plan_snapshot else {},
             parent_plan_id=parent_plan_id,
             version=parent_plan.version + 1,
             version_notes=version_notes,
@@ -226,15 +227,8 @@ class PlanService:
         plan.status = status
         if status == "completed":
             plan.updated_at = datetime.now(UTC)
-        elif error_message:
-            # Store error in plan_snapshot if it exists, otherwise create it
-            if plan.plan_snapshot:
-                plan.plan_snapshot = {
-                    **plan.plan_snapshot,
-                    "error": error_message,
-                }
-            else:
-                plan.plan_snapshot = {"error": error_message}
+        # Note: error_message is now logged but not stored in database
+        # Consider adding an errors table if error tracking is needed
 
         await self.db.commit()
         await self.db.refresh(plan)
@@ -318,10 +312,10 @@ class PlanService:
 
     def _extract_workouts_from_cycle(self, workout_cycle: list[dict]) -> list[dict]:
         """Extract workout data from training cycle.
-        
+
         Args:
             workout_cycle: Training cycle with workout and rest day items
-            
+
         Returns:
             List of workout dictionaries
         """
@@ -331,12 +325,14 @@ class PlanService:
                 workout_index = item.get("workout_index", 0)
                 # For now, create basic workout structure
                 # The actual workout details should come from the cycle
-                workouts.append({
-                    "day_name": f"Workout {workout_index + 1}",
-                    "duration_minutes": 60,
-                    "focus": "Training",
-                    "exercises": [],  # Will be populated from workout_cycle details if available
-                })
+                workouts.append(
+                    {
+                        "day_name": f"Workout {workout_index + 1}",
+                        "duration_minutes": 60,
+                        "focus": "Training",
+                        "exercises": [],  # Will be populated from workout_cycle details if available
+                    }
+                )
         return workouts
 
     async def get_plan_workouts(self, plan_id: UUID) -> list[WorkoutPlan]:
@@ -399,28 +395,129 @@ class PlanService:
         if not plan:
             raise ValueError(f"Plan not found: {plan_id}")
 
-        # Save the complete plan snapshot
-        plan.plan_snapshot = plan_output
+        # Mark plan as active
         plan.status = "active"
+
+        # Extract plan-level metadata and populate new fields
+        plan.key_principles = plan_output.get("key_principles", [])
+        plan.success_metrics = plan_output.get("success_metrics", [])
+        plan.important_notes = plan_output.get("important_notes")
 
         # Extract phases from plan output
         phases_data = plan_output.get("phases", [])
-        
+
         if not phases_data:
             raise ValueError("Plan output must contain phases data")
+
+        # Create ONE workout_plan for the entire fitness plan (not per phase)
+        from src.models.workout import WorkoutPlan
         
+        workout_metadata = plan_output.get("workout_metadata", {})
+        
+        # Get workout frequency from requirements dict (passed in plan_output)
+        requirements = plan_output.get("requirements", {})
+        workout_frequency = requirements.get("workout_plan", {}).get("workout_frequency", 3)
+        
+        # Get progression strategy from metadata
+        progression_strategy_full = workout_metadata.get("progression_strategy", "Progressive overload")
+        progression_strategy = (
+            progression_strategy_full[:252] + "..."
+            if len(progression_strategy_full) > 255
+            else progression_strategy_full
+        )
+        
+        workout_plan = WorkoutPlan(
+            fitness_plan_id=plan_id,
+            frequency_per_week=workout_frequency,
+            progression_strategy=progression_strategy,
+            phase_progression_notes=workout_metadata.get("phase_progression_notes"),
+            equipment_used=workout_metadata.get("equipment_used", []),
+            workout_plan_details={
+                "program_type": workout_metadata.get("program_type", "General"),
+                "progression_strategy": progression_strategy_full,
+                "training_principles": workout_metadata.get("training_principles", []),
+            },
+        )
+        self.db.add(workout_plan)
+        await self.db.flush()  # Get workout_plan ID
+        
+        # Create ONE meal_plan for the entire fitness plan (not per phase)
+        from src.models.meal import MealPlan
+        
+        meal_metadata = plan_output.get("meal_metadata", {})
+        
+        # Get meal frequency from requirements dict (passed in plan_output)
+        meal_frequency = requirements.get("meal_plan", {}).get("meal_frequency", 3)
+        
+        # Use first phase's data to calculate initial calorie/macro targets
+        # (these are general guidelines - phase details will have specific values)
+        first_phase_meals = phases_data[0].get("meal_details", {}) if phases_data else {}
+        daily_calories = first_phase_meals.get("daily_calorie_target", 2000)
+        macro_split = first_phase_meals.get("macro_split", "40% Carbs, 30% Protein, 30% Fat")
+        
+        # Parse macro percentages
+        import re
+        protein_percent = 30
+        carbs_percent = 40
+        fats_percent = 30
+        
+        if "protein" in macro_split.lower():
+            protein_match = re.search(r"(\d+)%?\s*protein", macro_split.lower())
+            if protein_match:
+                protein_percent = int(protein_match.group(1))
+        if "carb" in macro_split.lower():
+            carbs_match = re.search(r"(\d+)%?\s*carb", macro_split.lower())
+            if carbs_match:
+                carbs_percent = int(carbs_match.group(1))
+        if "fat" in macro_split.lower():
+            fats_match = re.search(r"(\d+)%?\s*fat", macro_split.lower())
+            if fats_match:
+                fats_percent = int(fats_match.group(1))
+        
+        # Calculate macro grams
+        protein_grams = int((daily_calories * protein_percent / 100) / 4)
+        carbs_grams = int((daily_calories * carbs_percent / 100) / 4)
+        fats_grams = int((daily_calories * fats_percent / 100) / 9)
+        
+        meal_plan = MealPlan(
+            fitness_plan_id=plan_id,
+            daily_calorie_target=daily_calories,
+            macronutrient_distribution={
+                "macro_split": macro_split,
+                "protein_percent": protein_percent,
+                "carbs_percent": carbs_percent,
+                "fats_percent": fats_percent,
+            },
+            protein_grams_target=protein_grams,
+            carbs_grams_target=carbs_grams,
+            fats_grams_target=fats_grams,
+            meals_per_day=meal_frequency,
+            dietary_approach=meal_metadata.get("dietary_approach"),
+            macro_strategy=meal_metadata.get("macro_strategy"),
+            meal_timing=meal_metadata.get("meal_timing"),
+            hydration_guidance=meal_metadata.get("hydration_guidance"),
+            phase_nutrition_notes=meal_metadata.get("phase_nutrition_notes"),
+        )
+        self.db.add(meal_plan)
+        await self.db.flush()  # Get meal_plan ID
+
         # Process each phase
-        from src.models.fitness_plan import Phase
         from datetime import timedelta
-        
+
+        from src.models.fitness_plan import Phase
+
         current_start_date = plan.start_date
-        
+
         for phase_data in phases_data:
             phase_number = phase_data.get("phase_number", 1)
             phase_duration = phase_data.get("duration_weeks", plan.duration_weeks)
             phase_end_date = current_start_date + timedelta(weeks=phase_duration)
-            
-            # Create Phase record
+
+            # Extract workout details for this phase
+            workout_details = phase_data.get("workout_details", {})
+            workout_cycle = workout_details.get("workout_cycle", [])
+
+            # Create Phase record with workout_cycle in phase_details
             phase = Phase(
                 fitness_plan_id=plan_id,
                 phase_number=phase_number,
@@ -430,48 +527,19 @@ class PlanService:
                 end_date=phase_end_date,
                 phase_details={
                     "duration_weeks": phase_duration,
+                    "workout_cycle": workout_cycle,  # Store for schedule generation
                 },
             )
             self.db.add(phase)
             await self.db.flush()  # Flush to get the phase ID
-            
-            # Extract workout details for this phase
-            workout_details = phase_data.get("workout_details", {})
-            workout_cycle = workout_details.get("workout_cycle", [])
-            
+
+            # Create individual Workout records for this phase (using the shared workout_plan)
             if workout_cycle:
-                # Calculate frequency from workout cycle
-                workout_days = [item for item in workout_cycle if item.get("type") == "workout"]
-                frequency_per_week = len(workout_days)
-                
-                # Create a WorkoutPlan record for this phase
-                progression_notes = workout_details.get("progression_notes", "Progressive overload")
-                # Truncate progression_strategy to fit VARCHAR(255) limit
-                progression_strategy = progression_notes[:252] + "..." if len(progression_notes) > 255 else progression_notes
-                
-                workout_plan = WorkoutPlan(
-                    fitness_plan_id=plan_id,
-                    frequency_per_week=frequency_per_week,
-                    progression_strategy=progression_strategy,
-                    workout_plan_details={
-                        "program_type": plan_output.get("workout_metadata", {}).get("program_type", "General"),
-                        "duration_weeks": phase_duration,
-                        "training_cycle": workout_cycle,
-                        "phase_number": phase_number,
-                        "intensity_guidance": workout_details.get("intensity_guidance", ""),
-                        "volume_notes": workout_details.get("volume_notes", ""),
-                        "progression_notes": progression_notes,  # Store full text in JSON
-                    },
-                )
-                self.db.add(workout_plan)
-                await self.db.flush()  # Flush to get the workout_plan ID
-                
-                # Create individual Workout records from workout details
                 from src.models.workout import Workout, Exercise
-                
+
                 # Get workouts list from PhaseWorkoutDetails
                 workouts_list = workout_details.get("workouts", [])
-                
+
                 for workout_data in workouts_list:
                     # Create Workout record with data from WorkoutDay
                     workout = Workout(
@@ -482,15 +550,19 @@ class PlanService:
                         duration_minutes=workout_data.get("duration_minutes", 60),
                         intensity_level=workout_data.get("intensity_level", "moderate"),
                         workout_structure={
-                            "warmup": workout_data.get("warmup", "5-10 minutes of light cardio and dynamic stretching"),
-                            "cooldown": workout_data.get("cooldown", "5-10 minutes of stretching and mobility"),
+                            "warmup": workout_data.get(
+                                "warmup", "5-10 minutes of light cardio and dynamic stretching"
+                            ),
+                            "cooldown": workout_data.get(
+                                "cooldown", "5-10 minutes of stretching and mobility"
+                            ),
                             "focus": workout_data.get("focus", "General"),
                             "notes": workout_data.get("notes"),
                         },
                     )
                     self.db.add(workout)
                     await self.db.flush()  # Get workout ID for exercises
-                    
+
                     # Create Exercise records for each exercise in this workout
                     exercises_list = workout_data.get("exercises", [])
                     for exercise_order, exercise_data in enumerate(exercises_list, start=1):
@@ -500,7 +572,9 @@ class PlanService:
                             name=exercise_data.get("name", "Unknown Exercise"),
                             exercise_type=exercise_data.get("exercise_type", "compound"),
                             target_muscle_groups=exercise_data.get("target_muscle_groups", []),
-                            equipment_required=exercise_data.get("equipment_required", ["bodyweight"]),
+                            equipment_required=exercise_data.get(
+                                "equipment_required", ["bodyweight"]
+                            ),
                             sets=exercise_data.get("sets"),
                             reps=exercise_data.get("reps"),
                             duration_seconds=exercise_data.get("duration_seconds"),
@@ -512,66 +586,18 @@ class PlanService:
                         )
                         self.db.add(exercise)
 
-            # Extract meal details for this phase
+            # Extract meal details for this phase and create Meal records (using the shared meal_plan)
             meal_details = phase_data.get("meal_details", {})
-            
+
             if meal_details:
-                # Parse macro split to calculate individual macro targets
-                daily_calories = meal_details.get("daily_calorie_target", 2000)
-                macro_split = meal_details.get("macro_split", "40% Carbs, 30% Protein, 30% Fat")
-
-                # Extract percentages from macro split string
-                # Default to 40/30/30 (carbs/protein/fat) if parsing fails
-                protein_percent = 30
-                carbs_percent = 40
-                fats_percent = 30
-
-                # Try to parse the macro split
-                import re
-                if "protein" in macro_split.lower():
-                    protein_match = re.search(r'(\d+)%?\s*protein', macro_split.lower())
-                    if protein_match:
-                        protein_percent = int(protein_match.group(1))
-                if "carb" in macro_split.lower():
-                    carbs_match = re.search(r'(\d+)%?\s*carb', macro_split.lower())
-                    if carbs_match:
-                        carbs_percent = int(carbs_match.group(1))
-                if "fat" in macro_split.lower():
-                    fats_match = re.search(r'(\d+)%?\s*fat', macro_split.lower())
-                    if fats_match:
-                        fats_percent = int(fats_match.group(1))
-
-                # Calculate macro grams (protein: 4 cal/g, carbs: 4 cal/g, fats: 9 cal/g)
-                protein_grams = int((daily_calories * protein_percent / 100) / 4)
-                carbs_grams = int((daily_calories * carbs_percent / 100) / 4)
-                fats_grams = int((daily_calories * fats_percent / 100) / 9)
-
-                # Create a MealPlan record for this phase
-                meal_plan = MealPlan(
-                    fitness_plan_id=plan_id,
-                    daily_calorie_target=daily_calories,
-                    macronutrient_distribution={
-                        "macro_split": macro_split,
-                        "protein_percent": protein_percent,
-                        "carbs_percent": carbs_percent,
-                        "fats_percent": fats_percent,
-                        "phase_nutrition_focus": meal_details.get("phase_nutrition_focus", ""),
-                    },
-                    protein_grams_target=protein_grams,
-                    carbs_grams_target=carbs_grams,
-                    fats_grams_target=fats_grams,
-                    meals_per_day=len(meal_details.get("sample_days", [{}])[0].get("meals", [])),
-                )
-                self.db.add(meal_plan)
-                await self.db.flush()  # Flush to get the meal_plan ID
-                
                 # Create individual Meal records from sample_days array
                 from src.models.meal import Meal
+
                 sample_days = meal_details.get("sample_days", [])
-                
+
                 for day_idx, day_plan in enumerate(sample_days):
                     meals_list = day_plan.get("meals", [])
-                    
+
                     for meal_data in meals_list:
                         # Calculate meal macros from food items
                         foods = meal_data.get("foods", [])
@@ -579,25 +605,32 @@ class PlanService:
                         meal_carbs = sum(food.get("carbs_g", 0) for food in foods)
                         meal_fat = sum(food.get("fat_g", 0) for food in foods)
                         meal_calories = meal_data.get("total_calories", 0)
-                        
+
                         # Convert foods to ingredients format for frontend
                         ingredients = []
                         for food in foods:
-                            ingredients.append({
-                                "name": food.get("name", "Unknown"),
-                                "quantity": food.get("portion", "1 serving").split()[0],  # Extract number
-                                "unit": " ".join(food.get("portion", "1 serving").split()[1:]) or "serving",  # Extract unit
-                                "calories": food.get("calories", 0),
-                                "protein_grams": food.get("protein_g", 0),
-                                "carbs_grams": food.get("carbs_g", 0),
-                                "fats_grams": food.get("fat_g", 0),
-                            })
-                        
+                            ingredients.append(
+                                {
+                                    "name": food.get("name", "Unknown"),
+                                    "quantity": food.get("portion", "1 serving").split()[
+                                        0
+                                    ],  # Extract number
+                                    "unit": " ".join(food.get("portion", "1 serving").split()[1:])
+                                    or "serving",  # Extract unit
+                                    "calories": food.get("calories", 0),
+                                    "protein_grams": food.get("protein_g", 0),
+                                    "carbs_grams": food.get("carbs_g", 0),
+                                    "fats_grams": food.get("fat_g", 0),
+                                }
+                            )
+
                         meal = Meal(
                             meal_plan_id=meal_plan.id,
                             phase_id=phase.id,
                             name=meal_data.get("meal_name", "Meal"),
-                            meal_type=meal_data.get("meal_name", "Meal").lower().split()[0] if meal_data.get("meal_name") else "meal",  # Extract first word (breakfast, lunch, etc.)
+                            meal_type=meal_data.get("meal_name", "Meal").lower().split()[0]
+                            if meal_data.get("meal_name")
+                            else "meal",  # Extract first word (breakfast, lunch, etc.)
                             day_of_week=day_idx + 1,  # 1-7 for each sample day
                             calories=meal_calories,
                             protein_grams=meal_protein,
@@ -614,7 +647,88 @@ class PlanService:
                             },
                         )
                         self.db.add(meal)
-            
+
+                # Create GroceryShoppingTrip records from grocery_shopping_schedule
+                from datetime import time
+
+                from src.models.grocery_trip import GroceryShoppingTrip
+
+                shopping_schedule = meal_details.get("grocery_shopping_schedule", [])
+
+                for shopping_entry in shopping_schedule:
+                    # Parse time if provided
+                    entry_time = None
+                    time_str = shopping_entry.get("time")
+                    if time_str:
+                        try:
+                            # Parse time string like "09:00" or "9:00 AM"
+                            if ":" in time_str:
+                                parts = time_str.split(":")
+                                hour = int(parts[0])
+                                minute = int(parts[1].split()[0])  # Remove AM/PM if present
+                                # Convert 12-hour to 24-hour if AM/PM present
+                                if "PM" in time_str.upper() and hour != 12:
+                                    hour += 12
+                                elif "AM" in time_str.upper() and hour == 12:
+                                    hour = 0
+                                entry_time = time(hour=hour, minute=minute)
+                        except (ValueError, IndexError):
+                            pass  # Keep as None if parsing fails
+
+                    grocery_trip = GroceryShoppingTrip(
+                        phase_id=phase.id,
+                        name=shopping_entry.get("name", "Grocery Shopping"),
+                        items=shopping_entry.get("shopping_list", []),
+                        estimated_duration_minutes=shopping_entry.get(
+                            "estimated_duration_minutes", 60
+                        ),
+                        notes=shopping_entry.get("notes"),
+                        target_day_name=shopping_entry.get("target_day_name"),
+                        time=entry_time,
+                        repeats_every=shopping_entry.get("repeats_every"),
+                    )
+                    self.db.add(grocery_trip)
+
+                # Create MealPrepSession records from meal_prep_schedule
+                from src.models.meal_prep import MealPrepSession
+
+                prep_schedule = meal_details.get("meal_prep_schedule", [])
+
+                for prep_entry in prep_schedule:
+                    # Parse time if provided
+                    entry_time = None
+                    time_str = prep_entry.get("time")
+                    if time_str:
+                        try:
+                            # Parse time string like "18:00" or "6:00 PM"
+                            if ":" in time_str:
+                                parts = time_str.split(":")
+                                hour = int(parts[0])
+                                minute = int(parts[1].split()[0])  # Remove AM/PM if present
+                                # Convert 12-hour to 24-hour if AM/PM present
+                                if "PM" in time_str.upper() and hour != 12:
+                                    hour += 12
+                                elif "AM" in time_str.upper() and hour == 12:
+                                    hour = 0
+                                entry_time = time(hour=hour, minute=minute)
+                        except (ValueError, IndexError):
+                            pass  # Keep as None if parsing fails
+
+                    meal_prep_session = MealPrepSession(
+                        phase_id=phase.id,
+                        session_name=prep_entry.get("session_name", "Meal Prep"),
+                        recipes=prep_entry.get("recipes", []),
+                        duration_minutes=prep_entry.get("duration_minutes", 90),
+                        batch_size=prep_entry.get("batch_size", 1),
+                        instructions=prep_entry.get("instructions", []),
+                        storage_instructions=prep_entry.get("storage_instructions"),
+                        notes=prep_entry.get("notes"),
+                        target_day_name=prep_entry.get("target_day_name"),
+                        time=entry_time,
+                        repeats_every=prep_entry.get("repeats_every"),
+                    )
+                    self.db.add(meal_prep_session)
+
             # Move to next phase start date
             current_start_date = phase_end_date
 
@@ -627,31 +741,41 @@ class PlanService:
         from src.services.schedule_service import ScheduleService
 
         schedule_service = ScheduleService(self.db)
-        
+
         # Check if a schedule already exists for this plan
-        from src.models.schedule import Schedule
         from sqlalchemy import select
-        
+
+        from src.models.schedule import Schedule
+
         existing_schedule_stmt = select(Schedule).where(Schedule.fitness_plan_id == plan_id)
         existing_schedule_result = await self.db.execute(existing_schedule_stmt)
         existing_schedule = existing_schedule_result.scalar_one_or_none()
-        
+
         if not existing_schedule:
             # Extract schedule preferences from plan requirements
             requirements = plan_output.get("requirements", {})
             schedule_preferences = requirements.get("schedule_preferences", {})
-            
+
             # Create schedule starting from plan start_date, covering entire duration
             try:
+                # Convert datetime to date for schedule service
+                schedule_start_date = plan.start_date.date() if isinstance(plan.start_date, datetime) else plan.start_date
+                print(f"DEBUG: Creating schedule for plan {plan_id}")
+                print(f"DEBUG: plan.start_date type: {type(plan.start_date)}, value: {plan.start_date}")
+                print(f"DEBUG: schedule_start_date type: {type(schedule_start_date)}, value: {schedule_start_date}")
+                
                 await schedule_service.create_schedule(
                     user_id=plan.user_id,
                     fitness_plan_id=plan_id,
-                    start_date=plan.start_date,
+                    start_date=schedule_start_date,
                     schedule_preferences=schedule_preferences,
                 )
+                print(f"DEBUG: Schedule created successfully for plan {plan_id}")
             except Exception as schedule_error:
                 # Log the error but don't fail the plan save operation
+                import traceback
                 print(f"Warning: Failed to auto-create schedule for plan {plan_id}: {schedule_error}")
+                print(f"DEBUG: Full traceback:\n{traceback.format_exc()}")
 
         return plan
 
@@ -713,10 +837,14 @@ class PlanService:
         completed_workouts = sum(
             1 for e in entries if e.workout_id and e.completion_status == "completed"
         )
-        completed_meals = sum(1 for e in entries if e.meal_id and e.completion_status == "completed")
+        completed_meals = sum(
+            1 for e in entries if e.meal_id and e.completion_status == "completed"
+        )
 
         overall_adherence = (completed_entries / total_entries * 100) if total_entries > 0 else 0
-        workout_adherence = (completed_workouts / workout_entries * 100) if workout_entries > 0 else 0
+        workout_adherence = (
+            (completed_workouts / workout_entries * 100) if workout_entries > 0 else 0
+        )
         meal_adherence = (completed_meals / meal_entries * 100) if meal_entries > 0 else 0
 
         # Analyze patterns by day of week
@@ -737,7 +865,10 @@ class PlanService:
 
         return {
             "has_data": True,
-            "analysis_period": {"start_date": start_date.isoformat(), "end_date": end_date.isoformat()},
+            "analysis_period": {
+                "start_date": start_date.isoformat(),
+                "end_date": end_date.isoformat(),
+            },
             "adherence_metrics": {
                 "overall": round(overall_adherence, 1),
                 "workouts": round(workout_adherence, 1),
@@ -783,98 +914,110 @@ class PlanService:
 
         # Low overall adherence
         if adherence["overall"] < 50:
-            recommendations.append({
-                "category": "Schedule Simplification",
-                "priority": "high",
-                "title": "Simplify Your Schedule",
-                "description": f"Your current adherence is {adherence['overall']:.0f}%. "
-                "Consider reducing workout frequency to build consistency.",
-                "action_items": [
-                    "Reduce weekly workouts by 1-2 sessions",
-                    "Focus on quality over quantity",
-                    "Build a sustainable habit first",
-                ],
-                "expected_impact": "Improved consistency and motivation",
-            })
+            recommendations.append(
+                {
+                    "category": "Schedule Simplification",
+                    "priority": "high",
+                    "title": "Simplify Your Schedule",
+                    "description": f"Your current adherence is {adherence['overall']:.0f}%. "
+                    "Consider reducing workout frequency to build consistency.",
+                    "action_items": [
+                        "Reduce weekly workouts by 1-2 sessions",
+                        "Focus on quality over quantity",
+                        "Build a sustainable habit first",
+                    ],
+                    "expected_impact": "Improved consistency and motivation",
+                }
+            )
 
         # Moderate adherence
         elif adherence["overall"] < 70:
-            recommendations.append({
-                "category": "Flexibility & Options",
-                "priority": "medium",
-                "title": "Add Flexible Alternatives",
-                "description": f"You're at {adherence['overall']:.0f}% adherence. "
-                "Adding flexible options can help you hit your targets more consistently.",
-                "action_items": [
-                    "Add shorter workout alternatives for busy days",
-                    "Include home workout options when gym access is limited",
-                    "Allow meal swaps for similar macros",
-                ],
-                "expected_impact": "Better adherence on challenging days",
-            })
+            recommendations.append(
+                {
+                    "category": "Flexibility & Options",
+                    "priority": "medium",
+                    "title": "Add Flexible Alternatives",
+                    "description": f"You're at {adherence['overall']:.0f}% adherence. "
+                    "Adding flexible options can help you hit your targets more consistently.",
+                    "action_items": [
+                        "Add shorter workout alternatives for busy days",
+                        "Include home workout options when gym access is limited",
+                        "Allow meal swaps for similar macros",
+                    ],
+                    "expected_impact": "Better adherence on challenging days",
+                }
+            )
 
         # Strong adherence - ready for progression
         elif adherence["overall"] >= 80:
-            recommendations.append({
-                "category": "Progressive Overload",
-                "priority": "medium",
-                "title": "Time to Level Up",
-                "description": f"Excellent {adherence['overall']:.0f}% adherence! "
-                "You're ready to increase workout intensity.",
-                "action_items": [
-                    "Increase weights by 5-10%",
-                    "Add 1-2 reps per set",
-                    "Consider adding an extra training session",
-                ],
-                "expected_impact": "Continued progress and adaptation",
-            })
+            recommendations.append(
+                {
+                    "category": "Progressive Overload",
+                    "priority": "medium",
+                    "title": "Time to Level Up",
+                    "description": f"Excellent {adherence['overall']:.0f}% adherence! "
+                    "You're ready to increase workout intensity.",
+                    "action_items": [
+                        "Increase weights by 5-10%",
+                        "Add 1-2 reps per set",
+                        "Consider adding an extra training session",
+                    ],
+                    "expected_impact": "Continued progress and adaptation",
+                }
+            )
 
         # Workout vs meal disparity
         if abs(adherence["workouts"] - adherence["meals"]) > 20:
             if adherence["workouts"] < adherence["meals"]:
-                recommendations.append({
-                    "category": "Workout Optimization",
-                    "priority": "high",
-                    "title": "Make Workouts More Accessible",
-                    "description": f"Workout adherence ({adherence['workouts']:.0f}%) is notably lower than "
-                    f"meal adherence ({adherence['meals']:.0f}%).",
-                    "action_items": [
-                        "Shorten workout duration",
-                        "Add bodyweight alternatives",
-                        "Schedule workouts at more convenient times",
-                    ],
-                    "expected_impact": "Balanced adherence across all activities",
-                })
+                recommendations.append(
+                    {
+                        "category": "Workout Optimization",
+                        "priority": "high",
+                        "title": "Make Workouts More Accessible",
+                        "description": f"Workout adherence ({adherence['workouts']:.0f}%) is notably lower than "
+                        f"meal adherence ({adherence['meals']:.0f}%).",
+                        "action_items": [
+                            "Shorten workout duration",
+                            "Add bodyweight alternatives",
+                            "Schedule workouts at more convenient times",
+                        ],
+                        "expected_impact": "Balanced adherence across all activities",
+                    }
+                )
             else:
-                recommendations.append({
-                    "category": "Nutrition Planning",
-                    "priority": "high",
-                    "title": "Simplify Meal Planning",
-                    "description": f"Meal adherence ({adherence['meals']:.0f}%) is notably lower than "
-                    f"workout adherence ({adherence['workouts']:.0f}%).",
-                    "action_items": [
-                        "Batch cook meals for the week",
-                        "Use simpler recipes",
-                        "Allow more flexible meal options",
-                    ],
-                    "expected_impact": "Improved nutrition consistency",
-                })
+                recommendations.append(
+                    {
+                        "category": "Nutrition Planning",
+                        "priority": "high",
+                        "title": "Simplify Meal Planning",
+                        "description": f"Meal adherence ({adherence['meals']:.0f}%) is notably lower than "
+                        f"workout adherence ({adherence['workouts']:.0f}%).",
+                        "action_items": [
+                            "Batch cook meals for the week",
+                            "Use simpler recipes",
+                            "Allow more flexible meal options",
+                        ],
+                        "expected_impact": "Improved nutrition consistency",
+                    }
+                )
 
         # Weak days pattern
         if patterns["weak_days"]:
             weak_day_names = ", ".join([d["day"] for d in patterns["weak_days"]])
-            recommendations.append({
-                "category": "Schedule Optimization",
-                "priority": "medium",
-                "title": f"Address {weak_day_names} Challenges",
-                "description": f"Your adherence is consistently lower on {weak_day_names}.",
-                "action_items": [
-                    f"Identify specific barriers on {weak_day_names}",
-                    "Consider lighter activities on these days",
-                    "Prepare in advance to reduce friction",
-                ],
-                "expected_impact": "More consistent week-to-week adherence",
-            })
+            recommendations.append(
+                {
+                    "category": "Schedule Optimization",
+                    "priority": "medium",
+                    "title": f"Address {weak_day_names} Challenges",
+                    "description": f"Your adherence is consistently lower on {weak_day_names}.",
+                    "action_items": [
+                        f"Identify specific barriers on {weak_day_names}",
+                        "Consider lighter activities on these days",
+                        "Prepare in advance to reduce friction",
+                    ],
+                    "expected_impact": "More consistent week-to-week adherence",
+                }
+            )
 
         # Get plan details for duration-based recommendations
         plan = await self.get_plan(fitness_plan_id)
@@ -883,18 +1026,20 @@ class PlanService:
 
             days_active = (date.today() - plan.start_date).days
             if days_active >= 30 and adherence["overall"] >= 75:
-                recommendations.append({
-                    "category": "Goal Expansion",
-                    "priority": "low",
-                    "title": "Consider New Challenges",
-                    "description": f"You've maintained strong adherence for {days_active} days!",
-                    "action_items": [
-                        "Add flexibility or mobility work",
-                        "Incorporate skill-based training",
-                        "Set a new performance goal",
-                    ],
-                    "expected_impact": "Sustained motivation and continued growth",
-                })
+                recommendations.append(
+                    {
+                        "category": "Goal Expansion",
+                        "priority": "low",
+                        "title": "Consider New Challenges",
+                        "description": f"You've maintained strong adherence for {days_active} days!",
+                        "action_items": [
+                            "Add flexibility or mobility work",
+                            "Incorporate skill-based training",
+                            "Set a new performance goal",
+                        ],
+                        "expected_impact": "Sustained motivation and continued growth",
+                    }
+                )
 
         return {
             "user_id": str(user_id),
@@ -1013,7 +1158,9 @@ class PlanService:
                 "objectives": next_phase.objectives,
                 "start_date": next_phase.start_date.isoformat(),
                 "end_date": next_phase.end_date.isoformat(),
-            } if next_phase else None,
+            }
+            if next_phase
+            else None,
             "is_complete": is_complete,
             "should_transition": should_transition,
         }
@@ -1053,23 +1200,8 @@ class PlanService:
         if not next_phase:
             raise ValueError("No next phase available for transition")
 
-        # Record transition in plan snapshot
+        # TODO: Consider adding a PhaseTransition table for historical tracking if needed
         plan = await self.get_plan(fitness_plan_id)
-        if plan.plan_snapshot is None:
-            plan.plan_snapshot = {}
-
-        if "phase_transitions" not in plan.plan_snapshot:
-            plan.plan_snapshot["phase_transitions"] = []
-
-        plan.plan_snapshot["phase_transitions"].append({
-            "from_phase": current_phase["phase_number"],
-            "from_phase_name": current_phase["name"],
-            "to_phase": next_phase["phase_number"],
-            "to_phase_name": next_phase["name"],
-            "transitioned_at": datetime.now(UTC).isoformat(),
-            "trigger_reason": trigger_reason,
-        })
-
         await self.db.commit()
         await self.db.refresh(plan)
 

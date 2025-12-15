@@ -14,7 +14,7 @@ from pydantic import BaseModel, Field
 
 from src.ai.app_agents.meal_phase_agent import meal_phase_agent
 from src.ai.app_agents.workout_phase_agent import workout_phase_agent
-from src.ai.schemas import MealPlanMetadata, SchedulePreferences, WorkoutPlanMetadata
+from src.ai.schemas import MealPlanMetadata, WorkoutPlanMetadata
 from src.services.plan_service import PlanService
 
 # Context variables for passing user_id, db_session, and conversation_id to function tools
@@ -178,14 +178,14 @@ Phase Context:
 - Objectives: {', '.join(phase_objectives)}
 
 Overall Workout Plan:
-{requirements.workout_plan_description}
+{requirements.workout_plan.description}
 
 User Context:
-- Fitness Level: {requirements.fitness_level}
-- Workout Frequency: {requirements.workout_frequency} days/week
-- Equipment: {requirements.equipment_access}
-- Time per Session: {requirements.time_per_session} minutes
-- Injuries/Conditions: {', '.join(requirements.injuries_or_conditions) if requirements.injuries_or_conditions else 'None'}
+- Fitness Level: {requirements.workout_plan.fitness_level}
+- Workout Frequency: {requirements.workout_plan.workout_frequency} days/week
+- Equipment: {requirements.workout_plan.equipment_access}
+- Time per Session: {requirements.workout_plan.time_per_session} minutes
+- Injuries/Conditions: {', '.join(requirements.workout_plan.injuries_or_conditions) if requirements.workout_plan.injuries_or_conditions else 'None'}
 
 Generate the specific workout cycle, intensity guidance, volume notes, and progression strategy for this phase."""
 
@@ -209,11 +209,11 @@ Phase Context:
 - Objectives: {', '.join(phase_objectives)}
 
 Overall Meal Plan:
-{requirements.meal_plan_description}
+{requirements.meal_plan.description}
 
 User Context:
-- Dietary Restrictions: {', '.join(requirements.dietary_restrictions) if requirements.dietary_restrictions else 'None'}
-- Meal Frequency: {requirements.meal_frequency} meals/day
+- Dietary Restrictions: {', '.join(requirements.meal_plan.dietary_restrictions) if requirements.meal_plan.dietary_restrictions else 'None'}
+- Meal Frequency: {requirements.meal_plan.meal_frequency} meals/day
 - Primary Goal: {requirements.primary_goal}
 
 Generate the specific calorie target, macro split, sample meal plans, and nutrition focus for this phase."""
@@ -268,16 +268,26 @@ async def _save_plan_to_database(
         # Create plan service
         plan_service = PlanService(db_session)
 
-        # Prepare requirements dict
+        # Prepare requirements dict from nested structure
         requirements_dict = {
-            "fitness_level": requirements.fitness_level,
-            "workout_frequency": requirements.workout_frequency,
-            "equipment_access": requirements.equipment_access,
-            "time_per_session": requirements.time_per_session,
-            "dietary_restrictions": requirements.dietary_restrictions,
-            "meal_frequency": requirements.meal_frequency,
-            "injuries_or_conditions": requirements.injuries_or_conditions,
-            "schedule_preferences": requirements.schedule_preferences.model_dump(),
+            "name": requirements.name,
+            "description": requirements.description,
+            "primary_goal": requirements.primary_goal,
+            "workout_plan": {
+                "fitness_level": requirements.workout_plan.fitness_level,
+                "workout_frequency": requirements.workout_plan.workout_frequency,
+                "equipment_access": requirements.workout_plan.equipment_access,
+                "time_per_session": requirements.workout_plan.time_per_session,
+                "injuries_or_conditions": requirements.workout_plan.injuries_or_conditions,
+                "description": requirements.workout_plan.description,
+                "schedule_preferences": requirements.workout_plan.schedule_preferences.model_dump() if requirements.workout_plan.schedule_preferences else None,
+            },
+            "meal_plan": {
+                "dietary_restrictions": requirements.meal_plan.dietary_restrictions,
+                "meal_frequency": requirements.meal_plan.meal_frequency,
+                "description": requirements.meal_plan.description,
+                "schedule_preferences": requirements.meal_plan.schedule_preferences.model_dump() if requirements.meal_plan.schedule_preferences else None,
+            },
         }
 
         # Create fitness plan record with parsed dates
@@ -383,14 +393,66 @@ def _parse_and_validate_dates(
     return start, end, actual_weeks
 
 
-class WorkoutPlanInput(BaseModel):
-    """Input parameters for workout plan generation."""
-
+class WorkoutSchedulePreferences(BaseModel):
+    """Scheduling preferences specific to workout training."""
+    
     model_config = {"extra": "forbid"}
-
-    primary_goal: str = Field(
-        description="Primary fitness goal (e.g., 'muscle_gain', 'weight_loss')"
+    
+    split_type: str = Field(
+        default="weekly_fixed",
+        description="Training split type: 'weekly_fixed' (same days each week) or 'rolling' (e.g., 4-day cycle repeats regardless of calendar week)",
     )
+    preferred_workout_days: list[str] | None = Field(
+        default=None,
+        description="Preferred days for workouts (e.g., ['Monday', 'Wednesday', 'Friday', 'Saturday']) for weekly_fixed. Leave None for rolling splits.",
+    )
+    rest_days: list[str] | None = Field(
+        default=None,
+        description="Mandatory rest days (e.g., ['Sunday']) for weekly_fixed schedules",
+    )
+    preferred_time: str | None = Field(
+        default=None,
+        description="Preferred workout time: 'morning' (6-10am), 'afternoon' (12-4pm), 'evening' (5-9pm), or specific time like '6:00 AM'",
+    )
+    notes: str | None = Field(
+        default=None, 
+        description="Additional workout scheduling notes or constraints"
+    )
+
+
+class MealSchedulePreferences(BaseModel):
+    """Scheduling preferences for meal prep and grocery shopping."""
+    
+    model_config = {"extra": "forbid"}
+    
+    preferred_grocery_day: str | None = Field(
+        default=None,
+        description="Preferred day for grocery shopping (e.g., 'Sunday', 'Saturday morning')"
+    )
+    grocery_frequency: str = Field(
+        default="weekly",
+        description="Grocery shopping frequency: 'weekly', 'biweekly', 'custom'"
+    )
+    preferred_meal_prep_day: str | None = Field(
+        default=None,
+        description="Preferred day for batch meal prep (e.g., 'Sunday', 'Wednesday evening')"
+    )
+    meal_prep_frequency: str = Field(
+        default="weekly",
+        description="Meal prep frequency: 'weekly', 'twice_weekly', 'custom'"
+    )
+    notes: str | None = Field(
+        default=None,
+        description="Additional meal/grocery scheduling notes or constraints"
+    )
+
+
+class WorkoutPlanInput(BaseModel):
+    """Complete workout plan data including metadata, requirements, and scheduling."""
+    
+    model_config = {"extra": "forbid"}
+    
+    # Workout requirements
     fitness_level: str = Field(description="Fitness level: beginner, intermediate, or advanced")
     workout_frequency: int = Field(description="Number of workout days per week", ge=2, le=7)
     equipment_access: str = Field(
@@ -402,21 +464,50 @@ class WorkoutPlanInput(BaseModel):
     injuries_or_conditions: list[str] = Field(
         default_factory=list, description="Any injuries or health conditions"
     )
+    
+    # High-level workout strategy
+    description: str = Field(
+        description="High-level workout plan strategy spanning all phases. Include: program type (e.g., 'Push/Pull/Legs'), progression strategy, key training principles, equipment usage, and how intensity/volume/frequency changes across phases."
+    )
+    
+    # Structured metadata
+    metadata: WorkoutPlanMetadata = Field(
+        description="Structured workout metadata with program_type, progression_strategy, training_principles, equipment_used, and phase_progression_notes"
+    )
+    
+    # Workout-specific scheduling
+    schedule_preferences: WorkoutSchedulePreferences = Field(
+        default_factory=WorkoutSchedulePreferences,
+        description="Scheduling preferences specific to workout training"
+    )
 
 
 class MealPlanInput(BaseModel):
-    """Input parameters for meal plan generation."""
-
+    """Complete meal plan data including metadata, requirements, and scheduling."""
+    
     model_config = {"extra": "forbid"}
-
-    primary_goal: str = Field(
-        description="Primary fitness goal (e.g., 'muscle_gain', 'weight_loss', 'maintenance')"
-    )
+    
+    # Nutrition requirements
     dietary_restrictions: list[str] = Field(
         default_factory=list, description="Dietary restrictions like vegetarian, vegan, gluten_free"
     )
     meal_frequency: int = Field(default=3, description="Number of meals per day", ge=3, le=6)
-    preferences: str = Field(default="", description="Additional dietary preferences")
+    
+    # High-level nutrition strategy
+    description: str = Field(
+        description="High-level nutrition strategy spanning all phases. Include: dietary approach, macro distribution strategy, calorie targets per phase, meal timing preferences, and how nutrition adjusts as phases progress."
+    )
+    
+    # Structured metadata
+    metadata: MealPlanMetadata = Field(
+        description="Structured meal metadata with dietary_approach, macro_strategy, meal_timing, hydration_guidance, and phase_nutrition_notes"
+    )
+    
+    # Meal/prep/grocery-specific scheduling
+    schedule_preferences: MealSchedulePreferences = Field(
+        default_factory=MealSchedulePreferences,
+        description="Scheduling preferences for meal prep and grocery shopping"
+    )
 
 
 class PhaseInput(BaseModel):
@@ -430,43 +521,48 @@ class PhaseInput(BaseModel):
 
 
 class FitnessPlanInput(BaseModel):
-    """Input parameters for complete fitness plan generation."""
+    """Input parameters for complete fitness plan generation.
+    
+    A fitness plan contains:
+    - Basic plan information (name, goal, description)
+    - Phases with explicit dates
+    - A workout plan (with its own requirements, metadata, and schedule preferences)
+    - A meal plan (with its own requirements, metadata, and schedule preferences)
+    """
 
     model_config = {"extra": "forbid"}
 
-    primary_goal: str = Field(description="Primary fitness goal")
-    fitness_level: str = Field(description="Fitness level: beginner, intermediate, or advanced")
-    workout_frequency: int = Field(description="Workout days per week", ge=2, le=7)
-    equipment_access: str = Field(description="Available equipment")
-    time_per_session: int = Field(
-        default=60, description="Time per workout in minutes", ge=20, le=120
+    # Plan-level basic information
+    name: str = Field(
+        description="Plan name (e.g., '12-Week Muscle Building Program', 'Summer Shred Plan', '2026 Marathon Training')"
     )
-    dietary_restrictions: list[str] = Field(
-        default_factory=list, description="Dietary restrictions"
+    primary_goal: str = Field(
+        description="Primary fitness goal (e.g., 'muscle_gain', 'weight_loss', 'strength_building', 'marathon_training')"
     )
-    meal_frequency: int = Field(default=3, description="Meals per day", ge=3, le=6)
-    injuries_or_conditions: list[str] = Field(
-        default_factory=list, description="Injuries or health conditions"
+    description: str = Field(
+        description="Overall plan description and context (2-3 sentences describing the complete program)"
     )
+    
+    # Phase structure with explicit dates
     phases: list[PhaseInput] = Field(
-        description="List of phases with explicit start and end dates. Each phase MUST have: name, start_date (YYYY-MM-DD), and end_date (YYYY-MM-DD). The first phase's start_date is the plan start date. The last phase's end_date is the plan end date. Examples: [{name: 'Foundation Phase', start_date: '2025-12-13', end_date: '2026-01-09'}, {name: 'Building Phase', start_date: '2026-01-10', end_date: '2026-02-06'}]. Phases should be contiguous with no gaps. IMPORTANT: Always use explicit dates in YYYY-MM-DD format. Never use 'today' or relative dates.",
+        description="List of phases with explicit start and end dates. Each phase MUST have: name, start_date (YYYY-MM-DD), and end_date (YYYY-MM-DD). The first phase's start_date is the plan start date. The last phase's end_date is the plan end date. Phases should be contiguous with no gaps. IMPORTANT: Always use explicit dates in YYYY-MM-DD format. Examples: [{name: 'Foundation Phase', start_date: '2025-12-15', end_date: '2026-01-11'}, {name: 'Progression Phase', start_date: '2026-01-12', end_date: '2026-02-08'}]",
         min_length=1
     )
-    workout_plan_description: str = Field(
-        description="High-level workout plan strategy spanning all phases. Include: program type (e.g., 'Push/Pull/Legs', 'Upper/Lower', 'Full Body'), progression strategy (linear progression, DUP, wave loading, etc.), key training principles, equipment usage, and how intensity/volume/frequency changes across phases. Example: 'Push/Pull/Legs split with linear progression. Phase 1: 3 sets x 12 reps (lighter weight, form focus). Phase 2: 4 sets x 10 reps (moderate weight). Phase 3: 5 sets x 8 reps (heavier weight, strength focus). Progressive overload each week.'"
+    
+    # Workout plan (complete with metadata and scheduling)
+    workout_plan: WorkoutPlanInput = Field(
+        description="Complete workout plan including requirements, high-level strategy, metadata, and workout-specific scheduling preferences"
     )
-    meal_plan_description: str = Field(
-        description="High-level nutrition strategy spanning all phases. Include: dietary approach (flexible dieting, meal prep, intermittent fasting, etc.), macro distribution strategy, calorie targets per phase, meal timing preferences, and how nutrition adjusts as phases progress. Example: 'Flexible dieting with moderate carbs. Phase 1: 2500 cal (40% carb, 30% protein, 30% fat) - metabolic adaptation. Phase 2: 2800 cal (45% carb, 30% protein, 25% fat) - muscle building. Phase 3: 3000 cal (50% carb, 30% protein, 20% fat) - performance peak. 4-5 meals daily.'"
+    
+    # Meal plan (complete with metadata and scheduling)
+    meal_plan: MealPlanInput = Field(
+        description="Complete meal plan including requirements, high-level nutrition strategy, metadata, and meal/prep/grocery scheduling preferences"
     )
-    workout_metadata: WorkoutPlanMetadata = Field(
-        description="Structured workout metadata with program_type, progression_strategy, training_principles, equipment_used, and phase_progression_notes"
-    )
-    meal_metadata: MealPlanMetadata = Field(
-        description="Structured meal metadata with dietary_approach, macro_strategy, meal_timing, hydration_guidance, and phase_nutrition_notes"
-    )
-    schedule_preferences: SchedulePreferences = Field(
-        default_factory=SchedulePreferences,
-        description="User's scheduling preferences: split_type (weekly_fixed|rolling), preferred_workout_days, rest_days, preferred_time, avoid_dates, notes",
+    
+    # Plan-level avoided dates (applies to both workouts and meals)
+    avoid_dates: list[str] | None = Field(
+        default=None,
+        description="Specific dates to avoid for ALL activities (e.g., ['2025-12-25', '2026-01-01'] for holidays, travel). Format: YYYY-MM-DD"
     )
 
 
@@ -514,18 +610,33 @@ async def build_fitness_plan(requirements: FitnessPlanInput) -> str:
             phases.append(phase_output)
 
         # 3. Create comprehensive multi-phase fitness plan output
-        phase_summary = " + ".join([f"{p.name} ({p.duration_weeks}w)" for p in phases])
+        # Generate key principles from workout and meal metadata
+        key_principles = []
+        if requirements.workout_plan.metadata.training_principles:
+            key_principles.extend(requirements.workout_plan.metadata.training_principles[:3])  # Top 3 training principles
+        if requirements.meal_plan.metadata.dietary_approach:
+            key_principles.append(f"Nutrition: {requirements.meal_plan.metadata.dietary_approach}")
+        
+        # Generate success metrics based on goal and plan structure
+        success_metrics = [
+            f"Complete all {actual_duration_weeks} weeks of training",
+            f"Progress through all {num_phases} phase(s) successfully",
+            "Track workouts and nutrition consistently",
+            f"Achieve {requirements.primary_goal} objective",
+        ]
 
         fitness_plan_output = FitnessPlanOutput(
-            goal_summary=f"Complete {actual_duration_weeks}-week fitness plan for {requirements.primary_goal} with {num_phases} phase(s): {phase_summary}",
+            goal_summary=f"{requirements.name}: {requirements.description}",
             start_date=start_date.isoformat(),
             end_date=end_date.isoformat(),
             duration_weeks=actual_duration_weeks,
-            fitness_level=requirements.fitness_level,
-            workout_metadata=requirements.workout_metadata,
-            meal_metadata=requirements.meal_metadata,
+            fitness_level=requirements.workout_plan.fitness_level,
+            workout_metadata=requirements.workout_plan.metadata,
+            meal_metadata=requirements.meal_plan.metadata,
             phases=phases,
-            important_notes=f"This {actual_duration_weeks}-week plan runs from {start_date.isoformat()} to {end_date.isoformat()} and is designed for {requirements.fitness_level} level with {num_phases} phase(s). Each phase has specific objectives and will transition automatically. Adjust weights and intensity based on your progress. Listen to your body and take extra rest if needed.",
+            key_principles=key_principles,
+            success_metrics=success_metrics,
+            important_notes=f"This {actual_duration_weeks}-week plan runs from {start_date.isoformat()} to {end_date.isoformat()} and is designed for {requirements.workout_plan.fitness_level} level with {num_phases} phase(s). Each phase has specific objectives and will transition automatically. Adjust weights and intensity based on your progress. Listen to your body and take extra rest if needed.",
         )
 
         # Validate plan completeness
@@ -668,10 +779,7 @@ async def get_active_fitness_plan() -> str:
             }
             return json.dumps(no_plan_dict, indent=2)
 
-        # Extract plan details from plan_snapshot
-        plan_snapshot = active_plan.plan_snapshot or {}
-
-        # Build comprehensive plan details
+        # Build comprehensive plan details from normalized tables
         plan_details = {
             "plan_id": str(active_plan.id),
             "goal": active_plan.goal_description,
@@ -683,44 +791,38 @@ async def get_active_fitness_plan() -> str:
             "created_at": active_plan.created_at.isoformat(),
         }
 
-        # Add training plan details if available
-        if "workout_plan" in plan_snapshot:
-            workout_plan = plan_snapshot["workout_plan"]
+        # Add training plan details from workout_plans table
+        if active_plan.workout_plans and len(active_plan.workout_plans) > 0:
+            workout_plan = active_plan.workout_plans[0]
             plan_details["training_plan"] = {
-                "program_type": workout_plan.get("program_type"),
-                "frequency_per_week": workout_plan.get("frequency_per_week"),
-                "duration_weeks": workout_plan.get("duration_weeks"),
-                "progression_notes": workout_plan.get("progression_notes"),
-                "workouts": workout_plan.get("workouts", []),
+                "frequency_per_week": workout_plan.frequency_per_week,
+                "progression_strategy": workout_plan.progression_strategy,
+                "program_type": workout_plan.workout_plan_details.get("program_type") if workout_plan.workout_plan_details else None,
             }
 
-        # Add nutrition plan details if available
-        if "meal_plan" in plan_snapshot:
-            meal_plan = plan_snapshot["meal_plan"]
+        # Add nutrition plan details from meal_plans table
+        if active_plan.meal_plans and len(active_plan.meal_plans) > 0:
+            meal_plan = active_plan.meal_plans[0]
             plan_details["nutrition_plan"] = {
-                "daily_calorie_target": meal_plan.get("daily_calorie_target"),
-                "macro_split": meal_plan.get("macro_split"),
-                "meal_frequency": meal_plan.get("meal_frequency"),
-                "dietary_guidelines": meal_plan.get("dietary_guidelines"),
-                "hydration_guidance": meal_plan.get("hydration_guidance"),
-                "sample_days": meal_plan.get("sample_days", []),
+                "daily_calorie_target": meal_plan.daily_calorie_target,
+                "protein_grams": meal_plan.protein_grams_target,
+                "carbs_grams": meal_plan.carbs_grams_target,
+                "fats_grams": meal_plan.fats_grams_target,
+                "meals_per_day": meal_plan.meals_per_day,
             }
 
-        # Add phase information if available
-        if "phases" in plan_snapshot:
-            plan_details["phases"] = plan_snapshot["phases"]
-
-        # Add key principles if available
-        if "key_principles" in plan_snapshot:
-            plan_details["key_principles"] = plan_snapshot["key_principles"]
-
-        # Add success metrics if available
-        if "success_metrics" in plan_snapshot:
-            plan_details["success_metrics"] = plan_snapshot["success_metrics"]
-
-        # Add important notes if available
-        if "important_notes" in plan_snapshot:
-            plan_details["important_notes"] = plan_snapshot["important_notes"]
+        # Add phase information from phases table
+        if active_plan.phases and len(active_plan.phases) > 0:
+            plan_details["phases"] = [
+                {
+                    "phase_number": phase.phase_number,
+                    "name": phase.name,
+                    "objectives": phase.objectives,
+                    "start_date": phase.start_date.isoformat() if phase.start_date else None,
+                    "end_date": phase.end_date.isoformat() if phase.end_date else None,
+                }
+                for phase in active_plan.phases
+            ]
 
         result_dict = {
             "status": "success",
