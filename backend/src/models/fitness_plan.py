@@ -31,13 +31,15 @@ class FitnessPlan(Base, UUIDMixin, TimestampMixin):
         default="draft",
     )
 
-    # AI-generated plan snapshot (FR-009, FR-010)
-    plan_snapshot = Column(JSON, nullable=False)  # Complete plan structure for reference
-
     # Plan versioning - track modifications and evolution
     parent_plan_id = Column(PGUUID(as_uuid=True), ForeignKey("fitness_plans.id", ondelete="SET NULL"), nullable=True, index=True)
     version = Column(Integer, nullable=False, default=1)  # Version number within the plan family
     version_notes = Column(Text, nullable=True)  # Description of what changed in this version
+
+    # Plan-level guidance metadata
+    key_principles = Column(JSON, nullable=True)  # Core principles guiding the plan (list of strings)
+    success_metrics = Column(JSON, nullable=True)  # How to measure success (list of strings)
+    important_notes = Column(Text, nullable=True)  # Critical information and warnings
 
     # Relationships
     user = relationship("User", back_populates="fitness_plans")
@@ -78,6 +80,8 @@ class Phase(Base, UUIDMixin, TimestampMixin):
     fitness_plan = relationship("FitnessPlan", back_populates="phases")
     workouts = relationship("Workout", back_populates="phase", cascade="all, delete-orphan")
     meals = relationship("Meal", back_populates="phase", cascade="all, delete-orphan")
+    grocery_trips = relationship("GroceryShoppingTrip", back_populates="phase", cascade="all, delete-orphan")
+    meal_prep_sessions = relationship("MealPrepSession", back_populates="phase", cascade="all, delete-orphan")
 
     def __repr__(self) -> str:
         return f"<Phase(id={self.id}, plan_id={self.fitness_plan_id}, phase_number={self.phase_number})>"

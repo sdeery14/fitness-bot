@@ -25,6 +25,13 @@ class MealPlan(Base, UUIDMixin, TimestampMixin):
     # Meal configuration (FR-028)
     meals_per_day = Column(Integer, nullable=False, default=3)  # 3, 4, 5, 6, etc.
 
+    # Meal plan guidance metadata
+    dietary_approach = Column(String(500), nullable=True)  # Diet philosophy/approach
+    macro_strategy = Column(String(500), nullable=True)  # Macro distribution strategy
+    meal_timing = Column(String(500), nullable=True)  # Meal timing guidance
+    hydration_guidance = Column(String(500), nullable=True)  # Water intake guidelines
+    phase_nutrition_notes = Column(String(1000), nullable=True)  # How nutrition changes across phases
+
     # Relationships
     fitness_plan = relationship("FitnessPlan", back_populates="meal_plans")
     meals = relationship("Meal", back_populates="meal_plan", cascade="all, delete-orphan")

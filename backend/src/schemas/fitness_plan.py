@@ -53,7 +53,7 @@ class FitnessPlanRead(BaseModel):
     start_date: datetime
     end_date: datetime
     status: str
-    plan_snapshot: dict = Field(..., description="Complete AI-generated plan structure")
+    # plan_snapshot removed - data now stored in normalized tables (phases, workouts, meals)
     phases: list[PhaseRead] = Field(default_factory=list, description="Plan phases")
     created_at: datetime
     updated_at: datetime

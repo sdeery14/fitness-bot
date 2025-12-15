@@ -37,14 +37,12 @@ class CreatePlanRequest(BaseModel):
     goal_type: str
     duration_weeks: int = 12
     start_date: str | None = None
-    plan_snapshot: dict | None = None
 
 
 class UpdatePlanRequest(BaseModel):
     """Plan update request."""
 
     current_status: str | None = None
-    plan_snapshot: dict | None = None
 
 
 @router.post("", status_code=status.HTTP_201_CREATED)
@@ -151,7 +149,6 @@ async def create_plan(
             "start_date": start_date_str,
             "target_end_date": target_end_date_str,
             "current_status": plan.status,
-            "plan_snapshot": plan.plan_snapshot or {},
             "created_at": plan.created_at.isoformat(),
             "updated_at": plan.updated_at.isoformat(),
         })
@@ -217,7 +214,6 @@ async def list_plans(
                 "start_date": start_date_str,
                 "target_end_date": target_end_date_str,
                 "current_status": plan.status,
-                "plan_snapshot": plan.plan_snapshot,
                 "created_at": plan.created_at.isoformat(),
                 "updated_at": plan.updated_at.isoformat(),
             })
@@ -293,7 +289,6 @@ async def get_active_plan(
             "start_date": start_date_str,
             "target_end_date": target_end_date_str,
             "current_status": plan.status,
-            "plan_snapshot": plan.plan_snapshot,
             "created_at": plan.created_at.isoformat(),
             "updated_at": plan.updated_at.isoformat(),
         })
@@ -325,10 +320,25 @@ async def get_plan(
     Raises:
         HTTPException: If plan not found or not owned by user
     """
+    from sqlalchemy.orm import selectinload
+    from sqlalchemy import select
+    from src.models.fitness_plan import FitnessPlan, Phase
+    from src.models.workout import Workout, Exercise, WorkoutPlan
+    from src.models.meal import Meal, MealPlan
     from src.schemas import create_error_response
 
-    plan_service = PlanService(db)
-    plan = await plan_service.get_plan(plan_id)
+    # Load plan with all related data
+    stmt = (
+        select(FitnessPlan)
+        .where(FitnessPlan.id == plan_id)
+        .options(
+            selectinload(FitnessPlan.phases),
+            selectinload(FitnessPlan.workout_plans),
+            selectinload(FitnessPlan.meal_plans),
+        )
+    )
+    result = await db.execute(stmt)
+    plan = result.scalar_one_or_none()
 
     if not plan:
         raise HTTPException(
@@ -346,7 +356,139 @@ async def get_plan(
             detail="Not authorized to access this plan",
         )
 
-    return create_success_response({
+    # Build the nested structure that frontend expects (similar to old plan_snapshot)
+    phases_data = []
+    
+    for phase in sorted(plan.phases, key=lambda p: p.phase_number):
+        # Get workouts for this phase
+        workouts_stmt = (
+            select(Workout)
+            .where(Workout.phase_id == phase.id)
+            .options(selectinload(Workout.exercises))
+        )
+        workouts_result = await db.execute(workouts_stmt)
+        workouts = list(workouts_result.scalars().all())
+        
+        # Build workout details
+        workout_details = {
+            "workouts": [
+                {
+                    "day_name": workout.name,
+                    "workout_type": workout.workout_type,
+                    "duration_minutes": workout.duration_minutes,
+                    "intensity_level": workout.intensity_level,
+                    "focus": workout.workout_structure.get("focus", ""),
+                    "warmup": workout.workout_structure.get("warmup", ""),
+                    "cooldown": workout.workout_structure.get("cooldown", ""),
+                    "exercises": [
+                        {
+                            "name": exercise.name,
+                            "exercise_type": exercise.exercise_type,
+                            "target_muscle_groups": exercise.target_muscle_groups,
+                            "equipment_required": exercise.equipment_required,
+                            "sets": exercise.sets,
+                            "reps": exercise.reps,
+                            "duration_seconds": exercise.duration_seconds,
+                            "rest_seconds": exercise.rest_seconds,
+                            "tempo": exercise.tempo,
+                            "rpe_target": exercise.rpe_target,
+                            "instructions": exercise.instructions,
+                            "form_cues": exercise.form_cues,
+                        }
+                        for exercise in sorted(workout.exercises, key=lambda e: e.exercise_order)
+                    ]
+                }
+                for workout in workouts
+            ],
+            "workout_cycle": phase.phase_details.get("workout_cycle", []) if phase.phase_details else [],
+        }
+        
+        # Get meals for this phase
+        meals_stmt = select(Meal).where(Meal.phase_id == phase.id)
+        meals_result = await db.execute(meals_stmt)
+        meals = list(meals_result.scalars().all())
+        
+        # Group meals by day
+        meals_by_day = {}
+        for meal in meals:
+            day = meal.day_of_week
+            if day not in meals_by_day:
+                meals_by_day[day] = []
+            meals_by_day[day].append(meal)
+        
+        # Build sample days
+        sample_days = []
+        for day_num in sorted(meals_by_day.keys()):
+            day_meals = meals_by_day[day_num]
+            sample_days.append({
+                "day": day_num,
+                "meals": [
+                    {
+                        "meal_name": meal.name,
+                        "total_calories": meal.calories,
+                        "foods": [
+                            {
+                                "name": ingredient["name"],
+                                "portion": f"{ingredient['quantity']} {ingredient['unit']}",
+                                "calories": ingredient.get("calories", 0),
+                                "protein_g": ingredient.get("protein_grams", 0),
+                                "carbs_g": ingredient.get("carbs_grams", 0),
+                                "fat_g": ingredient.get("fats_grams", 0),
+                            }
+                            for ingredient in meal.meal_details.get("ingredients", [])
+                        ] if meal.meal_details else []
+                    }
+                    for meal in day_meals
+                ]
+            })
+        
+        # Get meal plan for calorie target
+        meal_plan = plan.meal_plans[0] if plan.meal_plans else None
+        
+        meal_details = {
+            "sample_days": sample_days,
+            "daily_calorie_target": meal_plan.daily_calorie_target if meal_plan else 2000,
+            "macro_split": meal_plan.macronutrient_distribution.get("macro_split", "40/30/30") if meal_plan and meal_plan.macronutrient_distribution else "40% Carbs, 30% Protein, 30% Fat",
+        }
+        
+        # Calculate phase duration
+        phase_duration_weeks = phase.phase_details.get("duration_weeks", 0) if phase.phase_details else 0
+        
+        phases_data.append({
+            "phase_number": phase.phase_number,
+            "phase_name": phase.name,
+            "duration_weeks": phase_duration_weeks,
+            "description": ", ".join(phase.objectives) if phase.objectives else "",
+            "objectives": phase.objectives,
+            "workout_details": workout_details,
+            "meal_details": meal_details,
+        })
+    
+    # Get workout and meal plan metadata
+    workout_plan = plan.workout_plans[0] if plan.workout_plans else None
+    meal_plan = plan.meal_plans[0] if plan.meal_plans else None
+    
+    # Build workout metadata
+    workout_metadata = None
+    if workout_plan:
+        workout_metadata = {
+            "phase_progression_notes": workout_plan.phase_progression_notes,
+            "equipment_used": workout_plan.equipment_used or [],
+        }
+    
+    # Build meal metadata
+    meal_metadata = None
+    if meal_plan:
+        meal_metadata = {
+            "dietary_approach": meal_plan.dietary_approach,
+            "macro_strategy": meal_plan.macro_strategy,
+            "meal_timing": meal_plan.meal_timing,
+            "hydration_guidance": meal_plan.hydration_guidance,
+            "phase_nutrition_notes": meal_plan.phase_nutrition_notes,
+        }
+    
+    # Build response matching frontend expectations
+    response_data = {
         "id": str(plan.id),
         "user_id": str(plan.user_id),
         "goal_description": plan.goal_description,
@@ -355,10 +497,25 @@ async def get_plan(
         "start_date": plan.start_date.isoformat(),
         "target_end_date": plan.end_date.isoformat(),
         "current_status": plan.status,
-        "plan_snapshot": plan.plan_snapshot,
         "created_at": plan.created_at.isoformat(),
         "updated_at": plan.updated_at.isoformat(),
-    })
+        
+        # Plan-level metadata
+        "key_principles": plan.key_principles or [],
+        "success_metrics": plan.success_metrics or [],
+        "important_notes": plan.important_notes,
+        
+        # Structured plan data
+        "phases": phases_data,
+        "workout_frequency": workout_plan.frequency_per_week if workout_plan else 3,
+        "daily_calorie_target": meal_plan.daily_calorie_target if meal_plan else 2000,
+        
+        # Workout and meal metadata
+        "workout_metadata": workout_metadata,
+        "meal_metadata": meal_metadata,
+    }
+
+    return create_success_response(response_data)
 
 
 @router.patch("/{plan_id}")
@@ -410,12 +567,6 @@ async def update_plan(
             status=request.current_status,
         )
 
-    # Update plan_snapshot if provided
-    if request.plan_snapshot is not None:
-        plan.plan_snapshot = {**(plan.plan_snapshot or {}), **request.plan_snapshot}
-        await db.commit()
-        await db.refresh(plan)
-
     if not plan:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -434,7 +585,7 @@ async def update_plan(
         "start_date": plan.start_date.isoformat(),
         "target_end_date": plan.end_date.isoformat(),
         "current_status": plan.status,
-        "plan_snapshot": plan.plan_snapshot,
+
         "created_at": plan.created_at.isoformat(),
         "updated_at": plan.updated_at.isoformat(),
     })

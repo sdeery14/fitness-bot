@@ -54,9 +54,25 @@ interface FitnessPlan {
   start_date: string;
   target_end_date: string;
   current_status: string;
-  plan_snapshot: any;
+  phases: any[];
+  workout_frequency: number;
+  daily_calorie_target: number;
   created_at: string;
   updated_at: string;
+  key_principles?: string[];
+  success_metrics?: string[];
+  important_notes?: string;
+  workout_metadata?: {
+    phase_progression_notes?: string;
+    equipment_used?: string[];
+  };
+  meal_metadata?: {
+    dietary_approach?: string;
+    macro_strategy?: string;
+    meal_timing?: string;
+    hydration_guidance?: string;
+    phase_nutrition_notes?: string;
+  };
 }
 
 interface ScheduleStatistics {
@@ -195,16 +211,16 @@ export default function PlanPage() {
     }
 
     // Extract phases from plan snapshot if available
-    if (plan.plan_snapshot && plan.plan_snapshot.phases) {
-      setPhases(plan.plan_snapshot.phases);
+    if (plan.phases) {
+      setPhases(plan.phases);
     } else {
       setPhases([]);
     }
 
     // Derive phase status from plan data
-    if (plan.plan_snapshot && plan.plan_snapshot.phases) {
+    if (plan.phases) {
       const today = new Date();
-      const currentPhase = plan.plan_snapshot.phases.find((p: Phase) => {
+      const currentPhase = plan.phases.find((p: Phase) => {
         const start = new Date(p.start_date);
         const end = new Date(p.end_date);
         return start <= today && today <= end;
@@ -216,12 +232,12 @@ export default function PlanPage() {
           (endDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
         );
 
-        const currentIndex = plan.plan_snapshot.phases.findIndex(
+        const currentIndex = plan.phases.findIndex(
           (p: Phase) => p.id === currentPhase.id
         );
         const nextPhase =
-          currentIndex < plan.plan_snapshot.phases.length - 1
-            ? plan.plan_snapshot.phases[currentIndex + 1]
+          currentIndex < plan.phases.length - 1
+            ? plan.phases[currentIndex + 1]
             : null;
 
         setPhaseStatus({
@@ -642,29 +658,25 @@ export default function PlanPage() {
                     )}
 
                     {/* Training Plan Details */}
-                    {(selectedPlan.plan_snapshot?.workout_metadata || selectedPlan.plan_snapshot?.workout_plan) && (
+                    {selectedPlan.phases && (
                       <div className="border-t pt-6">
                         <h4 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
                           <TrendingUp className="h-5 w-5 text-blue-600" />
                           Training Plan
                         </h4>
                         <div className="space-y-4">
-                          {/* Training Overview - supports both old and new schema */}
+                          {/* Training Overview */}
                           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
                             <div>
                               <span className="text-xs text-blue-600 uppercase block mb-1">Program Type</span>
                               <span className="text-sm font-medium text-blue-900">
-                                {selectedPlan.plan_snapshot.workout_metadata?.program_type || 
-                                 selectedPlan.plan_snapshot.workout_plan?.program_type || 
-                                 'General Fitness'}
+                                General Fitness
                               </span>
                             </div>
                             <div>
-                              <span className="text-xs text-blue-600 uppercase block mb-1">Training Principles</span>
+                              <span className="text-xs text-blue-600 uppercase block mb-1">Frequency</span>
                               <span className="text-sm font-medium text-blue-900">
-                                {selectedPlan.plan_snapshot.workout_metadata?.training_principles?.join(', ') || 
-                                 selectedPlan.plan_snapshot.workout_plan?.frequency_per_week + ' days/week' || 
-                                 'Progressive overload'}
+                                {selectedPlan.workout_frequency || 3} days/week
                               </span>
                             </div>
                             <div>
@@ -676,55 +688,51 @@ export default function PlanPage() {
                             <div>
                               <span className="text-xs text-blue-600 uppercase block mb-1">Phases</span>
                               <span className="text-sm font-medium text-blue-900">
-                                {selectedPlan.plan_snapshot.phases?.length || 1} phase(s)
+                                {selectedPlan.phases?.length || 1} phase(s)
                               </span>
                             </div>
                           </div>
 
                           {/* Progression Strategy */}
-                          {(selectedPlan.plan_snapshot.workout_metadata?.progression_strategy || 
-                            selectedPlan.plan_snapshot.workout_plan?.progression_notes) && (
-                            <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
-                              <span className="text-xs font-semibold text-gray-700 uppercase block mb-1">
-                                Progression Strategy
-                              </span>
-                              <p className="text-sm text-gray-900">
-                                {selectedPlan.plan_snapshot.workout_metadata?.progression_strategy || 
-                                 selectedPlan.plan_snapshot.workout_plan?.progression_notes}
-                              </p>
-                            </div>
-                          )}
+                          <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
+                            <span className="text-xs font-semibold text-gray-700 uppercase block mb-1">
+                              Progression Strategy
+                            </span>
+                            <p className="text-sm text-gray-900">
+                              Progressive overload with systematic increases in intensity and volume
+                            </p>
+                          </div>
 
-                          {/* Phase Progression Notes (new schema) */}
-                          {selectedPlan.plan_snapshot.workout_metadata?.phase_progression_notes && (
+                          {/* Phase Progression Notes */}
+                          {selectedPlan.workout_metadata?.phase_progression_notes && (
                             <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
                               <span className="text-xs font-semibold text-gray-700 uppercase block mb-1">
                                 Phase Progression Notes
                               </span>
                               <p className="text-sm text-gray-900">
-                                {selectedPlan.plan_snapshot.workout_metadata.phase_progression_notes}
+                                {selectedPlan.workout_metadata.phase_progression_notes}
                               </p>
                             </div>
                           )}
 
-                          {/* Equipment Used (new schema) */}
-                          {selectedPlan.plan_snapshot.workout_metadata?.equipment_used && (
+                          {/* Equipment Used */}
+                          {selectedPlan.workout_metadata?.equipment_used && selectedPlan.workout_metadata.equipment_used.length > 0 && (
                             <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
                               <span className="text-xs font-semibold text-gray-700 uppercase block mb-1">
                                 Equipment
                               </span>
                               <p className="text-sm text-gray-900">
-                                {selectedPlan.plan_snapshot.workout_metadata.equipment_used.join(', ')}
+                                {selectedPlan.workout_metadata.equipment_used.join(', ')}
                               </p>
                             </div>
                           )}
 
-                          {/* Phase-specific workout details (new schema) */}
-                          {selectedPlan.plan_snapshot.phases && selectedPlan.plan_snapshot.phases.length > 0 && (
+                          {/* Phase-specific workout details */}
+                          {selectedPlan.phases && selectedPlan.phases.length > 0 && (
                             <div>
                               <h5 className="font-medium text-gray-900 mb-3">Phase Details</h5>
                               <div className="space-y-3">
-                                {selectedPlan.plan_snapshot.phases.map((phase: any, idx: number) => (
+                                {selectedPlan.phases.map((phase: any, idx: number) => (
                                   <details key={idx} className="group">
                                     <summary className="p-3 bg-gray-50 rounded-lg border border-gray-200 cursor-pointer hover:bg-gray-100 transition-colors">
                                       <div className="flex items-center justify-between">
@@ -785,11 +793,11 @@ export default function PlanPage() {
                           )}
 
                           {/* Legacy Workout Days (old schema) */}
-                          {selectedPlan.plan_snapshot.workout_plan?.workouts && selectedPlan.plan_snapshot.workout_plan.workouts.length > 0 && (
+                          {selectedPlan.workout_plan?.workouts && selectedPlan.workout_plan.workouts.length > 0 && (
                             <div>
                               <h5 className="font-medium text-gray-900 mb-3">Workout Schedule</h5>
                               <div className="space-y-3">
-                                {selectedPlan.plan_snapshot.workout_plan.workouts.map((workout: any, idx: number) => (
+                                {selectedPlan.workout_plan.workouts.map((workout: any, idx: number) => (
                                   <details key={idx} className="group">
                                     <summary className="p-3 bg-gray-50 rounded-lg border border-gray-200 cursor-pointer hover:bg-gray-100 transition-colors">
                                       <div className="flex items-center justify-between">
@@ -845,7 +853,7 @@ export default function PlanPage() {
                     )}
 
                     {/* Meal Plan Details */}
-                    {(selectedPlan.plan_snapshot?.meal_metadata || selectedPlan.plan_snapshot?.meal_plan) && (
+                    {(selectedPlan.meal_metadata || selectedPlan.meal_plan) && (
                       <div className="border-t pt-6">
                         <h4 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
                           <Target className="h-5 w-5 text-green-600" />
@@ -857,69 +865,69 @@ export default function PlanPage() {
                             <div>
                               <span className="text-xs text-green-600 uppercase block mb-1">Dietary Approach</span>
                               <span className="text-sm font-medium text-green-900">
-                                {selectedPlan.plan_snapshot.meal_metadata?.dietary_approach || 
-                                 selectedPlan.plan_snapshot.meal_plan?.dietary_notes || 
+                                {selectedPlan.meal_metadata?.dietary_approach || 
+                                 selectedPlan.meal_plan?.dietary_notes || 
                                  'Balanced'}
                               </span>
                             </div>
                             <div>
                               <span className="text-xs text-green-600 uppercase block mb-1">Macro Strategy</span>
                               <span className="text-sm font-medium text-green-900">
-                                {selectedPlan.plan_snapshot.meal_metadata?.macro_strategy || 
-                                 selectedPlan.plan_snapshot.meal_plan?.macro_split || 
+                                {selectedPlan.meal_metadata?.macro_strategy || 
+                                 selectedPlan.meal_plan?.macro_split || 
                                  'Balanced macros'}
                               </span>
                             </div>
                             <div>
                               <span className="text-xs text-green-600 uppercase block mb-1">Meal Timing</span>
                               <span className="text-sm font-medium text-green-900">
-                                {selectedPlan.plan_snapshot.meal_metadata?.meal_timing || 
-                                 selectedPlan.plan_snapshot.meal_plan?.meal_frequency + ' meals/day' || 
+                                {selectedPlan.meal_metadata?.meal_timing || 
+                                 selectedPlan.meal_plan?.meal_frequency + ' meals/day' || 
                                  '3-4 meals/day'}
                               </span>
                             </div>
                             <div>
                               <span className="text-xs text-green-600 uppercase block mb-1">Phases</span>
                               <span className="text-sm font-medium text-green-900">
-                                {selectedPlan.plan_snapshot.phases?.length || 
-                                 selectedPlan.plan_snapshot.meal_plan?.sample_days?.length || 
+                                {selectedPlan.phases?.length || 
+                                 selectedPlan.meal_plan?.sample_days?.length || 
                                  1} phase(s)
                               </span>
                             </div>
                           </div>
 
                           {/* Hydration Guidance (new schema) */}
-                          {(selectedPlan.plan_snapshot.meal_metadata?.hydration_guidance || 
-                            selectedPlan.plan_snapshot.meal_plan?.hydration_guidance) && (
+                          {(selectedPlan.meal_metadata?.hydration_guidance || 
+                            selectedPlan.meal_plan?.hydration_guidance) && (
                             <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
                               <span className="text-xs font-semibold text-blue-700 uppercase block mb-1">
                                 Hydration
                               </span>
                               <p className="text-sm text-blue-900">
-                                {selectedPlan.plan_snapshot.meal_metadata?.hydration_guidance || 
-                                 selectedPlan.plan_snapshot.meal_plan?.hydration_guidance}
+                                {selectedPlan.meal_metadata?.hydration_guidance || 
+                                 selectedPlan.meal_plan?.hydration_guidance}
                               </p>
                             </div>
                           )}
 
                           {/* Phase Nutrition Notes (new schema) */}
-                          {selectedPlan.plan_snapshot.meal_metadata?.phase_nutrition_notes && (
+                          {selectedPlan.meal_metadata?.phase_nutrition_notes && (
                             <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
                               <span className="text-xs font-semibold text-gray-700 uppercase block mb-1">
                                 Phase Nutrition Notes
                               </span>
                               <p className="text-sm text-gray-900">
-                                {selectedPlan.plan_snapshot.meal_metadata.phase_nutrition_notes}
+                                {selectedPlan.meal_metadata.phase_nutrition_notes}
                               </p>
                             </div>
                           )}
 
                           {/* Phase-specific meal details (new schema) */}
-                          {selectedPlan.plan_snapshot.phases && selectedPlan.plan_snapshot.phases.length > 0 && (
+                          {selectedPlan.phases && selectedPlan.phases.length > 0 && (
                             <div>
                               <h5 className="font-medium text-gray-900 mb-3">Phase Nutrition Details</h5>
                               <div className="space-y-3">
-                                {selectedPlan.plan_snapshot.phases.map((phase: any, idx: number) => (
+                                {selectedPlan.phases.map((phase: any, idx: number) => (
                                   <details key={idx} className="group">
                                     <summary className="p-3 bg-gray-50 rounded-lg border border-gray-200 cursor-pointer hover:bg-gray-100 transition-colors">
                                       <div className="flex items-center justify-between">
@@ -1170,11 +1178,11 @@ export default function PlanPage() {
                           )}
 
                           {/* Legacy Sample Meal Days (old schema) */}
-                          {selectedPlan.plan_snapshot.meal_plan?.sample_days && selectedPlan.plan_snapshot.meal_plan.sample_days.length > 0 && (
+                          {selectedPlan.meal_plan?.sample_days && selectedPlan.meal_plan.sample_days.length > 0 && (
                             <div>
                               <h5 className="font-medium text-gray-900 mb-3">Sample Meal Plans</h5>
                               <div className="space-y-3">
-                                {selectedPlan.plan_snapshot.meal_plan.sample_days.map((day: any, idx: number) => (
+                                {selectedPlan.meal_plan.sample_days.map((day: any, idx: number) => (
                                   <details key={idx} className="group">
                                     <summary className="p-3 bg-gray-50 rounded-lg border border-gray-200 cursor-pointer hover:bg-gray-100 transition-colors">
                                       <div className="flex items-center justify-between">
@@ -1229,14 +1237,14 @@ export default function PlanPage() {
                     )}
 
                     {/* Key Principles & Success Metrics */}
-                    {(selectedPlan.plan_snapshot?.key_principles || selectedPlan.plan_snapshot?.success_metrics) && (
+                    {(selectedPlan.key_principles || selectedPlan.success_metrics) && (
                       <div className="border-t pt-6">
                         <div className="grid md:grid-cols-2 gap-6">
-                          {selectedPlan.plan_snapshot.key_principles && selectedPlan.plan_snapshot.key_principles.length > 0 && (
+                          {selectedPlan.key_principles && selectedPlan.key_principles.length > 0 && (
                             <div>
                               <h5 className="font-medium text-gray-900 mb-3">Key Principles for Success</h5>
                               <ul className="space-y-2">
-                                {selectedPlan.plan_snapshot.key_principles.map((principle: string, idx: number) => (
+                                {selectedPlan.key_principles.map((principle: string, idx: number) => (
                                   <li key={idx} className="flex items-start gap-2 text-sm text-gray-700">
                                     <CheckCircle2 className="h-4 w-4 text-green-600 flex-shrink-0 mt-0.5" />
                                     <span>{principle}</span>
@@ -1245,11 +1253,11 @@ export default function PlanPage() {
                               </ul>
                             </div>
                           )}
-                          {selectedPlan.plan_snapshot.success_metrics && selectedPlan.plan_snapshot.success_metrics.length > 0 && (
+                          {selectedPlan.success_metrics && selectedPlan.success_metrics.length > 0 && (
                             <div>
                               <h5 className="font-medium text-gray-900 mb-3">Success Metrics</h5>
                               <ul className="space-y-2">
-                                {selectedPlan.plan_snapshot.success_metrics.map((metric: string, idx: number) => (
+                                {selectedPlan.success_metrics.map((metric: string, idx: number) => (
                                   <li key={idx} className="flex items-start gap-2 text-sm text-gray-700">
                                     <Target className="h-4 w-4 text-blue-600 flex-shrink-0 mt-0.5" />
                                     <span>{metric}</span>
@@ -1263,7 +1271,7 @@ export default function PlanPage() {
                     )}
 
                     {/* Important Notes */}
-                    {selectedPlan.plan_snapshot?.important_notes && (
+                    {selectedPlan.important_notes && (
                       <div className="border-t pt-6">
                         <div className="p-4 bg-yellow-50 rounded-lg border border-yellow-200">
                           <div className="flex gap-2">
@@ -1271,7 +1279,7 @@ export default function PlanPage() {
                             <div>
                               <h5 className="font-medium text-yellow-900 mb-1">Important Notes</h5>
                               <p className="text-sm text-yellow-800">
-                                {selectedPlan.plan_snapshot.important_notes}
+                                {selectedPlan.important_notes}
                               </p>
                             </div>
                           </div>
@@ -1345,3 +1353,5 @@ export default function PlanPage() {
     </div>
   );
 }
+
+

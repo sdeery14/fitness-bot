@@ -52,12 +52,8 @@ export function PlanMessageCard({ planId }: PlanMessageCardProps) {
         const data = await res.json();
         const responseData = data.data || data;
         
-        // Parse plan_snapshot if it's a string
-        const planSnapshot = typeof responseData.plan_snapshot === "string"
-          ? JSON.parse(responseData.plan_snapshot)
-          : responseData.plan_snapshot;
-
-        setPlanData(planSnapshot);
+        // Use the structured plan data directly
+        setPlanData(responseData);
       } catch (err) {
         console.error("Error loading plan:", err);
         setError("Failed to load plan details");

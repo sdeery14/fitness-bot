@@ -23,6 +23,10 @@ class WorkoutPlan(Base, UUIDMixin, TimestampMixin):
     # Workout plan details (FR-017, FR-018)
     workout_plan_details = Column(JSON, nullable=False)  # Split type, focus areas, rest days, etc.
 
+    # Workout plan guidance metadata
+    phase_progression_notes = Column(Text, nullable=True)  # How phases progress in intensity/volume
+    equipment_used = Column(JSON, nullable=True)  # List of equipment required (list of strings)
+
     # Relationships
     fitness_plan = relationship("FitnessPlan", back_populates="workout_plans")
     workouts = relationship("Workout", back_populates="workout_plan", cascade="all, delete-orphan")
