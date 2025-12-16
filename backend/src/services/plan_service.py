@@ -244,14 +244,17 @@ class PlanService:
             ]
         """
         from sqlalchemy.orm import selectinload
+        from src.models.fitness_plan import Phase
+        from src.models.workout import Workout
+        from src.models.meal import Meal
 
         # Load parent plan with all relationships
         stmt = (
             select(FitnessPlan)
             .where(FitnessPlan.id == parent_plan_id)
             .options(
-                selectinload(FitnessPlan.phases).selectinload("workouts").selectinload("exercises"),
-                selectinload(FitnessPlan.phases).selectinload("meals"),
+                selectinload(FitnessPlan.phases).selectinload(Phase.workouts).selectinload(Workout.exercises),
+                selectinload(FitnessPlan.phases).selectinload(Phase.meals),
                 selectinload(FitnessPlan.workout_plans),
                 selectinload(FitnessPlan.meal_plans),
             )
