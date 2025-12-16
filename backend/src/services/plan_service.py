@@ -698,9 +698,18 @@ class PlanService:
                 # Create MealPrepSession records from meal_prep_schedule
                 from src.models.meal_prep import MealPrepSession
 
+                prep_sessions = meal_details.get("meal_prep_sessions", [])
                 prep_schedule = meal_details.get("meal_prep_schedule", [])
 
                 for prep_entry in prep_schedule:
+                    # Get the session details from meal_prep_sessions using session_index
+                    session_index = prep_entry.get("session_index", 0)
+                    if session_index < len(prep_sessions):
+                        session_details = prep_sessions[session_index]
+                    else:
+                        # Fallback if index is out of range (shouldn't happen with valid agent output)
+                        session_details = {}
+
                     # Parse time if provided
                     entry_time = None
                     time_str = prep_entry.get("time")
@@ -722,13 +731,13 @@ class PlanService:
 
                     meal_prep_session = MealPrepSession(
                         phase_id=phase.id,
-                        session_name=prep_entry.get("session_name", "Meal Prep"),
-                        recipes=prep_entry.get("recipes", []),
-                        duration_minutes=prep_entry.get("duration_minutes", 90),
-                        batch_size=prep_entry.get("batch_size", 1),
-                        instructions=prep_entry.get("instructions", []),
-                        storage_instructions=prep_entry.get("storage_instructions"),
-                        notes=prep_entry.get("notes"),
+                        session_name=session_details.get("session_name", "Meal Prep"),
+                        recipes=session_details.get("recipes", []),
+                        duration_minutes=session_details.get("duration_minutes", 90),
+                        batch_size=session_details.get("batch_size", 1),
+                        instructions=session_details.get("instructions", []),
+                        storage_instructions=session_details.get("storage_instructions"),
+                        notes=prep_entry.get("notes"),  # Schedule-level notes
                         target_day_name=prep_entry.get("target_day_name"),
                         time=entry_time,
                         repeats_every=prep_entry.get("repeats_every"),
