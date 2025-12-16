@@ -161,8 +161,14 @@ export function PlanMessageCard({ planId }: PlanMessageCardProps) {
                       Phase {phase.phase_number}: {phase.phase_name}
                     </div>
                     <div className="text-sm text-gray-600">
-                      {phase.duration_weeks} weeks • {phase.workout_details?.workouts?.length || 0} workouts • {phase.meal_details?.sample_days?.length || 0} meal days
+                      {phase.duration_weeks} weeks • {phase.workout_details?.workouts?.length || 0} workouts • {phase.meal_details?.daily_calorie_target || 0} cal/day
+                      {phase.meal_details?.macro_split && ` (${phase.meal_details.macro_split})`}
                     </div>
+                    {phase.objectives && phase.objectives.length > 0 && (
+                      <div className="text-xs text-gray-500 mt-1">
+                        {phase.objectives.join(', ')}
+                      </div>
+                    )}
                   </div>
                   {expandedPhase === phase.phase_number ? (
                     <ChevronUp className="h-5 w-5 text-gray-400" />
@@ -200,13 +206,23 @@ export function PlanMessageCard({ planId }: PlanMessageCardProps) {
                           <Utensils className="h-4 w-4" />
                           Meal Plans
                         </h5>
-                        <div className="space-y-2">
-                          {phase.meal_details.sample_days.map((day: any, idx: number) => (
-                            <div key={idx} className="bg-gray-50 rounded p-3 text-sm">
-                              <div className="font-medium text-gray-900">{day.day_name}</div>
-                              <div className="text-gray-600">{day.meals?.length || 0} meals • {day.target_calories} cal</div>
+                        <div className="bg-green-50 rounded p-3 text-sm">
+                          <div className="font-medium text-green-900">Phase Nutrition Target</div>
+                          <div className="text-green-700">
+                            {phase.meal_details.daily_calorie_target} cal/day • {phase.meal_details.macro_split}
+                          </div>
+                          {phase.meal_details.phase_nutrition_focus && (
+                            <div className="text-xs text-green-600 mt-1">
+                              Focus: {phase.meal_details.phase_nutrition_focus}
                             </div>
-                          ))}
+                          )}
+                          <div className="text-xs text-green-600 mt-2">
+                            Includes {phase.meal_details.sample_days.length} sample meal plan{phase.meal_details.sample_days.length > 1 ? 's' : ''}
+                            {phase.meal_details.sample_days.length <= 3 && (() => {
+                              const dayNames = phase.meal_details.sample_days.map((d: any) => d.day_name).filter(Boolean).join(', ');
+                              return dayNames ? <span> ({dayNames})</span> : null;
+                            })()}
+                          </div>
                         </div>
                       </div>
                     )}
