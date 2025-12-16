@@ -91,6 +91,10 @@ export default function MealPrepDetailPage() {
   }
 
   const { prep_instructions } = entry;
+  
+  // Ensure recipes and instructions are arrays
+  const recipes = Array.isArray(prep_instructions.recipes) ? prep_instructions.recipes : [];
+  const instructions = Array.isArray(prep_instructions.instructions) ? prep_instructions.instructions : [];
 
   return (
     <div className="container mx-auto py-8 space-y-6">
@@ -142,13 +146,13 @@ export default function MealPrepDetailPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold">{prep_instructions.recipes.length}</p>
+            <p className="text-2xl font-bold">{recipes.length}</p>
           </CardContent>
         </Card>
       </div>
 
       {/* Recipes */}
-      {prep_instructions.recipes.length > 0 && (
+      {recipes.length > 0 && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -156,12 +160,12 @@ export default function MealPrepDetailPage() {
               Recipes to Prepare
             </CardTitle>
             <CardDescription>
-              {prep_instructions.recipes.length} {prep_instructions.recipes.length === 1 ? 'recipe' : 'recipes'} for this session
+              {recipes.length} {recipes.length === 1 ? 'recipe' : 'recipes'} for this session
             </CardDescription>
           </CardHeader>
           <CardContent>
             <ul className="space-y-2">
-              {prep_instructions.recipes.map((recipe, idx) => (
+              {recipes.map((recipe, idx) => (
                 <li key={idx} className="flex items-center gap-3 p-3 bg-secondary rounded-lg">
                   <Badge variant="outline" className="text-lg">{idx + 1}</Badge>
                   <span className="font-medium">{recipe}</span>
@@ -173,7 +177,7 @@ export default function MealPrepDetailPage() {
       )}
 
       {/* Instructions */}
-      {prep_instructions.instructions.length > 0 && (
+      {instructions.length > 0 && (
         <Card>
           <CardHeader>
             <CardTitle>Step-by-Step Instructions</CardTitle>
@@ -181,7 +185,7 @@ export default function MealPrepDetailPage() {
           </CardHeader>
           <CardContent>
             <ol className="space-y-4">
-              {prep_instructions.instructions.map((instruction, idx) => (
+              {instructions.map((instruction, idx) => (
                 <li key={idx} className="flex gap-4">
                   <div className="flex-shrink-0">
                     <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary text-primary-foreground font-bold">

@@ -654,6 +654,8 @@ class PlanService:
                 from src.models.grocery_trip import GroceryShoppingTrip
 
                 shopping_schedule = meal_details.get("grocery_shopping_schedule", [])
+                # Get the phase-level grocery list (shared across all shopping trips in this phase)
+                phase_grocery_list = meal_details.get("grocery_list", [])
 
                 for shopping_entry in shopping_schedule:
                     # Parse time if provided
@@ -675,12 +677,16 @@ class PlanService:
                         except (ValueError, IndexError):
                             pass  # Keep as None if parsing fails
 
+                    # Convert grocery list to the format expected by database
+                    # Database expects {"items": [...]} but we store just the array
+                    items_dict = {"items": phase_grocery_list} if phase_grocery_list else []
+                    
                     grocery_trip = GroceryShoppingTrip(
                         phase_id=phase.id,
                         name=shopping_entry.get("name", "Grocery Shopping"),
-                        items=shopping_entry.get("shopping_list", []),
+                        items=items_dict,
                         estimated_duration_minutes=shopping_entry.get(
-                            "estimated_duration_minutes", 60
+                            "duration_minutes", 60
                         ),
                         notes=shopping_entry.get("notes"),
                         target_day_name=shopping_entry.get("target_day_name"),

@@ -89,10 +89,15 @@ export default function GroceryShoppingDetailPage() {
     );
   }
 
-  const { grocery_list } = entry;
+  const grocery_list = entry.grocery_list;
+  
+  // Handle both array and object formats from API
+  const items = Array.isArray(grocery_list) 
+    ? grocery_list 
+    : (grocery_list as any).items || [];
 
   // Group items by category
-  const itemsByCategory = grocery_list.items.reduce((acc, item) => {
+  const itemsByCategory = items.reduce((acc, item) => {
     if (!acc[item.category]) {
       acc[item.category] = [];
     }
@@ -110,8 +115,8 @@ export default function GroceryShoppingDetailPage() {
     return aIndex - bIndex;
   });
 
-  const totalItems = grocery_list.items.length;
-  const completedItems = grocery_list.items.filter(item => item.purchased).length;
+  const totalItems = items.length;
+  const completedItems = items.filter(item => item.purchased).length;
 
   return (
     <div className="container mx-auto py-8 space-y-6">

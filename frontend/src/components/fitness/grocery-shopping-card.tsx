@@ -26,7 +26,16 @@ export function GroceryShoppingCard({ entry, showStatus = true, compact = false 
     return null;
   }
 
-  const { grocery_list } = entry;
+  const grocery_list = entry.grocery_list;
+  
+  // Handle both array and object formats from API
+  const items = Array.isArray(grocery_list) 
+    ? grocery_list 
+    : (grocery_list as any).items || [];
+  
+  if (!items || items.length === 0) {
+    return null;
+  }
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -53,7 +62,7 @@ export function GroceryShoppingCard({ entry, showStatus = true, compact = false 
   };
 
   // Group items by category
-  const itemsByCategory = grocery_list.items.reduce((acc, item) => {
+  const itemsByCategory = items.reduce((acc, item) => {
     if (!acc[item.category]) {
       acc[item.category] = [];
     }
@@ -98,7 +107,7 @@ export function GroceryShoppingCard({ entry, showStatus = true, compact = false 
         </CardHeader>
         <CardContent>
           <p className="text-sm text-muted-foreground">
-            {grocery_list.items.length} items • {sortedCategories.length} categories
+            {items.length} items • {sortedCategories.length} categories
           </p>
         </CardContent>
       </Card>
@@ -174,7 +183,7 @@ export function GroceryShoppingCard({ entry, showStatus = true, compact = false 
 
         {/* Item Count Summary */}
         <div className="border-t pt-3 text-sm text-muted-foreground">
-          Total: {grocery_list.items.length} items across {sortedCategories.length} categories
+          Total: {items.length} items across {sortedCategories.length} categories
         </div>
       </CardContent>
     </Card>

@@ -302,8 +302,13 @@ export default function DayDetailPage() {
                   {entry.grocery_list && (
                     <CardContent>
                       <p className="text-sm text-muted-foreground">
-                        {entry.grocery_list.items.length} items
-                        {entry.grocery_list.notes && ` • ${entry.grocery_list.notes}`}
+                        {(() => {
+                          const items = Array.isArray(entry.grocery_list) 
+                            ? entry.grocery_list 
+                            : (entry.grocery_list as any).items || [];
+                          return `${items.length} items`;
+                        })()}
+                        {!Array.isArray(entry.grocery_list) && (entry.grocery_list as any).notes && ` • ${(entry.grocery_list as any).notes}`}
                       </p>
                     </CardContent>
                   )}
