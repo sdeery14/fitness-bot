@@ -17,10 +17,8 @@ import {
   CheckCircle2,
   Pause,
   Play,
-  Trash2,
   ShoppingCart,
   ChefHat,
-  Package,
 } from "lucide-react";
 import {
   AlertDialog,
@@ -682,80 +680,78 @@ export default function PlanPage() {
                       </div>
                     )}
 
-                    {/* Training Plan Details */}
+                    {/* Plan Metadata */}
+                    <div className="border-t pt-6">
+                      <h4 className="font-semibold text-gray-900 mb-4">Plan Overview</h4>
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                        {/* Training Overview */}
+                        <div className="p-4 bg-blue-50 rounded-lg border border-blue-200 space-y-3">
+                          <h5 className="font-semibold text-blue-900 flex items-center gap-2">
+                            <TrendingUp className="h-4 w-4" />
+                            Training Strategy
+                          </h5>
+                          <div className="space-y-2 text-sm">
+                            <div className="flex justify-between">
+                              <span className="text-blue-700">Workout Frequency:</span>
+                              <span className="font-medium text-blue-900">{selectedPlan.workout_frequency || 3} days/week</span>
+                            </div>
+                            {selectedPlan.workout_metadata?.equipment_used && selectedPlan.workout_metadata.equipment_used.length > 0 && (
+                              <div>
+                                <span className="text-blue-700">Equipment:</span>
+                                <p className="text-blue-900 mt-1">{selectedPlan.workout_metadata.equipment_used.join(', ')}</p>
+                              </div>
+                            )}
+                            {selectedPlan.workout_metadata?.phase_progression_notes && (
+                              <div>
+                                <span className="text-blue-700">Progression:</span>
+                                <p className="text-blue-900 mt-1">{selectedPlan.workout_metadata.phase_progression_notes}</p>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Nutrition Overview */}
+                        <div className="p-4 bg-green-50 rounded-lg border border-green-200 space-y-3">
+                          <h5 className="font-semibold text-green-900 flex items-center gap-2">
+                            <Target className="h-4 w-4" />
+                            Nutrition Strategy
+                          </h5>
+                          <div className="space-y-2 text-sm">
+                            <div className="flex justify-between">
+                              <span className="text-green-700">Approach:</span>
+                              <span className="font-medium text-green-900">{selectedPlan.meal_metadata?.dietary_approach || 'Balanced'}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-green-700">Macro Strategy:</span>
+                              <span className="font-medium text-green-900">{selectedPlan.meal_metadata?.macro_strategy || 'Balanced'}</span>
+                            </div>
+                            {selectedPlan.meal_metadata?.meal_timing && (
+                              <div className="flex justify-between">
+                                <span className="text-green-700">Meal Timing:</span>
+                                <span className="font-medium text-green-900">{selectedPlan.meal_metadata.meal_timing}</span>
+                              </div>
+                            )}
+                            {selectedPlan.meal_metadata?.hydration_guidance && (
+                              <div>
+                                <span className="text-green-700">Hydration:</span>
+                                <p className="text-green-900 mt-1">{selectedPlan.meal_metadata.hydration_guidance}</p>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Phase Details */}
                     {selectedPlan.phases && (
                       <div className="border-t pt-6">
                         <h4 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                          <TrendingUp className="h-5 w-5 text-blue-600" />
-                          Training Plan
+                          <Calendar className="h-5 w-5 text-purple-600" />
+                          Phase Details
                         </h4>
                         <div className="space-y-4">
-                          {/* Training Overview */}
-                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
-                            <div>
-                              <span className="text-xs text-blue-600 uppercase block mb-1">Program Type</span>
-                              <span className="text-sm font-medium text-blue-900">
-                                General Fitness
-                              </span>
-                            </div>
-                            <div>
-                              <span className="text-xs text-blue-600 uppercase block mb-1">Frequency</span>
-                              <span className="text-sm font-medium text-blue-900">
-                                {selectedPlan.workout_frequency || 3} days/week
-                              </span>
-                            </div>
-                            <div>
-                              <span className="text-xs text-blue-600 uppercase block mb-1">Duration</span>
-                              <span className="text-sm font-medium text-blue-900">
-                                {selectedPlan.duration_weeks} weeks
-                              </span>
-                            </div>
-                            <div>
-                              <span className="text-xs text-blue-600 uppercase block mb-1">Phases</span>
-                              <span className="text-sm font-medium text-blue-900">
-                                {selectedPlan.phases?.length || 1} phase(s)
-                              </span>
-                            </div>
-                          </div>
-
-                          {/* Progression Strategy */}
-                          <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
-                            <span className="text-xs font-semibold text-gray-700 uppercase block mb-1">
-                              Progression Strategy
-                            </span>
-                            <p className="text-sm text-gray-900">
-                              Progressive overload with systematic increases in intensity and volume
-                            </p>
-                          </div>
-
-                          {/* Phase Progression Notes */}
-                          {selectedPlan.workout_metadata?.phase_progression_notes && (
-                            <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
-                              <span className="text-xs font-semibold text-gray-700 uppercase block mb-1">
-                                Phase Progression Notes
-                              </span>
-                              <p className="text-sm text-gray-900">
-                                {selectedPlan.workout_metadata.phase_progression_notes}
-                              </p>
-                            </div>
-                          )}
-
-                          {/* Equipment Used */}
-                          {selectedPlan.workout_metadata?.equipment_used && selectedPlan.workout_metadata.equipment_used.length > 0 && (
-                            <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
-                              <span className="text-xs font-semibold text-gray-700 uppercase block mb-1">
-                                Equipment
-                              </span>
-                              <p className="text-sm text-gray-900">
-                                {selectedPlan.workout_metadata.equipment_used.join(', ')}
-                              </p>
-                            </div>
-                          )}
-
-                          {/* Phase-specific workout details */}
                           {selectedPlan.phases && selectedPlan.phases.length > 0 && (
                             <div>
-                              <h5 className="font-medium text-gray-900 mb-3">Training & Nutrition Phases</h5>
                               <div className="space-y-4">
                                 {selectedPlan.phases.map((phase: any, idx: number) => (
                                   <details key={idx} className="group" open={idx === 0}>
@@ -893,11 +889,11 @@ export default function PlanPage() {
                           )}
 
                           {/* Legacy Workout Days (old schema) */}
-                          {selectedPlan.workout_plan?.workouts && selectedPlan.workout_plan.workouts.length > 0 && (
+                          {(selectedPlan as any).workout_plan?.workouts && (selectedPlan as any).workout_plan.workouts.length > 0 && (
                             <div>
                               <h5 className="font-medium text-gray-900 mb-3">Workout Schedule</h5>
                               <div className="space-y-3">
-                                {selectedPlan.workout_plan.workouts.map((workout: any, idx: number) => (
+                                {(selectedPlan as any).workout_plan.workouts.map((workout: any, idx: number) => (
                                   <details key={idx} className="group">
                                     <summary className="p-3 bg-gray-50 rounded-lg border border-gray-200 cursor-pointer hover:bg-gray-100 transition-colors">
                                       <div className="flex items-center justify-between">
@@ -952,389 +948,7 @@ export default function PlanPage() {
                       </div>
                     )}
 
-                    {/* Meal Plan Details */}
-                    {(selectedPlan.meal_metadata || selectedPlan.meal_plan) && (
-                      <div className="border-t pt-6">
-                        <h4 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                          <Target className="h-5 w-5 text-green-600" />
-                          Nutrition Plan
-                        </h4>
-                        <div className="space-y-4">
-                          {/* Nutrition Overview - supports both old and new schema */}
-                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-green-50 rounded-lg border border-green-200">
-                            <div>
-                              <span className="text-xs text-green-600 uppercase block mb-1">Dietary Approach</span>
-                              <span className="text-sm font-medium text-green-900">
-                                {selectedPlan.meal_metadata?.dietary_approach || 
-                                 selectedPlan.meal_plan?.dietary_notes || 
-                                 'Balanced'}
-                              </span>
-                            </div>
-                            <div>
-                              <span className="text-xs text-green-600 uppercase block mb-1">Macro Strategy</span>
-                              <span className="text-sm font-medium text-green-900">
-                                {selectedPlan.meal_metadata?.macro_strategy || 
-                                 selectedPlan.meal_plan?.macro_split || 
-                                 'Balanced macros'}
-                              </span>
-                            </div>
-                            <div>
-                              <span className="text-xs text-green-600 uppercase block mb-1">Meal Timing</span>
-                              <span className="text-sm font-medium text-green-900">
-                                {selectedPlan.meal_metadata?.meal_timing || 
-                                 selectedPlan.meal_plan?.meal_frequency + ' meals/day' || 
-                                 '3-4 meals/day'}
-                              </span>
-                            </div>
-                            <div>
-                              <span className="text-xs text-green-600 uppercase block mb-1">Phases</span>
-                              <span className="text-sm font-medium text-green-900">
-                                {selectedPlan.phases?.length || 
-                                 selectedPlan.meal_plan?.sample_days?.length || 
-                                 1} phase(s)
-                              </span>
-                            </div>
-                          </div>
 
-                          {/* Hydration Guidance (new schema) */}
-                          {(selectedPlan.meal_metadata?.hydration_guidance || 
-                            selectedPlan.meal_plan?.hydration_guidance) && (
-                            <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
-                              <span className="text-xs font-semibold text-blue-700 uppercase block mb-1">
-                                Hydration
-                              </span>
-                              <p className="text-sm text-blue-900">
-                                {selectedPlan.meal_metadata?.hydration_guidance || 
-                                 selectedPlan.meal_plan?.hydration_guidance}
-                              </p>
-                            </div>
-                          )}
-
-                          {/* Phase Nutrition Notes (new schema) */}
-                          {selectedPlan.meal_metadata?.phase_nutrition_notes && (
-                            <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
-                              <span className="text-xs font-semibold text-gray-700 uppercase block mb-1">
-                                Phase Nutrition Notes
-                              </span>
-                              <p className="text-sm text-gray-900">
-                                {selectedPlan.meal_metadata.phase_nutrition_notes}
-                              </p>
-                            </div>
-                          )}
-
-                          {/* Phase-specific meal details (new schema) */}
-                          {selectedPlan.phases && selectedPlan.phases.length > 0 && (
-                            <div>
-                              <h5 className="font-medium text-gray-900 mb-3">Phase Nutrition Details</h5>
-                              <div className="space-y-3">
-                                {selectedPlan.phases.map((phase: any, idx: number) => (
-                                  <details key={idx} className="group">
-                                    <summary className="p-3 bg-gray-50 rounded-lg border border-gray-200 cursor-pointer hover:bg-gray-100 transition-colors">
-                                      <div className="flex items-center justify-between">
-                                        <div>
-                                          <p className="font-medium text-gray-900 text-sm">
-                                            Phase {phase.phase_number}: {phase.name}
-                                          </p>
-                                          {phase.meal_details && (
-                                            <p className="text-xs text-gray-600">
-                                              {phase.meal_details.daily_calorie_target} kcal • {phase.meal_details.macro_split}
-                                            </p>
-                                          )}
-                                        </div>
-                                        <CheckCircle2 className="h-4 w-4 text-gray-400 group-open:rotate-90 transition-transform" />
-                                      </div>
-                                    </summary>
-                                    <div className="mt-2 p-4 bg-white rounded-lg border border-gray-200 space-y-3">
-                                      {phase.meal_details && (
-                                        <>
-                                          <div className="grid grid-cols-2 gap-4 p-3 bg-green-50 rounded-lg">
-                                            <div>
-                                              <p className="text-xs font-semibold text-green-700 uppercase mb-1">Daily Calories</p>
-                                              <p className="text-sm font-medium text-green-900">{phase.meal_details.daily_calorie_target} kcal</p>
-                                            </div>
-                                            <div>
-                                              <p className="text-xs font-semibold text-green-700 uppercase mb-1">Macro Split</p>
-                                              <p className="text-sm font-medium text-green-900">{phase.meal_details.macro_split}</p>
-                                            </div>
-                                          </div>
-                                          {phase.meal_details.phase_nutrition_focus && (
-                                            <div>
-                                              <p className="text-xs font-semibold text-gray-700 uppercase mb-1">Nutrition Focus</p>
-                                              <p className="text-sm text-gray-900">{phase.meal_details.phase_nutrition_focus}</p>
-                                            </div>
-                                          )}
-                                          {phase.meal_details.sample_days && phase.meal_details.sample_days.length > 0 && (
-                                            <div>
-                                              <p className="text-xs font-semibold text-gray-700 uppercase mb-2">Sample Meal Plans</p>
-                                              <div className="space-y-2">
-                                                {phase.meal_details.sample_days.map((day: any, dayIdx: number) => (
-                                                  <details key={dayIdx} className="group/day">
-                                                    <summary className="p-2 bg-gray-50 rounded cursor-pointer hover:bg-gray-100 text-sm">
-                                                      <span className="font-medium text-gray-900">{day.day_name}</span>
-                                                      {day.target_calories && (
-                                                        <span className="text-xs text-gray-600 ml-2">
-                                                          ({day.target_calories} kcal)
-                                                        </span>
-                                                      )}
-                                                    </summary>
-                                                    <div className="mt-1 pl-4 space-y-2">
-                                                      {day.meals?.map((meal: any, mealIdx: number) => (
-                                                        <div key={mealIdx} className="border-l-2 border-green-500 pl-2 py-1">
-                                                          <div className="flex justify-between items-start">
-                                                            <div>
-                                                              <p className="text-xs font-semibold text-gray-900">{meal.meal_name}</p>
-                                                              <p className="text-xs text-gray-500">{meal.time}</p>
-                                                            </div>
-                                                            <span className="text-xs font-medium text-gray-700">
-                                                              {meal.total_calories} kcal
-                                                            </span>
-                                                          </div>
-                                                          {meal.foods && meal.foods.length > 0 && (
-                                                            <div className="mt-1 space-y-0.5">
-                                                              {meal.foods.map((food: any, foodIdx: number) => (
-                                                                <div key={foodIdx} className="text-xs text-gray-600">
-                                                                  • {food.name} ({food.portion})
-                                                                </div>
-                                                              ))}
-                                                            </div>
-                                                          )}
-                                                        </div>
-                                                      ))}
-                                                    </div>
-                                                  </details>
-                                                ))}
-                                              </div>
-                                            </div>
-                                          )}
-
-                                          {/* Grocery Shopping Schedule */}
-                                          {phase.meal_details.grocery_shopping_schedule && phase.meal_details.grocery_shopping_schedule.length > 0 && (
-                                            <div className="border-t pt-3">
-                                              <p className="text-xs font-semibold text-gray-700 uppercase mb-2 flex items-center gap-1">
-                                                <ShoppingCart className="h-3 w-3" />
-                                                Grocery Shopping Schedule
-                                              </p>
-                                              <div className="space-y-2">
-                                                {phase.meal_details.grocery_shopping_schedule.map((entry: any, idx: number) => (
-                                                  <div key={idx} className="p-2 bg-green-50 rounded border border-green-200">
-                                                    <div className="flex items-center justify-between mb-1">
-                                                      <span className="text-xs font-medium text-green-900">
-                                                        Day {entry.day_offset + 1} @ {entry.time}
-                                                      </span>
-                                                      {entry.repeats_every && (
-                                                        <Badge variant="secondary" className="text-xs">
-                                                          Every {entry.repeats_every} days
-                                                        </Badge>
-                                                      )}
-                                                    </div>
-                                                    {entry.notes && (
-                                                      <p className="text-xs text-green-700">{entry.notes}</p>
-                                                    )}
-                                                  </div>
-                                                ))}
-                                              </div>
-                                            </div>
-                                          )}
-
-                                          {/* Grocery List */}
-                                          {phase.meal_details.grocery_list && phase.meal_details.grocery_list.length > 0 && (
-                                            <div className="border-t pt-3">
-                                              <p className="text-xs font-semibold text-gray-700 uppercase mb-2">Shopping List</p>
-                                              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                                {/* Group items by category */}
-                                                {(() => {
-                                                  const grouped = phase.meal_details.grocery_list.reduce((acc: any, item: any) => {
-                                                    if (!acc[item.category]) acc[item.category] = [];
-                                                    acc[item.category].push(item);
-                                                    return acc;
-                                                  }, {});
-                                                  const categories = ['Produce', 'Meat', 'Dairy', 'Grains', 'Frozen', 'Pantry', 'Other'];
-                                                  const sortedCategories = Object.keys(grouped).sort((a, b) => {
-                                                    const aIndex = categories.indexOf(a);
-                                                    const bIndex = categories.indexOf(b);
-                                                    if (aIndex === -1 && bIndex === -1) return a.localeCompare(b);
-                                                    if (aIndex === -1) return 1;
-                                                    if (bIndex === -1) return -1;
-                                                    return aIndex - bIndex;
-                                                  });
-                                                  return sortedCategories.map((category) => (
-                                                    <div key={category} className="space-y-1">
-                                                      <p className="text-xs font-semibold text-gray-600 uppercase">{category}</p>
-                                                      <ul className="space-y-0.5 ml-3">
-                                                        {grouped[category].map((item: any, idx: number) => (
-                                                          <li key={idx} className="text-xs text-gray-700 flex justify-between">
-                                                            <span>{item.ingredient}</span>
-                                                            <span className="text-gray-500">{item.quantity}</span>
-                                                          </li>
-                                                        ))}
-                                                      </ul>
-                                                    </div>
-                                                  ));
-                                                })()}
-                                              </div>
-                                            </div>
-                                          )}
-
-                                          {/* Meal Prep Schedule */}
-                                          {phase.meal_details.meal_prep_schedule && phase.meal_details.meal_prep_schedule.length > 0 && (
-                                            <div className="border-t pt-3">
-                                              <p className="text-xs font-semibold text-gray-700 uppercase mb-2 flex items-center gap-1">
-                                                <ChefHat className="h-3 w-3" />
-                                                Meal Prep Schedule
-                                              </p>
-                                              <div className="space-y-2">
-                                                {phase.meal_details.meal_prep_schedule.map((entry: any, idx: number) => {
-                                                  const session = phase.meal_details.meal_prep_sessions?.[entry.session_index];
-                                                  return (
-                                                    <div key={idx} className="p-2 bg-purple-50 rounded border border-purple-200">
-                                                      <div className="flex items-center justify-between mb-1">
-                                                        <div className="flex items-center gap-2">
-                                                          <span className="text-xs font-medium text-purple-900">
-                                                            Day {entry.day_offset + 1} @ {entry.time}
-                                                          </span>
-                                                          {session && (
-                                                            <span className="text-xs text-purple-700">• {session.session_name}</span>
-                                                          )}
-                                                        </div>
-                                                        {entry.repeats_every && (
-                                                          <Badge variant="secondary" className="text-xs">
-                                                            Every {entry.repeats_every} days
-                                                          </Badge>
-                                                        )}
-                                                      </div>
-                                                      {entry.notes && (
-                                                        <p className="text-xs text-purple-700">{entry.notes}</p>
-                                                      )}
-                                                    </div>
-                                                  );
-                                                })}
-                                              </div>
-                                            </div>
-                                          )}
-
-                                          {/* Meal Prep Sessions */}
-                                          {phase.meal_details.meal_prep_sessions && phase.meal_details.meal_prep_sessions.length > 0 && (
-                                            <div className="border-t pt-3">
-                                              <p className="text-xs font-semibold text-gray-700 uppercase mb-2">Prep Session Templates</p>
-                                              <div className="space-y-3">
-                                                {phase.meal_details.meal_prep_sessions.map((session: any, idx: number) => (
-                                                  <details key={idx} className="group/session">
-                                                    <summary className="p-2 bg-purple-50 rounded border border-purple-200 cursor-pointer hover:bg-purple-100 text-sm">
-                                                      <div className="flex items-center justify-between">
-                                                        <span className="font-medium text-purple-900">{session.session_name}</span>
-                                                        <div className="flex items-center gap-2 text-xs text-purple-700">
-                                                          <Package className="h-3 w-3" />
-                                                          <span>{session.batch_size} servings</span>
-                                                          <Clock className="h-3 w-3" />
-                                                          <span>{session.duration_minutes} min</span>
-                                                        </div>
-                                                      </div>
-                                                    </summary>
-                                                    <div className="mt-2 p-3 bg-white rounded border border-gray-200 space-y-2">
-                                                      {session.recipes && session.recipes.length > 0 && (
-                                                        <div>
-                                                          <p className="text-xs font-semibold text-gray-700 mb-1">Recipes:</p>
-                                                          <ul className="space-y-0.5 ml-3">
-                                                            {session.recipes.map((recipe: string, rIdx: number) => (
-                                                              <li key={rIdx} className="text-xs text-gray-700">• {recipe}</li>
-                                                            ))}
-                                                          </ul>
-                                                        </div>
-                                                      )}
-                                                      {session.instructions && session.instructions.length > 0 && (
-                                                        <div>
-                                                          <p className="text-xs font-semibold text-gray-700 mb-1">Instructions:</p>
-                                                          <ol className="space-y-1">
-                                                            {session.instructions.map((instruction: string, iIdx: number) => (
-                                                              <li key={iIdx} className="text-xs text-gray-700">
-                                                                {iIdx + 1}. {instruction}
-                                                              </li>
-                                                            ))}
-                                                          </ol>
-                                                        </div>
-                                                      )}
-                                                      {session.storage_instructions && (
-                                                        <div className="bg-amber-50 rounded p-2 border border-amber-200">
-                                                          <p className="text-xs font-semibold text-amber-900 mb-0.5 flex items-center gap-1">
-                                                            <Package className="h-3 w-3" />
-                                                            Storage:
-                                                          </p>
-                                                          <p className="text-xs text-amber-900">{session.storage_instructions}</p>
-                                                        </div>
-                                                      )}
-                                                    </div>
-                                                  </details>
-                                                ))}
-                                              </div>
-                                            </div>
-                                          )}
-                                        </>
-                                      )}
-                                    </div>
-                                  </details>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Legacy Sample Meal Days (old schema) */}
-                          {selectedPlan.meal_plan?.sample_days && selectedPlan.meal_plan.sample_days.length > 0 && (
-                            <div>
-                              <h5 className="font-medium text-gray-900 mb-3">Sample Meal Plans</h5>
-                              <div className="space-y-3">
-                                {selectedPlan.meal_plan.sample_days.map((day: any, idx: number) => (
-                                  <details key={idx} className="group">
-                                    <summary className="p-3 bg-gray-50 rounded-lg border border-gray-200 cursor-pointer hover:bg-gray-100 transition-colors">
-                                      <div className="flex items-center justify-between">
-                                        <div>
-                                          <p className="font-medium text-gray-900 text-sm">{day.day_name}</p>
-                                          <p className="text-xs text-gray-600">
-                                            {day.target_calories} kcal • P: {day.target_protein_g}g • C: {day.target_carbs_g}g • F: {day.target_fat_g}g
-                                          </p>
-                                        </div>
-                                        <CheckCircle2 className="h-4 w-4 text-gray-400 group-open:rotate-90 transition-transform" />
-                                      </div>
-                                    </summary>
-                                    <div className="mt-2 p-4 bg-white rounded-lg border border-gray-200 space-y-3">
-                                      {day.meals && day.meals.map((meal: any, mealIdx: number) => (
-                                        <div key={mealIdx} className="border-l-2 border-green-500 pl-3">
-                                          <div className="flex justify-between items-start mb-2">
-                                            <div>
-                                              <p className="text-sm font-semibold text-gray-900">{meal.meal_name}</p>
-                                              <p className="text-xs text-gray-500">{meal.time}</p>
-                                            </div>
-                                            <span className="text-xs font-medium text-gray-700 bg-gray-100 px-2 py-1 rounded">
-                                              {meal.total_calories} kcal
-                                            </span>
-                                          </div>
-                                          {meal.foods && meal.foods.length > 0 && (
-                                            <div className="space-y-1">
-                                              {meal.foods.map((food: any, foodIdx: number) => (
-                                                <div key={foodIdx} className="flex justify-between text-xs">
-                                                  <span className="text-gray-700">
-                                                    {food.name} ({food.portion})
-                                                  </span>
-                                                  <span className="text-gray-500">
-                                                    {food.calories} kcal • P:{food.protein_g}g C:{food.carbs_g}g F:{food.fat_g}g
-                                                  </span>
-                                                </div>
-                                              ))}
-                                            </div>
-                                          )}
-                                          {meal.notes && (
-                                            <p className="text-xs text-gray-500 italic mt-2">{meal.notes}</p>
-                                          )}
-                                        </div>
-                                      ))}
-                                    </div>
-                                  </details>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    )}
 
                     {/* Key Principles & Success Metrics */}
                     {(selectedPlan.key_principles || selectedPlan.success_metrics) && (
