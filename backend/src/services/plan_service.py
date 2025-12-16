@@ -204,6 +204,176 @@ class PlanService:
 
         return new_plan
 
+    async def apply_plan_updates(
+        self,
+        parent_plan_id: UUID,
+        updates: list[dict],
+        version_notes: str | None = None,
+    ) -> FitnessPlan:
+        """Apply structured updates to create a new plan version.
+
+        This creates a new plan version with specific field updates applied.
+        Supports updates to:
+        - Plan-level fields (goal_description, duration_weeks, etc.)
+        - Phase fields (phases[0].duration_weeks, phases[1].objectives)
+        - Workout fields (workout_plans[0].frequency_per_week)
+        - Individual workout fields (phases[0].workouts[1].duration_minutes)
+        - Meal plan fields (meal_plans[0].daily_calorie_target)
+        - Individual meal fields (phases[0].meals[2].protein_grams)
+
+        Args:
+            parent_plan_id: UUID of the plan to update
+            updates: List of update operations, each with:
+                - field: Field path (e.g., "goal_description", "phases[0].duration_weeks")
+                - value: New value to set
+                - operation: "set" (default), "append" (for lists), "increment" (for numbers)
+            version_notes: Human-readable description of changes
+
+        Returns:
+            New plan instance with updates applied
+
+        Raises:
+            ValueError: If parent plan not found or invalid update path
+
+        Example updates:
+            [
+                {"field": "goal_description", "value": "Build muscle and lose 10 lbs", "operation": "set"},
+                {"field": "phases[0].duration_weeks", "value": 6, "operation": "set"},
+                {"field": "workout_plans[0].frequency_per_week", "value": 4, "operation": "set"},
+                {"field": "meal_plans[0].daily_calorie_target", "value": 2200, "operation": "set"}
+            ]
+        """
+        from sqlalchemy.orm import selectinload
+
+        # Load parent plan with all relationships
+        stmt = (
+            select(FitnessPlan)
+            .where(FitnessPlan.id == parent_plan_id)
+            .options(
+                selectinload(FitnessPlan.phases).selectinload("workouts").selectinload("exercises"),
+                selectinload(FitnessPlan.phases).selectinload("meals"),
+                selectinload(FitnessPlan.workout_plans),
+                selectinload(FitnessPlan.meal_plans),
+            )
+        )
+        result = await self.db.execute(stmt)
+        parent_plan = result.scalar_one_or_none()
+
+        if not parent_plan:
+            raise ValueError(f"Parent plan not found: {parent_plan_id}")
+
+        # Create new plan version (copy parent)
+        new_plan = FitnessPlan(
+            user_id=parent_plan.user_id,
+            goal_type=parent_plan.goal_type,
+            goal_description=parent_plan.goal_description,
+            target_weight_kg=parent_plan.target_weight_kg,
+            target_date=parent_plan.target_date,
+            duration_weeks=parent_plan.duration_weeks,
+            start_date=parent_plan.start_date,
+            end_date=parent_plan.end_date,
+            status="active",
+            parent_plan_id=parent_plan_id,
+            version=parent_plan.version + 1,
+            version_notes=version_notes,
+            key_principles=parent_plan.key_principles,
+            success_metrics=parent_plan.success_metrics,
+            important_notes=parent_plan.important_notes,
+        )
+
+        # Apply updates to the new plan
+        for update in updates:
+            field_path = update.get("field", "")
+            value = update.get("value")
+            operation = update.get("operation", "set")
+
+            if not field_path:
+                continue
+
+            # Parse the field path (e.g., "phases[0].duration_weeks")
+            try:
+                self._apply_update(new_plan, field_path, value, operation)
+            except Exception as e:
+                raise ValueError(f"Failed to apply update to '{field_path}': {str(e)}")
+
+        # Mark parent plan as replaced
+        parent_plan.status = "replaced"
+
+        # Save both plans
+        self.db.add(new_plan)
+        await self.db.commit()
+        await self.db.refresh(new_plan)
+        await self.db.refresh(parent_plan)
+
+        return new_plan
+
+    def _apply_update(
+        self,
+        obj: object,
+        field_path: str,
+        value: any,
+        operation: str = "set",
+    ) -> None:
+        """Apply a single update to an object using a field path.
+
+        Args:
+            obj: Object to update (FitnessPlan, Phase, Workout, etc.)
+            field_path: Dot-separated path with optional array indices
+            value: Value to set
+            operation: "set", "append", or "increment"
+
+        Raises:
+            ValueError: If field path is invalid or operation unsupported
+        """
+        import re
+
+        # Parse field path: "phases[0].workouts[1].duration_minutes"
+        parts = re.split(r'\.|\[|\]', field_path)
+        parts = [p for p in parts if p]  # Remove empty strings
+
+        current = obj
+        i = 0
+        while i < len(parts) - 1:
+            part = parts[i]
+            
+            # Check if next part is an index
+            if i + 1 < len(parts) and parts[i + 1].isdigit():
+                # Current part is a collection name, next part is index
+                collection = getattr(current, part, None)
+                if collection is None:
+                    raise ValueError(f"Collection '{part}' not found")
+                
+                index = int(parts[i + 1])
+                if index >= len(collection):
+                    raise ValueError(f"Index {index} out of range for '{part}' (length {len(collection)})")
+                
+                current = collection[index]
+                i += 2  # Skip both the collection name and the index
+            else:
+                # Regular attribute access
+                current = getattr(current, part, None)
+                if current is None:
+                    raise ValueError(f"Attribute '{part}' not found")
+                i += 1
+
+        # Apply the update to the final field
+        final_field = parts[-1]
+        
+        if operation == "set":
+            setattr(current, final_field, value)
+        elif operation == "append":
+            current_value = getattr(current, final_field, None)
+            if not isinstance(current_value, list):
+                raise ValueError(f"Cannot append to non-list field '{final_field}'")
+            current_value.append(value)
+        elif operation == "increment":
+            current_value = getattr(current, final_field, 0)
+            if not isinstance(current_value, (int, float)):
+                raise ValueError(f"Cannot increment non-numeric field '{final_field}'")
+            setattr(current, final_field, current_value + value)
+        else:
+            raise ValueError(f"Unsupported operation: {operation}")
+
     async def update_plan_status(
         self,
         plan_id: UUID,

@@ -8,9 +8,11 @@ Architecture:
 """
 import json
 import os
+from typing import Any, Literal
 
 from agents import Runner, function_tool
 from agents.mcp import MCPServerStdio
+from pydantic import BaseModel, Field
 
 # Module-level variable to store the MCP server instance (initialized at startup)
 _mcp_server: MCPServerStdio | None = None
@@ -28,6 +30,27 @@ def _get_database_uri() -> str:
     )
     # Convert asyncpg format to standard postgresql format for postgres-mcp
     return database_url.replace("postgresql+asyncpg://", "postgresql://")
+
+
+class PlanUpdate(BaseModel):
+    """A single update operation to apply to a fitness plan."""
+    
+    class Config:
+        """Pydantic config for strict schema."""
+        extra = "forbid"
+    
+    field: str = Field(
+        ...,
+        description="Field path using dot notation and array indices (e.g., 'duration_weeks', 'workout_plans[0].frequency_per_week')"
+    )
+    value: Any = Field(
+        ...,
+        description="New value to set for the field (can be string, number, boolean, or JSON object/array)"
+    )
+    operation: Literal["set", "append", "increment"] = Field(
+        default="set",
+        description="Operation to perform: 'set' (replace value), 'append' (add to list), 'increment' (add to number)"
+    )
 
 
 async def initialize_mcp_server() -> None:
@@ -229,8 +252,11 @@ Return a concise answer to the user's question with relevant details."""
 
 
 @function_tool
-async def update_fitness_plan(change_description: str) -> str:
-    """Create a new version of the user's fitness plan with modifications.
+async def update_fitness_plan(
+    updates: list[PlanUpdate],
+    change_description: str
+) -> str:
+    """Create a new version of the user's fitness plan with structured modifications.
 
     This tool creates a new plan that is a modified version of the user's
     current active plan. The old plan is marked as 'replaced' and the new
@@ -247,12 +273,43 @@ async def update_fitness_plan(change_description: str) -> str:
     DO NOT use this for completely new plans - use build_fitness_plan for that.
 
     Args:
-        change_description: Natural language description of what to modify
+        updates: List of structured field updates to apply. Each update must have:
+            - field: Field path using dot notation and array indices
+            - value: New value to set
+            - operation: "set" (default), "append" (for lists), "increment" (for numbers)
+            
+            Available field paths:
+            Plan level:
+            - "goal_description" (string)
+            - "duration_weeks" (int)
+            - "target_weight_kg" (string)
+            - "key_principles" (list of strings)
+            
+            Phase level (use phases[index]):
+            - "phases[0].duration_weeks" (int)
+            - "phases[0].objectives" (string in phase_details JSON)
+            
+            Workout plan level (use workout_plans[index]):
+            - "workout_plans[0].frequency_per_week" (int)
+            - "workout_plans[0].progression_strategy" (string)
+            
+            Meal plan level (use meal_plans[index]):
+            - "meal_plans[0].daily_calorie_target" (int)
+            - "meal_plans[0].protein_grams_target" (int)
+            - "meal_plans[0].meals_per_day" (int)
+            
             Examples:
-            - "Add 20 minutes of cardio after each workout"
-            - "Increase protein to 180g per day in all phases"
-            - "Replace barbell squats with goblet squats"
-            - "Change workout frequency to 4 days per week"
+            [
+                {"field": "goal_description", "value": "Build muscle and lose 10 lbs", "operation": "set"},
+                {"field": "duration_weeks", "value": 16, "operation": "set"},
+                {"field": "workout_plans[0].frequency_per_week", "value": 4, "operation": "set"},
+                {"field": "meal_plans[0].daily_calorie_target", "value": 2200, "operation": "set"}
+            ]
+            
+        change_description: Human-readable summary of the changes being made
+            Examples:
+            - "Increased workout frequency to 4 days and raised calories to 2200"
+            - "Extended plan to 16 weeks and adjusted protein target"
 
     Returns:
         JSON string with new plan details and confirmation
@@ -282,26 +339,38 @@ async def update_fitness_plan(change_description: str) -> str:
                 "change_description": change_description
             })
 
-        # Create new version of the plan
-        new_plan = await plan_service.create_plan_version(
+        # Convert Pydantic models to dicts for service layer
+        updates_dict = [u.model_dump() for u in updates]
+
+        # Apply structured updates to create new version
+        new_plan = await plan_service.apply_plan_updates(
             parent_plan_id=active_plan.id,
+            updates=updates_dict,
             version_notes=change_description
         )
 
+        # Format applied updates for response
+        applied_updates = [
+            f"- {u.field} = {u.value}"
+            for u in updates
+        ]
+
         return json.dumps({
             "status": "success",
-            "message": f"Created new plan version (v{new_plan.version})",
+            "message": f"Created new plan version (v{new_plan.version}) with {len(updates)} update(s)",
             "plan_id": str(new_plan.id),
             "parent_plan_id": str(active_plan.id),
             "version": new_plan.version,
-            "changes": change_description,
-            "note": "The new plan has been created with normalized data structure (phases, workouts, meals in separate tables)."
+            "changes_description": change_description,
+            "updates_applied": applied_updates,
+            "note": "The new plan version has been created with your requested modifications."
         }, indent=2)
 
     except Exception as e:
         return json.dumps({
             "error": f"Failed to update fitness plan: {str(e)}",
-            "change_description": change_description
+            "change_description": change_description,
+            "updates": [u.model_dump() for u in updates] if updates else []
         })
 
 
