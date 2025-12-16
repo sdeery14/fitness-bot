@@ -563,12 +563,215 @@ Once Foundational phase completes:
 - **Phase 6 (User Story 4)**: 11 tasks
 - **Phase 7 (User Story 5)**: 8 tasks
 - **Phase 8 (Polish)**: 20 tasks
+- **Phase 9 (User Management API)**: 15 tasks
+- **Phase 10 (AI Evaluation Framework)**: 12 tasks
+- **Phase 11 (Production Deployment)**: 13 tasks
 
-**Total**: 164 tasks
+**Total**: 205 tasks
 
 **MVP Scope**: 84 tasks (Phases 1-3)
 **Full Feature Set**: 144 tasks (Phases 1-7)
-**Production Polish**: 164 tasks (all phases)
+**Production Polish**: 164 tasks (Phases 1-8)
+**Production Ready**: 205 tasks (all phases)
+
+---
+
+## Phase 9: User Management API (Manual Operations)
+
+**Purpose**: Enable users to manually manage plans, schedules, and progress data without AI assistance
+
+**Gap Addressed**: Current implementation relies heavily on AI for all operations. Users need direct CRUD endpoints for manual adjustments, data corrections, and administrative tasks.
+
+- [ ] T165 [P] Implement manual plan creation endpoint in backend/src/api/v1/fitness_plans.py: POST /manual with full plan structure (bypasses AI)
+- [ ] T166 [P] Implement plan update endpoint in backend/src/api/v1/fitness_plans.py: PUT /{plan_id} for direct modifications
+- [ ] T167 [P] Implement plan deletion endpoint in backend/src/api/v1/fitness_plans.py: DELETE /{plan_id} with cascade handling
+- [ ] T168 [P] Implement workout CRUD endpoints in backend/src/api/v1/workouts.py: POST /, PUT /{id}, DELETE /{id}, GET /{id}/exercises
+- [ ] T169 [P] Implement meal CRUD endpoints in backend/src/api/v1/meals.py: POST /, PUT /{id}, DELETE /{id}
+- [ ] T170 [P] Implement schedule adjustment endpoint in backend/src/api/v1/schedules.py: PATCH /entries/{id} to manually reschedule activities
+- [ ] T171 [P] Implement bulk schedule operations in backend/src/api/v1/schedules.py: POST /bulk-update for multiple entry changes
+- [ ] T172 [P] Implement progress data entry endpoints in backend/src/api/v1/progress.py: POST /weight, POST /body-measurements, POST /photos
+- [ ] T173 [P] Implement user preferences update in backend/src/api/v1/users.py: PUT /me/preferences for dietary restrictions, equipment access
+- [ ] T174 Write contract tests for manual management endpoints in backend/tests/contract/test_manual_management.py
+- [ ] T175 Create admin panel components in frontend/src/components/admin/ for manual data management (optional for MVP, useful for support)
+
+**Checkpoint**: Users can manually manage all aspects of their fitness data
+
+---
+
+## Phase 10: AI Evaluation Framework (Quality Assurance)
+
+**Purpose**: Establish systematic evaluation of AI agents using MLflow to measure and improve performance before production deployment
+
+**Gap Addressed**: No formal evaluation of AI agent quality, prompt effectiveness, or tool usage accuracy. Need quantitative metrics to validate readiness.
+
+### MLflow Setup & Infrastructure
+
+- [ ] T176 Install MLflow dependencies in backend/requirements.txt: mlflow, mlflow-skinny for tracking
+- [ ] T177 Configure MLflow in backend/src/config.py with tracking URI, experiment names, artifact storage location
+- [ ] T178 Create MLflow tracking utilities in backend/src/utils/mlflow_utils.py with start_run, log_metrics, log_artifacts helpers
+- [ ] T179 Setup MLflow server in docker/docker-compose.yml with PostgreSQL backend for experiment tracking
+
+### Evaluation Dataset Creation
+
+- [ ] T180 Create evaluation dataset in backend/tests/evaluation/datasets/conversation_eval.json with 20-30 test conversations covering:
+  - Plan creation scenarios (weight loss, muscle gain, endurance)
+  - Plan modification requests (add cardio, change meals, adjust intensity)
+  - Schedule adjustments (disruptions, rescheduling)
+  - Progress tracking questions
+  - Edge cases (conflicting requirements, unclear goals)
+- [ ] T181 Create ground truth annotations in backend/tests/evaluation/datasets/ground_truth.json with expected:
+  - Tool calls (which functions should be invoked)
+  - Response quality ratings (1-5 scale)
+  - Key information extraction (goals, constraints, preferences)
+
+### Evaluation Metrics & Pipeline
+
+- [ ] T182 Implement evaluation metrics in backend/tests/evaluation/metrics.py:
+  - Tool selection accuracy (% correct function calls)
+  - Response relevance (semantic similarity to ground truth)
+  - Conversation efficiency (turns to completion)
+  - User satisfaction proxies (confirmation rate, follow-up questions)
+- [ ] T183 Create evaluation runner in backend/tests/evaluation/run_evaluation.py to:
+  - Load test dataset
+  - Execute conversations with each agent
+  - Calculate metrics
+  - Log results to MLflow
+  - Generate comparison reports
+- [ ] T184 Implement agent comparison utilities in backend/tests/evaluation/compare_agents.py to:
+  - Run A/B tests between prompt variations
+  - Compare different model configurations (GPT-4 vs GPT-4-turbo)
+  - Track performance over time
+- [ ] T185 Create evaluation report generator in backend/tests/evaluation/generate_report.py producing:
+  - Per-agent performance summary
+  - Metric trends over evaluation runs
+  - Failure case analysis
+  - Recommendations for prompt improvements
+- [ ] T186 Document evaluation process in docs/ai-evaluation.md with:
+  - How to run evaluations
+  - Metric interpretation guide
+  - Acceptance criteria for production readiness
+  - Iteration workflow
+
+### Agent Optimization Workflow
+
+- [ ] T187 Run baseline evaluation for all agents and log results to MLflow
+- [ ] T188 Iterate on agent prompts based on evaluation results (target: 85%+ tool accuracy, 4+ response quality)
+
+**Checkpoint**: AI agents evaluated, optimized, and validated for production quality
+
+---
+
+## Phase 11: Production Deployment (DevOps & Operations)
+
+**Purpose**: Prepare application for production deployment with monitoring, security, and operational readiness
+
+**Gap Addressed**: Current setup is development-focused. Need production configurations, CI/CD, monitoring, and operational procedures.
+
+### CI/CD Pipeline
+
+- [ ] T189 Create GitHub Actions workflow in .github/workflows/backend-ci.yml:
+  - Lint with Ruff/Black
+  - Type check with mypy
+  - Run pytest with coverage report
+  - Build Docker image
+  - Push to container registry
+- [ ] T190 Create GitHub Actions workflow in .github/workflows/frontend-ci.yml:
+  - Lint with ESLint/Prettier
+  - Type check with tsc
+  - Run Vitest unit tests
+  - Run Playwright E2E tests
+  - Build Next.js production bundle
+  - Push to container registry
+- [ ] T191 Create deployment workflow in .github/workflows/deploy.yml:
+  - Deploy to staging environment (automatic on main branch)
+  - Run smoke tests
+  - Deploy to production (manual approval required)
+
+### Production Configuration
+
+- [ ] T192 Create production environment files:
+  - backend/.env.production with secure defaults
+  - frontend/.env.production with API endpoints
+  - docker/docker-compose.prod.yml with resource limits, health checks
+- [ ] T193 Implement environment-specific configs in backend/src/config.py:
+  - Production database connection pooling (10-50 connections)
+  - Redis connection limits
+  - CORS allowed origins
+  - Log levels (INFO in prod, DEBUG in dev)
+  - Rate limiting (stricter in production)
+- [ ] T194 Configure production logging in backend/src/middleware/logging_middleware.py:
+  - Structured JSON logging
+  - Request tracing with correlation IDs
+  - Performance metrics
+  - Error alerting thresholds
+
+### Monitoring & Observability
+
+- [ ] T195 Setup application monitoring in docker/docker-compose.prod.yml:
+  - Prometheus for metrics collection
+  - Grafana for dashboards
+  - Alert manager for notifications
+- [ ] T196 Create monitoring dashboards in docs/monitoring/:
+  - API response time percentiles (p50, p95, p99)
+  - Error rate by endpoint
+  - Database query performance
+  - AI agent response times
+  - Redis cache hit rates
+  - User activity metrics (plans created, schedule completions)
+- [ ] T197 Implement health check endpoints in backend/src/api/v1/health.py:
+  - GET /health (basic liveness)
+  - GET /health/ready (readiness with dependency checks)
+  - GET /health/metrics (Prometheus metrics endpoint)
+
+### Security & Compliance
+
+- [ ] T198 Run security audit with bandit/safety for Python dependencies
+- [ ] T199 Configure secure headers in backend/src/main.py:
+  - HSTS (Strict-Transport-Security)
+  - CSP (Content-Security-Policy)
+  - X-Frame-Options
+  - X-Content-Type-Options
+- [ ] T200 Setup secrets management:
+  - Use environment variables for sensitive config
+  - Integrate with cloud secret managers (AWS Secrets Manager, GCP Secret Manager)
+  - Rotate API keys and JWT secrets
+
+### Database Operations
+
+- [ ] T201 Create database backup strategy in docs/database-backup.md:
+  - Automated daily backups
+  - Point-in-time recovery capability
+  - Backup retention policy (30 days)
+  - Restore procedures
+
+**Checkpoint**: Application deployed to production with full operational support
+
+---
+
+## Updated Dependencies & Execution Order
+
+### Phase Dependencies (Updated)
+
+- **Phase 9 (User Management)**: Depends on Phase 2 (Foundational) - Can run in parallel with other phases
+- **Phase 10 (AI Evaluation)**: Depends on Phase 3 (US1) completion - Needs working agents to evaluate
+- **Phase 11 (Deployment)**: Depends on Phase 8 (Polish) AND Phase 10 (Evaluation) - Final step before production
+
+### Execution Flow (Updated)
+
+```
+Phases 1-8: Core Implementation ✅ (COMPLETE)
+    ↓
+    ├──→ Phase 9: User Management API (parallel track)
+    │
+    └──→ Phase 10: AI Evaluation Framework
+             ↓
+             Phase 11: Production Deployment
+```
+
+**Recommended Sequence**:
+1. **Week 1**: Test & fix fitness coach agent, then complete Phase 9 (User Management)
+2. **Week 2**: Phase 10 (AI Evaluation) - setup, run baseline, iterate on agents
+3. **Week 3**: Phase 11 (Deployment) - CI/CD, monitoring, production launch
 
 ---
 
