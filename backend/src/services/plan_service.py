@@ -283,8 +283,49 @@ class PlanService:
             success_metrics=parent_plan.success_metrics,
             important_notes=parent_plan.important_notes,
         )
-
-        # Apply updates to the new plan
+        
+        # Add to session to get an ID
+        self.db.add(new_plan)
+        await self.db.flush()
+        
+        # Copy relationships from parent to new plan
+        # Deep copy workout plans
+        from src.models.workout import WorkoutPlan
+        for wp in parent_plan.workout_plans:
+            new_wp = WorkoutPlan(
+                fitness_plan_id=new_plan.id,
+                frequency_per_week=wp.frequency_per_week,
+                progression_strategy=wp.progression_strategy,
+                workout_plan_details=wp.workout_plan_details,
+                phase_progression_notes=wp.phase_progression_notes,
+                equipment_used=wp.equipment_used,
+            )
+            self.db.add(new_wp)
+            new_plan.workout_plans.append(new_wp)
+        
+        # Deep copy meal plans
+        from src.models.meal import MealPlan
+        for mp in parent_plan.meal_plans:
+            new_mp = MealPlan(
+                fitness_plan_id=new_plan.id,
+                daily_calorie_target=mp.daily_calorie_target,
+                macronutrient_distribution=mp.macronutrient_distribution,
+                protein_grams_target=mp.protein_grams_target,
+                carbs_grams_target=mp.carbs_grams_target,
+                fats_grams_target=mp.fats_grams_target,
+                meals_per_day=mp.meals_per_day,
+                dietary_approach=mp.dietary_approach,
+                macro_strategy=mp.macro_strategy,
+                meal_timing=mp.meal_timing,
+                hydration_guidance=mp.hydration_guidance,
+                phase_nutrition_notes=mp.phase_nutrition_notes,
+            )
+            self.db.add(new_mp)
+            new_plan.meal_plans.append(new_mp)
+        
+        await self.db.flush()
+        
+        # Apply updates to the new plan (now with relationships loaded)
         for update in updates:
             field_path = update.get("field", "")
             value = update.get("value")
