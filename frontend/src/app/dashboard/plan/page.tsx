@@ -755,61 +755,136 @@ export default function PlanPage() {
                           {/* Phase-specific workout details */}
                           {selectedPlan.phases && selectedPlan.phases.length > 0 && (
                             <div>
-                              <h5 className="font-medium text-gray-900 mb-3">Phase Details</h5>
-                              <div className="space-y-3">
+                              <h5 className="font-medium text-gray-900 mb-3">Training & Nutrition Phases</h5>
+                              <div className="space-y-4">
                                 {selectedPlan.phases.map((phase: any, idx: number) => (
-                                  <details key={idx} className="group">
-                                    <summary className="p-3 bg-gray-50 rounded-lg border border-gray-200 cursor-pointer hover:bg-gray-100 transition-colors">
-                                      <div className="flex items-center justify-between">
-                                        <div>
-                                          <p className="font-medium text-gray-900 text-sm">
-                                            Phase {phase.phase_number}: {phase.name}
+                                  <details key={idx} className="group" open={idx === 0}>
+                                    <summary className="p-4 bg-gradient-to-r from-blue-50 to-green-50 rounded-lg border-2 border-gray-200 cursor-pointer hover:border-gray-300 transition-all">
+                                      <div className="flex items-start justify-between">
+                                        <div className="flex-1">
+                                          <div className="flex items-center gap-2 mb-2">
+                                            <Badge className="bg-gradient-to-r from-blue-600 to-green-600">
+                                              Phase {phase.phase_number}
+                                            </Badge>
+                                            <h6 className="font-semibold text-gray-900">{phase.name}</h6>
+                                          </div>
+                                          <p className="text-sm text-gray-700 mb-2">
+                                            {formatDate(phase.start_date)} → {formatDate(phase.end_date)} 
+                                            <span className="text-gray-500 ml-2">({phase.duration_weeks} weeks)</span>
                                           </p>
-                                          <p className="text-xs text-gray-600">
-                                            {phase.duration_weeks} weeks • {phase.objectives?.join(', ')}
-                                          </p>
+                                          {phase.objectives && phase.objectives.length > 0 && (
+                                            <div className="flex flex-wrap gap-1 mt-2">
+                                              {phase.objectives.map((obj: string, objIdx: number) => (
+                                                <Badge key={objIdx} variant="outline" className="text-xs">
+                                                  {obj}
+                                                </Badge>
+                                              ))}
+                                            </div>
+                                          )}
                                         </div>
-                                        <CheckCircle2 className="h-4 w-4 text-gray-400 group-open:rotate-90 transition-transform" />
+                                        <CheckCircle2 className="h-5 w-5 text-gray-400 group-open:rotate-90 transition-transform flex-shrink-0 ml-4" />
                                       </div>
                                     </summary>
-                                    <div className="mt-2 p-4 bg-white rounded-lg border border-gray-200 space-y-3">
-                                      {phase.workout_details && (
-                                        <>
-                                          {phase.workout_details.intensity_guidance && (
-                                            <div>
-                                              <p className="text-xs font-semibold text-gray-700 uppercase mb-1">Intensity</p>
-                                              <p className="text-sm text-gray-900">{phase.workout_details.intensity_guidance}</p>
-                                            </div>
-                                          )}
-                                          {phase.workout_details.volume_notes && (
-                                            <div>
-                                              <p className="text-xs font-semibold text-gray-700 uppercase mb-1">Volume</p>
-                                              <p className="text-sm text-gray-900">{phase.workout_details.volume_notes}</p>
-                                            </div>
-                                          )}
-                                          {phase.workout_details.progression_notes && (
-                                            <div>
-                                              <p className="text-xs font-semibold text-gray-700 uppercase mb-1">Progression</p>
-                                              <p className="text-sm text-gray-900">{phase.workout_details.progression_notes}</p>
-                                            </div>
-                                          )}
-                                          {phase.workout_details.workout_cycle && phase.workout_details.workout_cycle.length > 0 && (
-                                            <div>
-                                              <p className="text-xs font-semibold text-gray-700 uppercase mb-2">Training Cycle</p>
-                                              <div className="space-y-2">
-                                                {phase.workout_details.workout_cycle.map((item: any, cycleIdx: number) => (
-                                                  <div key={cycleIdx} className="text-sm">
-                                                    <span className="font-medium text-gray-900">Day {cycleIdx + 1}:</span>{' '}
-                                                    <span className="text-gray-700">
-                                                      {item.type === 'workout' ? `Workout ${item.workout_index + 1}` : 'Rest'}
-                                                    </span>
-                                                  </div>
-                                                ))}
+                                    
+                                    <div className="mt-3 grid grid-cols-1 lg:grid-cols-2 gap-4">
+                                      {/* Training Details Column */}
+                                      <div className="p-4 bg-white rounded-lg border border-gray-200 space-y-4">
+                                        <h6 className="font-semibold text-blue-900 flex items-center gap-2 pb-2 border-b">
+                                          <TrendingUp className="h-4 w-4" />
+                                          Training Plan
+                                        </h6>
+                                        {phase.workout_details && (
+                                          <>
+                                            {phase.workout_details.intensity_guidance && (
+                                              <div className="p-3 bg-blue-50 rounded-lg">
+                                                <p className="text-xs font-semibold text-blue-700 uppercase mb-1">Intensity</p>
+                                                <p className="text-sm text-blue-900">{phase.workout_details.intensity_guidance}</p>
+                                              </div>
+                                            )}
+                                            {phase.workout_details.volume_notes && (
+                                              <div className="p-3 bg-blue-50 rounded-lg">
+                                                <p className="text-xs font-semibold text-blue-700 uppercase mb-1">Volume</p>
+                                                <p className="text-sm text-blue-900">{phase.workout_details.volume_notes}</p>
+                                              </div>
+                                            )}
+                                            {phase.workout_details.progression_notes && (
+                                              <div className="p-3 bg-blue-50 rounded-lg">
+                                                <p className="text-xs font-semibold text-blue-700 uppercase mb-1">Progression</p>
+                                                <p className="text-sm text-blue-900">{phase.workout_details.progression_notes}</p>
+                                              </div>
+                                            )}
+                                            {phase.workout_details.workout_cycle && phase.workout_details.workout_cycle.length > 0 && (
+                                              <div>
+                                                <p className="text-xs font-semibold text-gray-700 uppercase mb-2">Weekly Training Cycle</p>
+                                                <div className="grid grid-cols-7 gap-1">
+                                                  {phase.workout_details.workout_cycle.map((item: any, cycleIdx: number) => (
+                                                    <div 
+                                                      key={cycleIdx} 
+                                                      className={`p-2 rounded text-center text-xs ${
+                                                        item.type === 'workout' 
+                                                          ? 'bg-blue-100 text-blue-900 font-medium' 
+                                                          : 'bg-gray-100 text-gray-600'
+                                                      }`}
+                                                      title={item.type === 'workout' ? `Workout ${item.workout_index + 1}` : 'Rest Day'}
+                                                    >
+                                                      <div className="font-semibold mb-0.5">D{cycleIdx + 1}</div>
+                                                      <div className="text-[10px] leading-tight">
+                                                        {item.type === 'workout' ? `W${item.workout_index + 1}` : 'Rest'}
+                                                      </div>
+                                                    </div>
+                                                  ))}
+                                                </div>
+                                              </div>
+                                            )}
+                                          </>
+                                        )}
+                                      </div>
+
+                                      {/* Nutrition Details Column */}
+                                      <div className="p-4 bg-white rounded-lg border border-gray-200 space-y-4">
+                                        <h6 className="font-semibold text-green-900 flex items-center gap-2 pb-2 border-b">
+                                          <Target className="h-4 w-4" />
+                                          Nutrition Plan
+                                        </h6>
+                                        {phase.meal_details && (
+                                          <>
+                                            <div className="grid grid-cols-2 gap-3">
+                                              <div className="p-3 bg-green-50 rounded-lg">
+                                                <p className="text-xs font-semibold text-green-700 uppercase mb-1">Daily Calories</p>
+                                                <p className="text-lg font-bold text-green-900">{phase.meal_details.daily_calorie_target}</p>
+                                                <p className="text-xs text-green-600">kcal/day</p>
+                                              </div>
+                                              <div className="p-3 bg-green-50 rounded-lg">
+                                                <p className="text-xs font-semibold text-green-700 uppercase mb-1">Macro Split</p>
+                                                <p className="text-sm font-medium text-green-900">{phase.meal_details.macro_split}</p>
                                               </div>
                                             </div>
-                                          )}
-                                        </>
-                                      )}
+                                            {phase.meal_details.phase_nutrition_focus && (
+                                              <div className="p-3 bg-green-50 rounded-lg">
+                                                <p className="text-xs font-semibold text-green-700 uppercase mb-1">Nutrition Focus</p>
+                                                <p className="text-sm text-green-900">{phase.meal_details.phase_nutrition_focus}</p>
+                                              </div>
+                                            )}
+                                            {phase.meal_details.sample_days && phase.meal_details.sample_days.length > 0 && (
+                                              <div className="text-sm text-gray-600">
+                                                <span className="font-medium text-gray-900">{phase.meal_details.sample_days.length}</span> sample meal plan(s) available
+                                              </div>
+                                            )}
+                                            {phase.meal_details.grocery_list && phase.meal_details.grocery_list.length > 0 && (
+                                              <div className="flex items-center gap-2 text-sm text-gray-600">
+                                                <ShoppingCart className="h-4 w-4 text-green-600" />
+                                                <span><span className="font-medium text-gray-900">{phase.meal_details.grocery_list.length}</span> items on shopping list</span>
+                                              </div>
+                                            )}
+                                            {phase.meal_details.meal_prep_sessions && phase.meal_details.meal_prep_sessions.length > 0 && (
+                                              <div className="flex items-center gap-2 text-sm text-gray-600">
+                                                <ChefHat className="h-4 w-4 text-purple-600" />
+                                                <span><span className="font-medium text-gray-900">{phase.meal_details.meal_prep_sessions.length}</span> prep session(s) planned</span>
+                                              </div>
+                                            )}
+                                          </>
+                                        )}
+                                      </div>
                                     </div>
                                   </details>
                                 ))}
