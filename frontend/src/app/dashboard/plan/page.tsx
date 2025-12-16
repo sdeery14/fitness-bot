@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { PhaseTimeline } from "@/components/fitness/phase-timeline";
 import { MilestoneCelebration } from "@/components/fitness/milestone-celebration";
 import {
   ArrowLeft,
@@ -749,32 +748,48 @@ export default function PlanPage() {
                           <Calendar className="h-5 w-5 text-purple-600" />
                           Phase Details
                         </h4>
+
                         <div className="space-y-4">
                           {selectedPlan.phases && selectedPlan.phases.length > 0 && (
                             <div>
                               <div className="space-y-4">
-                                {selectedPlan.phases.map((phase: any, idx: number) => (
+                                {selectedPlan.phases.map((phase: any, idx: number) => {
+                                  const isCurrentPhase = phaseStatus?.current_phase?.phase_number === phase.phase_number;
+                                  return (
                                   <details key={idx} className="group" open={idx === 0}>
-                                    <summary className="p-4 bg-gradient-to-r from-blue-50 to-green-50 rounded-lg border-2 border-gray-200 cursor-pointer hover:border-gray-300 transition-all">
+                                    <summary className={`p-4 rounded-lg border-2 cursor-pointer hover:border-gray-400 transition-all ${
+                                      isCurrentPhase 
+                                        ? 'bg-gradient-to-r from-blue-100 to-green-100 border-blue-400' 
+                                        : 'bg-gradient-to-r from-blue-50 to-green-50 border-gray-200 hover:border-gray-300'
+                                    }`}>
                                       <div className="flex items-start justify-between">
                                         <div className="flex-1">
                                           <div className="flex items-center gap-2 mb-2">
-                                            <Badge className="bg-gradient-to-r from-blue-600 to-green-600">
+                                            <Badge className={isCurrentPhase ? "bg-gradient-to-r from-blue-700 to-green-700" : "bg-gradient-to-r from-blue-600 to-green-600"}>
                                               Phase {phase.phase_number}
                                             </Badge>
                                             <h6 className="font-semibold text-gray-900">{phase.name}</h6>
+                                            {isCurrentPhase && (
+                                              <Badge variant="outline" className="bg-white border-blue-600 text-blue-700">
+                                                Current
+                                              </Badge>
+                                            )}
                                           </div>
                                           <p className="text-sm text-gray-700 mb-2">
                                             {formatDate(phase.start_date)} → {formatDate(phase.end_date)} 
                                             <span className="text-gray-500 ml-2">({phase.duration_weeks} weeks)</span>
                                           </p>
                                           {phase.objectives && phase.objectives.length > 0 && (
-                                            <div className="flex flex-wrap gap-1 mt-2">
-                                              {phase.objectives.map((obj: string, objIdx: number) => (
-                                                <Badge key={objIdx} variant="outline" className="text-xs">
-                                                  {obj}
-                                                </Badge>
-                                              ))}
+                                            <div className="mt-3">
+                                              <p className="text-xs font-semibold text-gray-600 uppercase mb-2">Phase Objectives:</p>
+                                              <ul className="space-y-1">
+                                                {phase.objectives.map((obj: string, objIdx: number) => (
+                                                  <li key={objIdx} className="text-sm text-gray-700 flex items-start gap-2">
+                                                    <TrendingUp className="h-4 w-4 flex-shrink-0 mt-0.5 text-purple-600" />
+                                                    <span>{obj}</span>
+                                                  </li>
+                                                ))}
+                                              </ul>
                                             </div>
                                           )}
                                         </div>
@@ -883,7 +898,8 @@ export default function PlanPage() {
                                       </div>
                                     </div>
                                   </details>
-                                ))}
+                                  );
+                                })}
                               </div>
                             </div>
                           )}
@@ -1015,24 +1031,6 @@ export default function PlanPage() {
                     </div>
                   </CardContent>
                 </Card>
-
-                {/* Phase Timeline */}
-                {phases.length > 0 && (
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Phase Timeline</CardTitle>
-                      <CardDescription>
-                        Track your progress through each phase of your fitness journey
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <PhaseTimeline
-                        phases={phases}
-                        currentPhaseNumber={phaseStatus?.current_phase?.phase_number || 1}
-                      />
-                    </CardContent>
-                  </Card>
-                )}
               </div>
             )}
           </div>
