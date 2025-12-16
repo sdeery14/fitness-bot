@@ -349,6 +349,20 @@ async def update_fitness_plan(
             version_notes=change_description
         )
 
+        # Insert a plan message into the conversation for rich display
+        from src.ai.tools.plan_tools import _conversation_id_context
+        from src.services.conversation_service import ConversationService
+        
+        conversation_id = _conversation_id_context.get()
+        if conversation_id:
+            conv_service = ConversationService(db_session)
+            await conv_service.add_message(
+                conversation_id=conversation_id,
+                sender_type="plan",
+                message_content=f"Updated Fitness Plan (v{new_plan.version}): {change_description}",
+                plan_id=new_plan.id,
+            )
+
         # Format applied updates for response
         applied_updates = [
             f"- {u.field} = {u.value}"

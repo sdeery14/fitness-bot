@@ -445,12 +445,59 @@ class PlanService:
 
         # Mark parent plan as replaced
         parent_plan.status = "replaced"
+        
+        # Mark any existing schedule for parent plan as inactive
+        from src.models.schedule import Schedule
+        existing_schedule_stmt = select(Schedule).where(Schedule.fitness_plan_id == parent_plan_id)
+        existing_schedule_result = await self.db.execute(existing_schedule_stmt)
+        existing_schedule = existing_schedule_result.scalar_one_or_none()
+        if existing_schedule:
+            existing_schedule.is_active = False
 
         # Save both plans
         self.db.add(new_plan)
         await self.db.commit()
-        await self.db.refresh(new_plan)
         await self.db.refresh(parent_plan)
+
+        # Reload the updated plan with all relationships to ensure fresh data
+        stmt = (
+            select(FitnessPlan)
+            .where(FitnessPlan.id == new_plan.id)
+            .options(
+                selectinload(FitnessPlan.phases).selectinload(Phase.workouts).selectinload(Workout.exercises),
+                selectinload(FitnessPlan.phases).selectinload(Phase.meals),
+                selectinload(FitnessPlan.workout_plans).selectinload(WorkoutPlan.workouts).selectinload(Workout.exercises),
+                selectinload(FitnessPlan.meal_plans),
+            )
+        )
+        result = await self.db.execute(stmt)
+        new_plan = result.scalar_one()
+
+        # Automatically regenerate schedule for the updated plan
+        # This ensures the schedule reflects the latest plan changes
+        from src.services.schedule_service import ScheduleService
+        schedule_service = ScheduleService(self.db)
+
+        try:
+            # Convert datetime to date for schedule service
+            schedule_start_date = new_plan.start_date.date() if isinstance(new_plan.start_date, datetime) else new_plan.start_date
+            print(f"DEBUG: Regenerating schedule for updated plan {new_plan.id}")
+            print(f"DEBUG: new_plan.start_date type: {type(new_plan.start_date)}, value: {new_plan.start_date}")
+            print(f"DEBUG: schedule_start_date type: {type(schedule_start_date)}, value: {schedule_start_date}")
+            
+            # Create new schedule for the updated plan
+            await schedule_service.create_schedule(
+                user_id=new_plan.user_id,
+                fitness_plan_id=new_plan.id,
+                start_date=schedule_start_date,
+                schedule_preferences={},  # Use default preferences for plan updates
+            )
+            print(f"DEBUG: Schedule regenerated successfully for updated plan {new_plan.id}")
+        except Exception as schedule_error:
+            # Log the error but don't fail the plan update operation
+            import traceback
+            print(f"Warning: Failed to regenerate schedule for updated plan {new_plan.id}: {schedule_error}")
+            print(f"DEBUG: Full traceback:\n{traceback.format_exc()}")
 
         return new_plan
 
