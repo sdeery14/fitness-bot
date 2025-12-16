@@ -291,6 +291,7 @@ class PlanService:
         # Copy relationships from parent to new plan
         # Deep copy workout plans
         from src.models.workout import WorkoutPlan
+        new_workout_plans = []
         for wp in parent_plan.workout_plans:
             new_wp = WorkoutPlan(
                 fitness_plan_id=new_plan.id,
@@ -301,10 +302,11 @@ class PlanService:
                 equipment_used=wp.equipment_used,
             )
             self.db.add(new_wp)
-            new_plan.workout_plans.append(new_wp)
+            new_workout_plans.append(new_wp)
         
         # Deep copy meal plans
         from src.models.meal import MealPlan
+        new_meal_plans = []
         for mp in parent_plan.meal_plans:
             new_mp = MealPlan(
                 fitness_plan_id=new_plan.id,
@@ -321,9 +323,12 @@ class PlanService:
                 phase_nutrition_notes=mp.phase_nutrition_notes,
             )
             self.db.add(new_mp)
-            new_plan.meal_plans.append(new_mp)
+            new_meal_plans.append(new_mp)
         
         await self.db.flush()
+        
+        # Reload the plan with relationships to avoid lazy loading issues
+        await self.db.refresh(new_plan, ["workout_plans", "meal_plans"])
         
         # Apply updates to the new plan (now with relationships loaded)
         for update in updates:
