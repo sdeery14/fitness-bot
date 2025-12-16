@@ -61,11 +61,89 @@ You have THREE powerful tools to help users:
      * updates: List of field updates with exact paths and values
      * change_description: Human-readable summary of changes
    
-   Available update fields:
-   - Plan level: "goal_description", "duration_weeks", "target_weight_kg", "key_principles"
-   - Phase level: "phases[0].duration_weeks" (replace 0 with phase index)
-   - Workout plan: "workout_plans[0].frequency_per_week", "workout_plans[0].progression_strategy"
-   - Meal plan: "meal_plans[0].daily_calorie_target", "meal_plans[0].protein_grams_target"
+   DATA STRUCTURE for update_fitness_plan field paths:
+   
+   FitnessPlan (root)
+   ├── goal_description (str)
+   ├── duration_weeks (int)
+   ├── target_weight_kg (float, nullable)
+   ├── key_principles (list[str])
+   │
+   ├── phases[N] (list of Phase objects)
+   │   ├── name (str)
+   │   ├── phase_number (int)
+   │   ├── duration_weeks (int)
+   │   ├── objectives (list[str])
+   │   ├── start_date (str, YYYY-MM-DD)
+   │   ├── end_date (str, YYYY-MM-DD)
+   │   │
+   │   ├── workouts[M] (list of Workout objects - exercises for this phase)
+   │   │   ├── name (str) - e.g., "Day 1: Full Body A"
+   │   │   ├── workout_type (str) - "strength", "cardio", "hybrid"
+   │   │   ├── intensity_level (str) - "low", "moderate", "high"
+   │   │   ├── duration_minutes (int)
+   │   │   ├── warmup (str)
+   │   │   ├── cooldown (str)
+   │   │   ├── notes (str, nullable)
+   │   │   │
+   │   │   └── exercises[P] (list of Exercise objects)
+   │   │       ├── exercise_order (int)
+   │   │       ├── name (str) - e.g., "Barbell Squat"
+   │   │       ├── exercise_type (str) - "compound", "isolation", "cardio", "core"
+   │   │       ├── target_muscle_groups (list[str])
+   │   │       ├── equipment_required (list[str])
+   │   │       ├── sets (int, nullable)
+   │   │       ├── reps (str, nullable) - e.g., "8-12", "AMRAP"
+   │   │       ├── duration_seconds (int, nullable) - for timed exercises
+   │   │       ├── rest_seconds (int)
+   │   │       ├── tempo (str, nullable) - e.g., "3-1-1-0"
+   │   │       ├── rpe_target (int, nullable) - 1-10 scale
+   │   │       ├── instructions (str) - detailed how-to
+   │   │       └── form_cues (list[str])
+   │   │
+   │   └── meals[Q] (list of Meal objects - nutrition for this phase)
+   │       ├── name (str) - e.g., "Breakfast"
+   │       ├── meal_type (str) - "breakfast", "lunch", "dinner", "snack"
+   │       ├── day_of_week (str, nullable) - "Monday", etc.
+   │       ├── calories (int)
+   │       ├── protein_grams (int)
+   │       ├── carbs_grams (int)
+   │       ├── fats_grams (int)
+   │       └── meal_details (JSON) - foods list, prep notes
+   │
+   ├── workout_plans[0] (list, usually 1 item - high-level workout metadata)
+   │   ├── frequency_per_week (int) - 3, 4, 5, etc.
+   │   ├── program_type (str, max 100 chars) - "Full Body", "Upper/Lower", "Push/Pull/Legs"
+   │   ├── progression_strategy (str) - "Linear progression", "DUP"
+   │   ├── training_principles (list[str]) - ["Progressive overload", ...]
+   │   ├── phase_progression_notes (str)
+   │   ├── equipment_used (list[str])
+   │   │
+   │   └── workouts[M] (same Workout objects as phases[N].workouts[M] above)
+   │       └── exercises[P] (same Exercise objects)
+   │
+   └── meal_plans[0] (list, usually 1 item - high-level nutrition metadata)
+       ├── daily_calorie_target (int)
+       ├── protein_grams_target (int)
+       ├── carbs_grams_target (int)
+       ├── fats_grams_target (int)
+       └── dietary_approach (str)
+   
+   FIELD PATH EXAMPLES:
+   - Plan: "goal_description", "duration_weeks", "target_weight_kg"
+   - Phase: "phases[0].name", "phases[1].duration_weeks", "phases[0].objectives"
+   - Phase Workout/Exercise: "phases[0].workouts[2].exercises[0].name"
+   - Phase Meal: "phases[1].meals[3].calories"
+   - Workout Plan Metadata: "workout_plans[0].frequency_per_week", "workout_plans[0].program_type"
+   - Workout via WorkoutPlan: "workout_plans[0].workouts[1].exercises[0].sets"
+   - Meal Plan Metadata: "meal_plans[0].daily_calorie_target"
+   
+   IMPORTANT NOTES:
+   - program_type is SHORT (max 100 chars): "Full Body", "Upper/Lower", NOT exercise descriptions
+   - For exercise changes, use phases[N].workouts[M].exercises[P] path
+   - Workouts exist in BOTH phases[].workouts[] AND workout_plans[].workouts[] (same data)
+   - Most updates use phases[] path for phase-specific changes
+   - Use workout_plans[] path for plan-level workout metadata changes
    
    Each update needs: {"field": "path.to.field", "value": new_value, "operation": "set"}
    

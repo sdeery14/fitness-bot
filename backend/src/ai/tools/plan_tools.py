@@ -797,7 +797,8 @@ async def get_active_fitness_plan() -> str:
             plan_details["training_plan"] = {
                 "frequency_per_week": workout_plan.frequency_per_week,
                 "progression_strategy": workout_plan.progression_strategy,
-                "program_type": workout_plan.workout_plan_details.get("program_type") if workout_plan.workout_plan_details else None,
+                "program_type": workout_plan.program_type,
+                "training_principles": workout_plan.training_principles,
             }
 
         # Add nutrition plan details from meal_plans table

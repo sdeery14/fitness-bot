@@ -249,13 +249,15 @@ class PlanService:
         from src.models.meal import Meal
 
         # Load parent plan with all relationships
+        from src.models.workout import WorkoutPlan
+        
         stmt = (
             select(FitnessPlan)
             .where(FitnessPlan.id == parent_plan_id)
             .options(
                 selectinload(FitnessPlan.phases).selectinload(Phase.workouts).selectinload(Workout.exercises),
                 selectinload(FitnessPlan.phases).selectinload(Phase.meals),
-                selectinload(FitnessPlan.workout_plans),
+                selectinload(FitnessPlan.workout_plans).selectinload(WorkoutPlan.workouts).selectinload(Workout.exercises),
                 selectinload(FitnessPlan.meal_plans),
             )
         )
@@ -297,7 +299,8 @@ class PlanService:
                 fitness_plan_id=new_plan.id,
                 frequency_per_week=wp.frequency_per_week,
                 progression_strategy=wp.progression_strategy,
-                workout_plan_details=wp.workout_plan_details,
+                program_type=wp.program_type,
+                training_principles=wp.training_principles,
                 phase_progression_notes=wp.phase_progression_notes,
                 equipment_used=wp.equipment_used,
             )
@@ -325,12 +328,107 @@ class PlanService:
             self.db.add(new_mp)
             new_meal_plans.append(new_mp)
         
+        # Flush to get IDs for workout_plans and meal_plans
         await self.db.flush()
         
-        # Reload the plan with relationships to avoid lazy loading issues
-        await self.db.refresh(new_plan, ["workout_plans", "meal_plans"])
+        # Deep copy phases with all their workouts, meals, and exercises
+        from src.models.fitness_plan import Phase
+        from src.models.workout import Workout, Exercise
+        from src.models.meal import Meal
         
-        # Apply updates to the new plan (now with relationships loaded)
+        new_phases = []
+        phase_id_mapping = {}  # Map old phase IDs to new phase IDs
+        workout_plan_id_mapping = {}  # Map old workout_plan IDs to new ones
+        
+        # Create mapping for workout_plans (old ID -> new ID)
+        for old_wp, new_wp in zip(parent_plan.workout_plans, new_workout_plans):
+            workout_plan_id_mapping[old_wp.id] = new_wp.id
+        
+        for phase in parent_plan.phases:
+            # Create new phase
+            new_phase = Phase(
+                fitness_plan_id=new_plan.id,
+                name=phase.name,
+                phase_number=phase.phase_number,
+                objectives=phase.objectives,
+                start_date=phase.start_date,
+                end_date=phase.end_date,
+                phase_details=phase.phase_details,
+            )
+            self.db.add(new_phase)
+            await self.db.flush()  # Get new phase ID
+            
+            new_phases.append(new_phase)
+            phase_id_mapping[phase.id] = new_phase.id
+            
+            # Deep copy workouts for this phase
+            for workout in phase.workouts:
+                new_workout = Workout(
+                    workout_plan_id=workout_plan_id_mapping.get(workout.workout_plan_id),
+                    phase_id=new_phase.id,
+                    name=workout.name,
+                    workout_type=workout.workout_type,
+                    duration_minutes=workout.duration_minutes,
+                    intensity_level=workout.intensity_level,
+                    workout_structure=workout.workout_structure,
+                )
+                self.db.add(new_workout)
+                await self.db.flush()  # Get new workout ID
+                
+                # Deep copy exercises for this workout
+                for exercise in workout.exercises:
+                    new_exercise = Exercise(
+                        workout_id=new_workout.id,
+                        exercise_order=exercise.exercise_order,
+                        name=exercise.name,
+                        exercise_type=exercise.exercise_type,
+                        target_muscle_groups=exercise.target_muscle_groups,
+                        equipment_required=exercise.equipment_required,
+                        sets=exercise.sets,
+                        reps=exercise.reps,
+                        duration_seconds=exercise.duration_seconds,
+                        rest_seconds=exercise.rest_seconds,
+                        tempo=exercise.tempo,
+                        rpe_target=exercise.rpe_target,
+                        instructions=exercise.instructions,
+                        form_cues=exercise.form_cues,
+                    )
+                    self.db.add(new_exercise)
+            
+            # Deep copy meals for this phase
+            for meal in phase.meals:
+                new_meal = Meal(
+                    meal_plan_id=new_meal_plans[0].id if new_meal_plans else None,  # Associate with first meal plan
+                    phase_id=new_phase.id,
+                    name=meal.name,
+                    meal_type=meal.meal_type,
+                    day_of_week=meal.day_of_week,
+                    calories=meal.calories,
+                    protein_grams=meal.protein_grams,
+                    carbs_grams=meal.carbs_grams,
+                    fats_grams=meal.fats_grams,
+                    fiber_grams=meal.fiber_grams,
+                    meal_details=meal.meal_details,
+                )
+                self.db.add(new_meal)
+        
+        await self.db.flush()
+        
+        # Reload the plan with all nested relationships to avoid lazy loading issues
+        stmt = (
+            select(FitnessPlan)
+            .where(FitnessPlan.id == new_plan.id)
+            .options(
+                selectinload(FitnessPlan.phases).selectinload(Phase.workouts).selectinload(Workout.exercises),
+                selectinload(FitnessPlan.phases).selectinload(Phase.meals),
+                selectinload(FitnessPlan.workout_plans).selectinload(WorkoutPlan.workouts).selectinload(Workout.exercises),
+                selectinload(FitnessPlan.meal_plans),
+            )
+        )
+        result = await self.db.execute(stmt)
+        new_plan = result.scalar_one()
+        
+        # Apply updates to the new plan (now with all relationships loaded)
         for update in updates:
             field_path = update.get("field", "")
             value = update.get("value")
@@ -649,13 +747,10 @@ class PlanService:
             fitness_plan_id=plan_id,
             frequency_per_week=workout_frequency,
             progression_strategy=progression_strategy,
+            program_type=workout_metadata.get("program_type", "General"),
+            training_principles=workout_metadata.get("training_principles", []),
             phase_progression_notes=workout_metadata.get("phase_progression_notes"),
             equipment_used=workout_metadata.get("equipment_used", []),
-            workout_plan_details={
-                "program_type": workout_metadata.get("program_type", "General"),
-                "progression_strategy": progression_strategy_full,
-                "training_principles": workout_metadata.get("training_principles", []),
-            },
         )
         self.db.add(workout_plan)
         await self.db.flush()  # Get workout_plan ID

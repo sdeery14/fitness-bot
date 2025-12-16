@@ -20,8 +20,9 @@ class WorkoutPlan(Base, UUIDMixin, TimestampMixin):
     frequency_per_week = Column(Integer, nullable=False)  # 3, 4, 5, etc. (FR-016)
     progression_strategy = Column(String(255), nullable=False)  # "linear", "wave", "double progression", etc.
 
-    # Workout plan details (FR-017, FR-018)
-    workout_plan_details = Column(JSON, nullable=False)  # Split type, focus areas, rest days, etc.
+    # Workout plan details (FR-017, FR-018) - normalized from JSON
+    program_type = Column(String(100), nullable=False)  # "Full Body", "Upper/Lower", "Push/Pull/Legs", etc.
+    training_principles = Column(JSON, nullable=True)  # List of training principles (e.g., ["Progressive overload", "Mind-muscle connection"])
 
     # Workout plan guidance metadata
     phase_progression_notes = Column(Text, nullable=True)  # How phases progress in intensity/volume

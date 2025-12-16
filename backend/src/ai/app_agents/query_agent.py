@@ -81,9 +81,13 @@ Key Tables (ACCURATE SCHEMA - USE THESE EXACT COLUMN NAMES):
 
 - workout_plans: Workout plan metadata
   Columns: id (uuid), fitness_plan_id (uuid), frequency_per_week (int),
-  progression_strategy (varchar), workout_plan_details (json),
+  progression_strategy (varchar), program_type (varchar(100)), training_principles (json),
   phase_progression_notes (text), equipment_used (json),
   created_at (timestamptz), updated_at (timestamptz)
+  
+  ⚠️ CRITICAL: workout_plan_details was REMOVED. Use these columns instead:
+  - program_type (varchar 100): Training split type like "Full Body", "Upper/Lower", "Push/Pull/Legs"
+  - training_principles (json): Array of training principles like ["Progressive overload", "Controlled tempo"]
   
   * phase_progression_notes: How phases progress in intensity/volume
   * equipment_used: Required equipment (array of strings)
