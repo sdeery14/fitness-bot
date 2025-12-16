@@ -43,9 +43,9 @@ class PlanUpdate(BaseModel):
         ...,
         description="Field path using dot notation and array indices (e.g., 'duration_weeks', 'workout_plans[0].frequency_per_week')"
     )
-    value: Any = Field(
+    value: str | int | float | bool = Field(
         ...,
-        description="New value to set for the field (can be string, number, boolean, or JSON object/array)"
+        description="New value to set for the field (string, number, or boolean)"
     )
     operation: Literal["set", "append", "increment"] = Field(
         default="set",
