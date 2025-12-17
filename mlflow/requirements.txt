@@ -1,0 +1,11 @@
+# MLflow and dependencies
+mlflow==2.19.0
+psycopg2-binary==2.9.10
+boto3==1.35.77
+gunicorn==23.0.0
+
+# For evaluation
+openai==1.58.1
+pandas==2.2.3
+numpy==2.2.1
+scikit-learn==1.6.0

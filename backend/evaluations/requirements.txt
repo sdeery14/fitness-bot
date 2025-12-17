@@ -1,0 +1,9 @@
+# Evaluation Framework Dependencies
+# These should be added to backend/requirements.txt or used separately
+
+mlflow==2.19.0
+openai==1.58.1
+tiktoken==0.8.0
+pandas==2.2.3
+numpy==2.2.1
+pydantic==2.10.3
