@@ -1,0 +1,105 @@
+{
+  "name": "workout_phase_simple_v1",
+  "version": "1.0.0",
+  "description": "Simple evaluation dataset for workout phase generation agent",
+  "test_cases": [
+    {
+      "id": "wp_simple_001",
+      "description": "Beginner foundation phase - 3x/week full body",
+      "inputs": {
+        "workout_plan_description": "3-day per week full-body strength training program for a beginner. Focus on compound movements and proper form development.",
+        "phase_number": 1,
+        "phase_name": "Foundation Phase",
+        "phase_objectives": [
+          "Build foundational strength",
+          "Learn proper exercise form",
+          "Establish consistent training habit"
+        ],
+        "phase_duration_weeks": 4,
+        "fitness_level": "beginner",
+        "equipment_access": [
+          "barbell",
+          "dumbbells",
+          "bench",
+          "squat_rack"
+        ],
+        "workout_frequency": 3
+      },
+      "expectations": {
+        "expected_behavior": "Agent should generate 3 distinct full-body workouts focusing on fundamental compound movements (squat, deadlift, bench press, rows, overhead press). Each workout should have 6-8 exercises with beginner-appropriate volume (3 sets x 8-12 reps). The workout_cycle should be 3 training days + 4 rest days. Intensity should be moderate (RPE 6-7), volume should be low-moderate for adaptation, and progression should be linear (add weight weekly).",
+        "expected_structure": {
+          "workouts": {
+            "count": 3,
+            "type": "Each workout should be a WorkoutDay with exercises array"
+          },
+          "workout_cycle": {
+            "length": 7,
+            "pattern": "3 workout days, 4 rest days"
+          },
+          "intensity_guidance": "Should mention RPE 6-7 or light-moderate intensity for beginners",
+          "volume_notes": "Should specify low-moderate volume appropriate for adaptation (e.g., '10-12 sets per muscle group per week')",
+          "progression_notes": "Should specify linear progression (e.g., 'Add 5 lbs per week when completing all sets')"
+        },
+        "validation_criteria": {
+          "workout_count": 3,
+          "exercises_per_workout_min": 6,
+          "exercises_per_workout_max": 8,
+          "has_compound_movements": true,
+          "appropriate_for_beginner": true
+        }
+      },
+      "metadata": {
+        "agent": "workout_phase_agent",
+        "fitness_level": "beginner",
+        "test_type": "basic_functionality"
+      }
+    },
+    {
+      "id": "wp_simple_002",
+      "description": "Intermediate hypertrophy phase - 4x/week upper/lower split",
+      "inputs": {
+        "workout_plan_description": "4-day upper/lower split focused on muscle growth with moderate-high volume.",
+        "phase_number": 2,
+        "phase_name": "Hypertrophy Phase",
+        "phase_objectives": [
+          "Maximize muscle growth",
+          "Increase training volume",
+          "Refine mind-muscle connection"
+        ],
+        "phase_duration_weeks": 8,
+        "fitness_level": "intermediate",
+        "equipment_access": [
+          "full_gym"
+        ],
+        "workout_frequency": 4
+      },
+      "expectations": {
+        "expected_behavior": "Agent should generate 4 distinct workouts (2 upper body, 2 lower body) with hypertrophy-focused training. Upper workouts should have 8-10 exercises targeting chest, back, shoulders, arms. Lower workouts should have 7-9 exercises targeting quads, hamstrings, glutes, calves. Volume should be moderate-high (3-4 sets x 8-12 reps). The workout_cycle should alternate upper/lower with rest days. Intensity should be RPE 7-8, volume should be 16-20 sets per muscle per week, and progression should focus on adding reps before weight.",
+        "expected_structure": {
+          "workouts": {
+            "count": 4,
+            "pattern": "2 upper body, 2 lower body workouts"
+          },
+          "workout_cycle": {
+            "length": 7,
+            "pattern": "upper, lower, rest, upper, lower, rest, rest"
+          },
+          "intensity_guidance": "Should mention RPE 7-8 or moderate-high intensity",
+          "volume_notes": "Should specify moderate-high volume for hypertrophy (e.g., '16-20 sets per muscle group per week')",
+          "progression_notes": "Should emphasize progressive overload via reps then weight"
+        },
+        "validation_criteria": {
+          "workout_count": 4,
+          "upper_lower_split": true,
+          "hypertrophy_rep_range": true,
+          "appropriate_volume": true
+        }
+      },
+      "metadata": {
+        "agent": "workout_phase_agent",
+        "fitness_level": "intermediate",
+        "test_type": "split_routine"
+      }
+    }
+  ]
+}
