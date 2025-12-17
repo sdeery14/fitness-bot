@@ -198,12 +198,20 @@ User message: {user_message}"""
     else:
         enriched_message = user_message
     
-    # Set mock context for tools (evaluation mode - no real DB access)
-    # This allows the agent to call tools without errors, though they'll return mock data
-    test_user_id = uuid4()
-    set_plan_tools_context(user_id=test_user_id, db_session=None, conversation_id=None)
+    # Set context for tools using real test user from database
+    # User ID: fa19dc54-a35b-4aab-adf8-816933f96fa4 (created by setup_test_user.py)
+    from uuid import UUID
+    from src.database import get_async_session
+    
+    test_user_id = UUID("fa19dc54-a35b-4aab-adf8-816933f96fa4")
+    
+    # Get a real database session for tool access
+    db_session_gen = get_async_session()
+    db_session = await db_session_gen.__anext__()
     
     try:
+        set_plan_tools_context(user_id=test_user_id, db_session=db_session, conversation_id=None)
+        
         # Run agent
         result = await Runner.run(
             starting_agent=fitness_coach_agent,
@@ -228,8 +236,9 @@ User message: {user_message}"""
             "used_update_tool": "update_fitness_plan" in tool_calls,
         }
     finally:
-        # Always clear context
+        # Always clear context and close DB session
         clear_plan_tools_context()
+        await db_session.close()
 
 
 def run_fitness_coach_agent_sync(**inputs) -> dict[str, Any]:
