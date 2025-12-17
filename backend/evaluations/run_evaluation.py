@@ -110,7 +110,7 @@ def main():
         "--agent",
         type=str,
         required=True,
-        choices=["workout_phase_agent", "intake_agent", "fitness_coach_agent", "all"],
+        choices=["workout_phase_agent", "intake_agent", "fitness_coach_agent", "meal_phase_agent", "all"],
         help="Which agent to evaluate (or 'all' for all agents)"
     )
     parser.add_argument(
@@ -135,11 +135,13 @@ def main():
         },
         "fitness_coach_agent": {
             "experiment_id": 4,
-            "dataset_id": "d-c97983c9ec99494fbb63ec1bc534c0fe"
-        }        "meal_phase_agent": {
+            "dataset_id": "d-c97983c9ec99494fbb63ec1bc534c0fe",
+        },
+        "meal_phase_agent": {
             "experiment_id": 5,
             "dataset_id": "d-e87ebc1a7d654daab83bacc43579ee61",
-        },    }
+        },
+    }
     
     # Run evaluation(s)
     if args.agent == "all":

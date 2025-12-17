@@ -233,24 +233,65 @@ def run_fitness_coach_agent_sync(**inputs) -> dict[str, Any]:
     return loop.run_until_complete(run_fitness_coach_agent(**inputs))
 
 
-async def run_meal_phase_agent(**inputs) -> Dict[str, Any]:
-    """
-    Execute the meal phase agent.
-    Accepts keyword arguments matching the dataset inputs.
-    Returns the PhaseMealDetails output as a dictionary.
+async def run_meal_phase_agent(**inputs) -> dict[str, Any]:
+    """Run meal_phase_agent with MLflow dataset inputs.
+    
+    Args:
+        **inputs: Keyword args containing:
+            - meal_plan_description: Overall meal strategy (str)
+            - phase_number: Phase number (int)
+            - phase_name: Phase name (str)
+            - dietary_restrictions: List of restrictions (list[str], optional)
+            - meal_frequency: Meals per day (int)
+    
+    Returns:
+        Dict with generated PhaseMealDetails (daily_calorie_target, sample_days, grocery_list, etc.)
     """
     from src.ai.app_agents.meal_phase_agent import meal_phase_agent
     
-    result = await meal_phase_agent.run(**inputs)
+    # Build prompt for meal phase agent
+    prompt = f"""Generate meal details for this phase:
+
+Phase Context:
+- Phase {inputs['phase_number']}: {inputs['phase_name']}
+
+Overall Meal Plan:
+{inputs['meal_plan_description']}
+
+Requirements:
+- Meal Frequency: {inputs['meal_frequency']} meals/day"""
     
-    # Return structured output (PhaseMealDetails)
-    if hasattr(result, "output"):
-        return result.output.model_dump()
-    return {"error": "No output from meal_phase_agent"}
+    # Add dietary restrictions if provided
+    if 'dietary_restrictions' in inputs and inputs['dietary_restrictions']:
+        prompt += f"\n- Dietary Restrictions: {', '.join(inputs['dietary_restrictions'])}"
+    
+    prompt += "\n\nGenerate complete meal details including calorie targets, macro splits, sample days, grocery list, and prep schedules."
+    
+    # Run agent using Runner.run
+    result = await Runner.run(
+        starting_agent=meal_phase_agent,
+        input=prompt,
+        session=None,
+    )
+    
+    # Extract output - should be PhaseMealDetails
+    output = result.final_output
+    
+    # Convert to dict for MLflow (Pydantic model -> dict)
+    if hasattr(output, 'model_dump'):
+        output_dict = output.model_dump()
+    elif hasattr(output, 'dict'):
+        output_dict = output.dict()
+    else:
+        output_dict = output
+    
+    return output_dict
 
 
-def run_meal_phase_agent_sync(**inputs) -> Dict[str, Any]:
+def run_meal_phase_agent_sync(**inputs) -> dict[str, Any]:
     """Synchronous wrapper for meal phase agent evaluation."""
+    import asyncio
+    
     loop = asyncio.get_event_loop()
     if loop.is_closed():
         loop = asyncio.new_event_loop()

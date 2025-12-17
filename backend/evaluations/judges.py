@@ -198,7 +198,7 @@ def get_judges_for_agent(agent_name: str, include_guidelines: bool = True):
     """Get appropriate judges for a specific agent type.
 
     Args:
-        agent_name: One of 'workout_phase_agent', 'intake_agent', 'fitness_coach_agent'
+        agent_name: One of 'workout_phase_agent', 'intake_agent', 'fitness_coach_agent', 'meal_phase_agent'
         include_guidelines: Whether to include Guidelines-based safety scorers
 
     Returns:
@@ -209,6 +209,7 @@ def get_judges_for_agent(agent_name: str, include_guidelines: bool = True):
         "workout_phase_agent": [workout_phase_judge],
         "intake_agent": [intake_agent_judge],
         "fitness_coach_agent": [fitness_coach_judge],
+        "meal_phase_agent": [meal_phase_judge],
     }
 
     # Secondary guideline-based scorers (safety & compliance)
@@ -216,6 +217,7 @@ def get_judges_for_agent(agent_name: str, include_guidelines: bool = True):
         "workout_phase_agent": [safety_guideline, workout_safety_guideline],
         "intake_agent": [safety_guideline, tone_guideline],
         "fitness_coach_agent": [safety_guideline, tone_guideline],
+        "meal_phase_agent": [safety_guideline],
     }
 
     judges = primary_judges.get(agent_name)
