@@ -177,6 +177,9 @@ async def run_fitness_coach_agent(**inputs) -> dict[str, Any]:
     Returns:
         Dict with agent response and metadata
     """
+    from uuid import uuid4
+    from src.ai.tools.plan_tools import set_plan_tools_context, clear_plan_tools_context
+    
     # Extract user message
     messages = inputs.get('messages', [])
     if not messages:
@@ -195,29 +198,38 @@ User message: {user_message}"""
     else:
         enriched_message = user_message
     
-    # Run agent
-    result = await Runner.run(
-        starting_agent=fitness_coach_agent,
-        input=enriched_message,
-        session=None,
-    )
+    # Set mock context for tools (evaluation mode - no real DB access)
+    # This allows the agent to call tools without errors, though they'll return mock data
+    test_user_id = uuid4()
+    set_plan_tools_context(user_id=test_user_id, db_session=None, conversation_id=None)
     
-    # Extract agent response
-    response_text = result.final_output if isinstance(result.final_output, str) else str(result.final_output)
-    
-    # Check if agent used tools
-    tool_calls = []
-    if hasattr(result, 'all_messages'):
-        for msg in result.all_messages:
-            if hasattr(msg, 'tool_calls') and msg.tool_calls:
-                tool_calls.extend([tc.function.name for tc in msg.tool_calls])
-    
-    return {
-        "response": response_text,
-        "tool_calls_made": tool_calls,
-        "used_query_tool": "query_fitness_plan" in tool_calls,
-        "used_update_tool": "update_fitness_plan" in tool_calls,
-    }
+    try:
+        # Run agent
+        result = await Runner.run(
+            starting_agent=fitness_coach_agent,
+            input=enriched_message,
+            session=None,
+        )
+        
+        # Extract agent response
+        response_text = result.final_output if isinstance(result.final_output, str) else str(result.final_output)
+        
+        # Check if agent used tools
+        tool_calls = []
+        if hasattr(result, 'all_messages'):
+            for msg in result.all_messages:
+                if hasattr(msg, 'tool_calls') and msg.tool_calls:
+                    tool_calls.extend([tc.function.name for tc in msg.tool_calls])
+        
+        return {
+            "response": response_text,
+            "tool_calls_made": tool_calls,
+            "used_query_tool": "query_fitness_plan" in tool_calls,
+            "used_update_tool": "update_fitness_plan" in tool_calls,
+        }
+    finally:
+        # Always clear context
+        clear_plan_tools_context()
 
 
 def run_fitness_coach_agent_sync(**inputs) -> dict[str, Any]:
