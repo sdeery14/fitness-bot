@@ -289,11 +289,16 @@ Requirements:
 
 
 def run_meal_phase_agent_sync(**inputs) -> dict[str, Any]:
-    """Synchronous wrapper for meal phase agent evaluation."""
+    """Synchronous wrapper for meal phase agent evaluation.
+    
+    MLflow's evaluate function expects synchronous predict functions.
+    This wrapper runs the async agent in a new event loop.
+    """
     import asyncio
     
-    loop = asyncio.get_event_loop()
-    if loop.is_closed():
+    try:
+        loop = asyncio.get_event_loop()
+    except RuntimeError:
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
     
