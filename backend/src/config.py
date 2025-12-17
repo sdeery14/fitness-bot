@@ -50,6 +50,9 @@ class Settings(BaseSettings):
     CELERY_BROKER_URL: str | None = None
     CELERY_RESULT_BACKEND: str | None = None
     
+    # MLflow
+    MLFLOW_TRACKING_URI: str | None = None
+    
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

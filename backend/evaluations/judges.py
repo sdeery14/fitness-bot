@@ -41,7 +41,7 @@ workout_phase_judge = make_judge(
         "If any critical criteria are missed (wrong workout count, inappropriate exercises, unsafe volume), rate lower.\n"
     ),
     feedback_value_type=Literal["excellent", "good", "acceptable", "poor"],
-    model="openai:/gpt-4o"
+    model="openai:/gpt-4.1-mini"
 )
 
 
@@ -80,7 +80,7 @@ intake_agent_judge = make_judge(
         "- 1: Very Poor - Fails most/all criteria\n"
     ),
     feedback_value_type=int,
-    model="openai:/gpt-4o"
+    model="openai:/gpt-5-mini"
 )
 
 
@@ -119,7 +119,7 @@ fitness_coach_judge = make_judge(
         "- poor: Significant problems or safety concerns\n"
     ),
     feedback_value_type=Literal["excellent", "good", "acceptable", "poor"],
-    model="openai:/gpt-4o"
+    model="openai:/gpt-5-mini"
 )
 
 
