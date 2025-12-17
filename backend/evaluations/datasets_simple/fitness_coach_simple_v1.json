@@ -1,11 +1,10 @@
 {
   "name": "fitness_coach_simple_v1",
-  "version": "1.0.0",
-  "description": "Simple evaluation dataset for fitness coach conversation agent",
+  "version": "1.0.2",
+  "description": "Fitness coach agent evaluation - MLflow compatible format",
   "test_cases": [
     {
-      "id": "coach_simple_001",
-      "description": "User asks about their current workout plan",
+      "id": "coach_001",
       "inputs": {
         "messages": [
           {
@@ -21,32 +20,30 @@
         }
       },
       "expectations": {
-        "expected_behavior": "Agent should use the query_agent (database query) to retrieve the user's workout schedule for the current week. Should present the information clearly and ask if the user wants more details about any specific workout. Should be encouraging and supportive.",
-        "expected_tool_use": {
-          "uses_query_agent": true,
-          "query_type": "workout_schedule",
-          "query_scope": "current_week"
-        },
-        "expected_response_characteristics": {
-          "presents_workout_schedule": true,
-          "offers_more_details": true,
-          "tone": "encouraging, supportive"
-        },
-        "validation_criteria": {
-          "uses_correct_tool": true,
-          "provides_clear_answer": true,
-          "offers_follow_up": true
+        "expected_behavior": "Use query_agent to retrieve workout schedule for current week. Present info clearly. Ask if user wants more details. Be encouraging and supportive.",
+        "uses_query_agent": true,
+        "presents_workout_schedule": true,
+        "offers_more_details": true,
+        "tone": "encouraging, supportive",
+        "provides_clear_answer": true
+      },
+      "source": {
+        "source_type": "HUMAN",
+        "source_data": {
+          "curator": "coach_expert",
+          "date": "2025-12-17",
+          "guidelines": "coaching_eval_v1"
         }
       },
-      "metadata": {
+      "tags": {
         "agent": "conversation_agent",
         "mode": "coaching",
-        "test_type": "plan_query"
+        "interaction_type": "plan_query",
+        "priority": "high"
       }
     },
     {
-      "id": "coach_simple_002",
-      "description": "User wants to adjust their plan due to injury",
+      "id": "coach_002",
       "inputs": {
         "messages": [
           {
@@ -61,25 +58,31 @@
         }
       },
       "expectations": {
-        "expected_behavior": "Agent should express concern about the injury and recommend seeing a healthcare provider if pain is severe. Should offer to temporarily modify the plan to avoid overhead pressing movements and replace them with shoulder-friendly alternatives. Should ask about pain severity and range of motion. Tone should be cautious and health-first.",
-        "expected_response_characteristics": {
-          "expresses_concern": true,
-          "recommends_medical_advice_if_needed": true,
-          "offers_plan_modification": true,
-          "suggests_alternatives": true,
-          "asks_clarifying_questions": true,
-          "tone": "cautious, health-first, supportive"
-        },
-        "validation_criteria": {
-          "addresses_safety": true,
-          "offers_solution": true,
-          "asks_about_severity": true
+        "expected_behavior": "Express concern about injury. Recommend healthcare provider if severe. Offer to modify plan - avoid overhead pressing, suggest shoulder-friendly alternatives. Ask about pain severity and range of motion. Cautious, health-first tone.",
+        "expresses_concern": true,
+        "recommends_medical_advice": true,
+        "offers_plan_modification": true,
+        "suggests_alternatives": true,
+        "asks_about_severity": true,
+        "tone": "cautious, health-first, supportive",
+        "addresses_safety": true
+      },
+      "source": {
+        "source_type": "HUMAN",
+        "source_data": {
+          "curator": "coach_expert",
+          "date": "2025-12-17",
+          "guidelines": "coaching_eval_v1",
+          "safety_review": "approved"
         }
       },
-      "metadata": {
+      "tags": {
         "agent": "conversation_agent",
         "mode": "coaching",
-        "test_type": "plan_modification_injury"
+        "interaction_type": "plan_modification",
+        "safety_critical": "true",
+        "injury_related": "true",
+        "priority": "critical"
       }
     }
   ]

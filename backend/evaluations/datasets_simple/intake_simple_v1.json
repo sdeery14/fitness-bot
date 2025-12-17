@@ -1,11 +1,10 @@
 {
   "name": "intake_simple_v1",
-  "version": "1.0.0",
-  "description": "Simple evaluation dataset for intake/onboarding conversation agent",
+  "version": "1.0.2",
+  "description": "Intake agent evaluation - MLflow compatible format",
   "test_cases": [
     {
-      "id": "intake_simple_001",
-      "description": "New user starting fitness journey - complete intake",
+      "id": "intake_001",
       "inputs": {
         "messages": [
           {
@@ -15,34 +14,32 @@
         ]
       },
       "expectations": {
-        "expected_behavior": "Agent should warmly welcome the user, acknowledge their beginner status and gym access. Should ask clarifying questions about their specific goal (lose weight, build muscle, general fitness), current activity level, any injuries or limitations, and time availability. The agent should be encouraging and not overwhelming. Response should be conversational and ask 1-2 questions at a time.",
-        "expected_response_characteristics": {
-          "tone": "warm, encouraging, professional",
-          "asks_about": [
-            "specific fitness goal",
-            "current activity level",
-            "injuries or limitations",
-            "time availability"
-          ],
-          "question_count": "1-2 questions (not overwhelming)",
-          "acknowledges_user_input": true
-        },
-        "validation_criteria": {
-          "is_conversational": true,
-          "asks_questions": true,
-          "appropriate_for_beginner": true,
-          "does_not_create_plan_yet": true
+        "expected_behavior": "Warmly welcome user, acknowledge beginner status and gym access. Ask clarifying questions about goal, activity level, injuries, time availability. Be encouraging, not overwhelming. Ask 1-2 questions at a time.",
+        "tone": "warm, encouraging, professional",
+        "asks_questions": true,
+        "asks_about_goals": true,
+        "appropriate_for_beginner": true,
+        "does_not_create_plan_yet": true,
+        "question_count_max": 2
+      },
+      "source": {
+        "source_type": "HUMAN",
+        "source_data": {
+          "curator": "conversational_expert",
+          "date": "2025-12-17",
+          "guidelines": "conversation_eval_v1"
         }
       },
-      "metadata": {
+      "tags": {
         "agent": "conversation_agent",
         "mode": "intake",
-        "test_type": "initial_contact"
+        "user_type": "beginner",
+        "stage": "initial_contact",
+        "priority": "high"
       }
     },
     {
-      "id": "intake_simple_002",
-      "description": "User provides complete info - ready to build plan",
+      "id": "intake_002",
       "inputs": {
         "messages": [
           {
@@ -52,23 +49,28 @@
         ]
       },
       "expectations": {
-        "expected_behavior": "Agent should recognize this is comprehensive information and could proceed with plan creation. Should summarize what they heard (muscle building, beginner, 4x/week, 1 hour sessions, full gym, no injuries) and ask if the user is ready to create their plan, or if there are any other preferences (preferred training days, dietary restrictions, etc.). Tone should be positive and action-oriented.",
-        "expected_response_characteristics": {
-          "summarizes_user_info": true,
-          "ready_to_proceed": true,
-          "asks_confirmation": true,
-          "tone": "positive, action-oriented"
-        },
-        "validation_criteria": {
-          "acknowledges_all_info": true,
-          "offers_to_create_plan": true,
-          "asks_for_confirmation": true
+        "expected_behavior": "Recognize comprehensive info provided. Summarize: muscle building, beginner, 4x/week, 1hr sessions, full gym, no injuries. Ask if ready to create plan or any other preferences. Positive, action-oriented tone.",
+        "summarizes_user_info": true,
+        "ready_to_proceed": true,
+        "asks_confirmation": true,
+        "tone": "positive, action-oriented",
+        "acknowledges_all_info": true,
+        "offers_to_create_plan": true
+      },
+      "source": {
+        "source_type": "HUMAN",
+        "source_data": {
+          "curator": "conversational_expert",
+          "date": "2025-12-17",
+          "guidelines": "conversation_eval_v1"
         }
       },
-      "metadata": {
+      "tags": {
         "agent": "conversation_agent",
         "mode": "intake",
-        "test_type": "complete_info_provided"
+        "user_type": "beginner",
+        "stage": "ready_to_build",
+        "priority": "high"
       }
     }
   ]
