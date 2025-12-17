@@ -106,6 +106,36 @@ fitness_coach_judge = make_judge(
 
 
 # ============================================================================
+# Meal Phase Agent Judge
+# ============================================================================
+
+meal_phase_judge = make_judge(
+    name="meal_phase_quality",
+    instructions=(
+        "You are evaluating a meal phase generation agent that creates phase-specific nutrition plans.\n\n"
+        "## Input Context\n"
+        "{{ inputs }}\n\n"
+        "## Generated Output\n"
+        "{{ outputs }}\n\n"
+        "## Expected Criteria\n"
+        "{{ expectations }}\n\n"
+        "## Evaluation Instructions\n"
+        "Evaluate the generated meal phase against the expected criteria on these dimensions:\n\n"
+        "1. **Calorie & Macros**: Do calories and macro split match phase objectives and expectations?\n"
+        "2. **Sample Meals**: Are sample days complete with proper meal structure and portions?\n"
+        "3. **Dietary Compliance**: Does it strictly honor all dietary restrictions?\n"
+        "4. **Grocery & Prep Planning**: Does it include complete grocery list and prep sessions?\n"
+        "5. **Schedule Format**: Are shopping and prep schedules using correct format (target_day_name, repeats_every)?\n"
+        "6. **Practicality**: Are meal options realistic and sustainable?\n\n"
+        "Provide an overall quality rating based on how well the output meets ALL expectations.\n"
+        "If any critical criteria are missed (violates dietary restrictions, missing schedules, wrong calorie range), rate lower.\n"
+    ),
+    feedback_value_type=Literal["excellent", "good", "acceptable", "poor"],
+    model="openai:/gpt-5-mini",
+)
+
+
+# ============================================================================
 # Safety & Compliance Guidelines (Secondary Scorers)
 # ============================================================================
 
@@ -154,6 +184,7 @@ JUDGES = {
     "workout_phase": workout_phase_judge,
     "intake": intake_agent_judge,
     "fitness_coach": fitness_coach_judge,
+    "meal_phase": meal_phase_judge,
 }
 
 GUIDELINES = {

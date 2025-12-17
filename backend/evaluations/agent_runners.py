@@ -233,6 +233,32 @@ def run_fitness_coach_agent_sync(**inputs) -> dict[str, Any]:
     return loop.run_until_complete(run_fitness_coach_agent(**inputs))
 
 
+async def run_meal_phase_agent(**inputs) -> Dict[str, Any]:
+    """
+    Execute the meal phase agent.
+    Accepts keyword arguments matching the dataset inputs.
+    Returns the PhaseMealDetails output as a dictionary.
+    """
+    from src.ai.app_agents.meal_phase_agent import meal_phase_agent
+    
+    result = await meal_phase_agent.run(**inputs)
+    
+    # Return structured output (PhaseMealDetails)
+    if hasattr(result, "output"):
+        return result.output.model_dump()
+    return {"error": "No output from meal_phase_agent"}
+
+
+def run_meal_phase_agent_sync(**inputs) -> Dict[str, Any]:
+    """Synchronous wrapper for meal phase agent evaluation."""
+    loop = asyncio.get_event_loop()
+    if loop.is_closed():
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+    
+    return loop.run_until_complete(run_meal_phase_agent(**inputs))
+
+
 # ============================================================================
 # Registry: Map agent names to runner functions
 # ============================================================================
@@ -241,6 +267,7 @@ AGENT_RUNNERS = {
     "workout_phase_agent": run_workout_phase_agent_sync,
     "intake_agent": run_intake_agent_sync,
     "fitness_coach_agent": run_fitness_coach_agent_sync,
+    "meal_phase_agent": run_meal_phase_agent_sync,
 }
 
 

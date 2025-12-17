@@ -1,0 +1,101 @@
+{
+  "name": "meal_phase_simple_v1",
+  "version": "1.0.0",
+  "description": "Meal phase agent evaluation - phase-specific nutrition planning",
+  "test_cases": [
+    {
+      "id": "mp_001",
+      "inputs": {
+        "meal_plan_description": "Mediterranean-style nutrition plan for muscle building with emphasis on whole foods",
+        "phase_number": 1,
+        "phase_name": "Foundation Phase",
+        "phase_objectives": [
+          "Establish baseline calories",
+          "Build healthy eating habits",
+          "Assess metabolic response"
+        ],
+        "phase_duration_weeks": 4,
+        "phase_start_date": "2025-12-15",
+        "phase_start_day": "Sunday",
+        "dietary_restrictions": [
+          "No dairy",
+          "Pescatarian"
+        ],
+        "meal_frequency": 4
+      },
+      "expectations": {
+        "expected_behavior": "Generate phase-specific meal plan with 4 meals/day for pescatarian with no dairy. Foundation phase should have baseline calories (2500-2800). Include 2 sample days (training + rest). Must include grocery list with categories and shopping schedule. Must include meal prep sessions with instructions and prep schedule. All schedules use target_day_name format.",
+        "calorie_range": "2500-2800",
+        "macro_split_appropriate": true,
+        "sample_days_count": 2,
+        "meals_per_day": 4,
+        "honors_dietary_restrictions": true,
+        "includes_grocery_list": true,
+        "includes_shopping_schedule": true,
+        "includes_prep_sessions": true,
+        "includes_prep_schedule": true,
+        "schedule_uses_day_names": true
+      },
+      "source": {
+        "source_type": "HUMAN",
+        "source_data": {
+          "curator": "nutrition_expert",
+          "date": "2025-12-17",
+          "guidelines": "meal_agent_eval_v1"
+        }
+      },
+      "tags": {
+        "agent": "meal_phase_agent",
+        "diet_type": "pescatarian",
+        "dietary_restrictions": "no_dairy",
+        "phase": "foundation",
+        "priority": "high"
+      }
+    },
+    {
+      "id": "mp_002",
+      "inputs": {
+        "meal_plan_description": "High-protein meal plan for hypertrophy with calorie surplus",
+        "phase_number": 2,
+        "phase_name": "Hypertrophy Phase",
+        "phase_objectives": [
+          "Maximize muscle growth",
+          "Maintain calorie surplus",
+          "Optimize protein timing"
+        ],
+        "phase_duration_weeks": 8,
+        "phase_start_date": "2025-12-22",
+        "phase_start_day": "Sunday",
+        "dietary_restrictions": [],
+        "meal_frequency": 5
+      },
+      "expectations": {
+        "expected_behavior": "Generate hypertrophy phase meal plan with 5 meals/day. Should have calorie surplus (3000-3400). High protein (35-40%). Include pre/post workout nutrition. Must include complete grocery shopping and meal prep schedules with explicit day names and repeat patterns.",
+        "calorie_range": "3000-3400",
+        "protein_percentage": "35-40",
+        "sample_days_count": 2,
+        "meals_per_day": 5,
+        "includes_preworkout_meal": true,
+        "includes_postworkout_meal": true,
+        "includes_shopping_schedule": true,
+        "includes_prep_schedule": true,
+        "schedule_format": "day_name_with_repeats"
+      },
+      "source": {
+        "source_type": "HUMAN",
+        "source_data": {
+          "curator": "nutrition_expert",
+          "date": "2025-12-17",
+          "guidelines": "meal_agent_eval_v1"
+        }
+      },
+      "tags": {
+        "agent": "meal_phase_agent",
+        "diet_type": "omnivore",
+        "phase": "hypertrophy",
+        "goal": "muscle_growth",
+        "priority": "high"
+      }
+    }
+  ]
+}
