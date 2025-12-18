@@ -373,22 +373,36 @@ Query: {query_request}"""
     print(f"[DEBUG] Running query agent with input: {agent_input[:100]}...\n")
     
     # Run query agent (uses postgres-mcp MCP server)
-    result = await Runner.run(
-        starting_agent=query_agent,
-        input=agent_input,
-        session=None
-    )
-    
-    response_text = result.final_output
-    
-    # Extract SQL queries and results from the response if possible
-    # Note: The actual SQL and results are in the MCP tool calls
-    return {
-        "response": response_text,
-        "query_executed": True,  # Assume query executed if agent responded
-        "user_id": user_id,
-        "query_request": query_request,
-    }
+    try:
+        result = await Runner.run(
+            starting_agent=query_agent,
+            input=agent_input,
+            session=None
+        )
+        
+        response_text = result.final_output
+        
+        # Extract SQL queries and results from the response if possible
+        # Note: The actual SQL and results are in the MCP tool calls
+        return {
+            "response": response_text,
+            "query_executed": True,  # Assume query executed if agent responded
+            "user_id": user_id,
+            "query_request": query_request,
+        }
+    except Exception as e:
+        # Handle errors gracefully (e.g., invalid SQL, connection issues)
+        error_msg = str(e)
+        print(f"[ERROR] Query agent failed: {error_msg}")
+        
+        return {
+            "response": f"Error executing query: {error_msg}",
+            "query_executed": False,
+            "error": True,
+            "error_message": error_msg,
+            "user_id": user_id,
+            "query_request": query_request,
+        }
 
 
 # Persistent event loop and initialization flag for query_agent
@@ -411,40 +425,68 @@ def run_query_agent_sync(**inputs) -> dict[str, Any]:
     Uses a dedicated background thread with an event loop to keep MCP server
     alive across test cases. Worker threads submit coroutines via 
     run_coroutine_threadsafe for thread-safe concurrent execution.
+    
+    Handles all errors gracefully to ensure evaluation continues even when
+    individual test cases fail.
     """
     import asyncio
     global _query_agent_loop, _query_agent_loop_thread, _query_agent_initialized
     
-    # Initialize event loop thread once
-    with _query_agent_lock:
-        if _query_agent_loop is None:
-            # Create new event loop for the background thread
-            _query_agent_loop = asyncio.new_event_loop()
+    try:
+        # Initialize event loop thread once
+        with _query_agent_lock:
+            if _query_agent_loop is None:
+                # Create new event loop for the background thread
+                _query_agent_loop = asyncio.new_event_loop()
+                
+                # Start background thread to run the loop
+                _query_agent_loop_thread = threading.Thread(
+                    target=_run_event_loop_forever,
+                    args=(_query_agent_loop,),
+                    daemon=True,
+                    name="query_agent_loop_thread"
+                )
+                _query_agent_loop_thread.start()
             
-            # Start background thread to run the loop
-            _query_agent_loop_thread = threading.Thread(
-                target=_run_event_loop_forever,
-                args=(_query_agent_loop,),
-                daemon=True,
-                name="query_agent_loop_thread"
-            )
-            _query_agent_loop_thread.start()
+            # Initialize MCP server once in the background loop
+            if not _query_agent_initialized:
+                future = asyncio.run_coroutine_threadsafe(
+                    initialize_mcp_server(),
+                    _query_agent_loop
+                )
+                future.result(timeout=30)  # Wait for initialization
+                _query_agent_initialized = True
         
-        # Initialize MCP server once in the background loop
-        if not _query_agent_initialized:
-            future = asyncio.run_coroutine_threadsafe(
-                initialize_mcp_server(),
-                _query_agent_loop
-            )
-            future.result(timeout=30)  # Wait for initialization
-            _query_agent_initialized = True
-    
-    # Submit coroutine to background loop and wait for result
-    future = asyncio.run_coroutine_threadsafe(
-        run_query_agent(**inputs),
-        _query_agent_loop
-    )
-    return future.result(timeout=120)  # 2 minute timeout for query execution
+        # Submit coroutine to background loop and wait for result
+        future = asyncio.run_coroutine_threadsafe(
+            run_query_agent(**inputs),
+            _query_agent_loop
+        )
+        return future.result(timeout=120)  # 2 minute timeout for query execution
+        
+    except TimeoutError as e:
+        # Timeout waiting for query to complete
+        print(f"[ERROR] Query agent timeout after 120s: {inputs.get('query_request', 'unknown query')}")
+        return {
+            "response": f"Query timed out after 120 seconds",
+            "query_executed": False,
+            "error": True,
+            "error_message": "Timeout waiting for query execution",
+            "user_id": inputs.get("user_id"),
+            "query_request": inputs.get("query_request"),
+        }
+    except Exception as e:
+        # Catch any other errors (initialization, threading, etc.)
+        error_msg = str(e)
+        print(f"[ERROR] Query agent runner failed: {error_msg}")
+        return {
+            "response": f"System error: {error_msg}",
+            "query_executed": False,
+            "error": True,
+            "error_message": error_msg,
+            "user_id": inputs.get("user_id"),
+            "query_request": inputs.get("query_request"),
+        }
 
 
 # ============================================================================

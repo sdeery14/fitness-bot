@@ -132,9 +132,14 @@ Key Tables (ACCURATE SCHEMA - USE THESE EXACT COLUMN NAMES):
 
 - meals: Individual meals
   Columns: id (uuid), meal_plan_id (uuid), phase_id (uuid), meal_type (varchar),
-  name (varchar), calories (int), protein_g (int), carbs_g (int), fat_g (int),
-  ingredients (json), preparation_instructions (text),
+  name (varchar), calories (int), protein_grams (decimal), carbs_grams (decimal), 
+  fats_grams (decimal), fiber_grams (decimal), meal_details (json), day_of_week (varchar),
   created_at (timestamptz), updated_at (timestamptz)
+  
+  ⚠️ CRITICAL: Use these EXACT column names:
+  - protein_grams (NOT protein_g)
+  - carbs_grams (NOT carbs_g)
+  - fats_grams (NOT fat_g or fats_g)
 
 - users: id, email, full_name, current_fitness_level, preferences (json), timezone
 
