@@ -342,7 +342,7 @@ async def run_query_agent(**inputs) -> dict[str, Any]:
     Returns:
         Dict with agent response and query execution details
     """
-    from src.ai.tools.query_tools import initialize_mcp_server, cleanup_mcp_server
+    from src.ai.tools.query_tools import initialize_mcp_server, cleanup_mcp_server, _mcp_server
     
     user_id = inputs.get("user_id")
     query_request = inputs.get("query_request")
@@ -354,6 +354,23 @@ Query: {query_request}"""
     try:
         # Initialize MCP server for database access
         await initialize_mcp_server()
+        
+        # DEBUG: Verify MCP server connection
+        print(f"\n[DEBUG] MCP Server initialized: {_mcp_server is not None}")
+        print(f"[DEBUG] Query agent has MCP servers: {len(query_agent.mcp_servers) if query_agent.mcp_servers else 0}")
+        
+        if query_agent.mcp_servers:
+            try:
+                tools = await query_agent.mcp_servers[0].list_tools()
+                tool_names = [t.name for t in tools]
+                print(f"[DEBUG] Available MCP tools: {tool_names}")
+                print(f"[DEBUG] execute_sql available: {'execute_sql' in tool_names}")
+            except Exception as e:
+                print(f"[DEBUG] Failed to list MCP tools: {e}")
+        else:
+            print(f"[DEBUG] WARNING: query_agent.mcp_servers is empty!")
+        
+        print(f"[DEBUG] Running query agent with input: {agent_input[:100]}...\n")
         
         # Run query agent (uses postgres-mcp MCP server)
         result = await Runner.run(
