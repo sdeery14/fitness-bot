@@ -126,27 +126,42 @@ class WorkoutCycleItem(BaseModel):
 
 
 class MealItem(BaseModel):
-    """A single food item or meal component."""
+    """A single food item or meal component.
+    
+    Agent provides percentage split, code calculates actual calories/macros based on meal target.
+    """
 
     model_config = {"extra": "forbid"}  # Strict schema for agents SDK
 
     name: str = Field(description="Food/meal name")
     portion: str = Field(description="Portion size (e.g., '200g', '1 cup', '2 slices')")
-    calories: int = Field(description="Approximate calories", ge=0)
-    protein_g: int = Field(description="Protein in grams", ge=0)
-    carbs_g: int = Field(description="Carbohydrates in grams", ge=0)
-    fat_g: int = Field(description="Fat in grams", ge=0)
+    calorie_percentage: float = Field(
+        description="Percentage of meal's total calories this food provides (0-100). All items in meal should sum to 100%.",
+        ge=0,
+        le=100
+    )
+    notes: str | None = Field(
+        default=None,
+        description="Nutritional notes (e.g., 'high protein', 'complex carbs', 'healthy fats')"
+    )
 
 
 class Meal(BaseModel):
-    """A single meal in the day."""
+    """A single meal in the day.
+    
+    Agent provides percentage of daily calories, code calculates actual calories.
+    """
 
     model_config = {"extra": "forbid"}  # Strict schema for agents SDK
 
     meal_name: str = Field(description="Meal identifier (e.g., 'Breakfast', 'Post-Workout Snack')")
     time: str = Field(description="Suggested time (e.g., '7:00 AM', 'Post-workout')")
+    calorie_percentage: float = Field(
+        description="Percentage of daily calories for this meal (0-100). All meals in day should sum to 100%.",
+        ge=0,
+        le=100
+    )
     foods: list[MealItem] = Field(description="List of foods in this meal")
-    total_calories: int = Field(description="Total meal calories", ge=0)
     notes: str | None = Field(default=None, description="Preparation tips or alternatives")
     prep_type: str | None = Field(
         default="quick_assembly", 
@@ -163,26 +178,54 @@ class Meal(BaseModel):
 
 
 class DailyMealPlan(BaseModel):
-    """A single day's meal plan."""
+    """A single day's meal plan.
+    
+    Agent provides meal structure and percentages, code calculates actual calories/macros.
+    """
 
     model_config = {"extra": "forbid"}  # Strict schema for agents SDK
 
     day_name: str = Field(description="Day identifier (e.g., 'Training Day', 'Rest Day', 'Monday')")
-    target_calories: int = Field(description="Target daily calories", ge=1200, le=5000)
-    target_protein_g: int = Field(description="Target daily protein in grams", ge=50, le=300)
-    target_carbs_g: int = Field(description="Target daily carbs in grams", ge=50, le=500)
-    target_fat_g: int = Field(description="Target daily fat in grams", ge=30, le=200)
+    day_type: str = Field(
+        description="Day type for calorie adjustment: 'training' (full calories), 'rest' (reduced calories), or 'refeed' (increased calories)"
+    )
+    calorie_modifier: float = Field(
+        description="Multiplier for this day type (e.g., 1.0 for training, 0.9 for rest, 1.1 for refeed)",
+        ge=0.7,
+        le=1.3
+    )
     meals: list[Meal] = Field(description="List of meals for the day")
 
 
 class MealPlan(BaseModel):
-    """Complete meal plan structure."""
+    """Complete meal plan structure.
+    
+    Agent provides goal strategy and macro ratios, code calculates actual calories from user TDEE.
+    """
 
     model_config = {"extra": "forbid"}  # Strict schema for agents SDK
 
     goal: str = Field(description="Nutrition goal (e.g., 'Muscle Gain', 'Fat Loss', 'Maintenance')")
-    daily_calorie_target: int = Field(description="Average daily calorie target", ge=1200, le=5000)
-    macro_split: str = Field(description="Macro ratio (e.g., '40% Carbs, 30% Protein, 30% Fat')")
+    calorie_goal_modifier: float = Field(
+        description="Calorie adjustment from TDEE: 0.8-0.9 for cutting, 1.0 for maintenance, 1.1-1.2 for bulking",
+        ge=0.7,
+        le=1.3
+    )
+    macro_split_carbs_percent: int = Field(
+        description="Percentage of calories from carbohydrates (e.g., 40)",
+        ge=20,
+        le=60
+    )
+    macro_split_protein_percent: int = Field(
+        description="Percentage of calories from protein (e.g., 30)",
+        ge=20,
+        le=50
+    )
+    macro_split_fat_percent: int = Field(
+        description="Percentage of calories from fat (e.g., 30). Carbs + Protein + Fat should sum to 100.",
+        ge=20,
+        le=50
+    )
     meal_frequency: int = Field(description="Number of meals per day", ge=3, le=6)
     sample_days: list[DailyMealPlan] = Field(
         description="Sample meal plans (e.g., training day, rest day)"
@@ -348,15 +391,32 @@ class MealPrepScheduleEntry(BaseModel):
 
 
 class PhaseMealDetails(BaseModel):
-    """Phase-specific nutrition implementation details."""
+    """Phase-specific nutrition implementation details.
+    
+    Agent provides calorie strategy and macro ratios, code calculates actual numbers from user TDEE.
+    """
 
     model_config = {"extra": "forbid"}
 
-    daily_calorie_target: int = Field(
-        description="Target daily calories for this phase", ge=1200, le=5000
+    calorie_goal_modifier: float = Field(
+        description="Calorie adjustment from TDEE for this phase: 0.8-0.9 for cutting, 1.0 for maintenance, 1.1-1.2 for bulking",
+        ge=0.7,
+        le=1.3
     )
-    macro_split: str = Field(
-        description="Macronutrient ratio for this phase (e.g., '40% Carbs, 30% Protein, 30% Fat')"
+    macro_split_carbs_percent: int = Field(
+        description="Percentage of calories from carbohydrates (e.g., 40)",
+        ge=20,
+        le=60
+    )
+    macro_split_protein_percent: int = Field(
+        description="Percentage of calories from protein (e.g., 30)",
+        ge=20,
+        le=50
+    )
+    macro_split_fat_percent: int = Field(
+        description="Percentage of calories from fat (e.g., 30). Carbs + Protein + Fat should sum to 100.",
+        ge=20,
+        le=50
     )
     sample_days: list[DailyMealPlan] = Field(
         description="Sample meal plans for this phase (e.g., training day, rest day)", min_length=1
@@ -546,11 +606,31 @@ class SchedulePreferences(BaseModel):
     )
 
 
+class UserBiometrics(BaseModel):
+    """User's biometric data for TDEE/calorie calculation."""
+
+    model_config = {"extra": "forbid"}
+
+    age: int = Field(description="Age in years", ge=13, le=100)
+    biological_sex: str = Field(description="Biological sex for TDEE calculation: 'male' or 'female'")
+    height_cm: float = Field(description="Height in centimeters", ge=120, le=250)
+    weight_kg: float = Field(description="Current weight in kilograms", ge=30, le=300)
+    activity_level: str = Field(
+        description="Activity level: 'sedentary' (little/no exercise), 'lightly_active' (1-3 days/week), 'moderately_active' (3-5 days/week), 'very_active' (6-7 days/week), 'extra_active' (athlete/physical job)"
+    )
+
+
 class ConversationRequirements(BaseModel):
     """Structured requirements extracted from conversation."""
 
     model_config = {"extra": "forbid"}  # Strict schema for agents SDK
 
+    # Biometric data for calorie calculation
+    biometrics: UserBiometrics = Field(
+        description="User's biometric data (age, sex, height, weight, activity level) for TDEE calculation"
+    )
+    
+    # Fitness requirements
     primary_goal: str = Field(description="Primary fitness goal")
     fitness_level: str = Field(description="Current fitness level")
     workout_frequency: int = Field(description="Days per week for working out", ge=2, le=7)
