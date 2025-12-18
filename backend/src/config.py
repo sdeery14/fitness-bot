@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     POSTGRES_PASSWORD: str = "postgres"
     POSTGRES_DB: str = "fitness_bot"
     DATABASE_URL: str
+    DATABASE_URL_LOCAL: str | None = None  # Optional: for local scripts outside Docker
     
     # Redis
     REDIS_URL: str
@@ -58,6 +59,14 @@ class Settings(BaseSettings):
         env_file_encoding="utf-8",
         case_sensitive=True,
     )
+    
+    def get_database_url(self) -> str:
+        """Get the appropriate database URL for the current context.
+        
+        Returns DATABASE_URL_LOCAL if set (for local scripts), otherwise DATABASE_URL.
+        This allows local scripts to use localhost:5432 while Docker uses postgres:5432.
+        """
+        return self.DATABASE_URL_LOCAL or self.DATABASE_URL
 
 
 # Global settings instance

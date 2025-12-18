@@ -23,10 +23,17 @@ def _get_database_uri() -> str:
 
     Converts DATABASE_URL (with asyncpg driver) to standard postgresql:// format
     that postgres-mcp expects.
+    
+    Prefers DATABASE_URL_LOCAL for local scripts (localhost), falls back to DATABASE_URL
+    for Docker containers (postgres hostname).
     """
+    # Prefer DATABASE_URL_LOCAL for local development (uses localhost)
     database_url = os.environ.get(
-        "DATABASE_URL",
-        "postgresql+asyncpg://fitness_user:fitness_pass_dev@postgres:5432/fitness_bot"
+        "DATABASE_URL_LOCAL",
+        os.environ.get(
+            "DATABASE_URL",
+            "postgresql+asyncpg://fitness_user:fitness_pass_dev@localhost:5432/fitness_bot"
+        )
     )
     # Convert asyncpg format to standard postgresql format for postgres-mcp
     return database_url.replace("postgresql+asyncpg://", "postgresql://")

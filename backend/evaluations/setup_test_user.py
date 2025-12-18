@@ -33,60 +33,57 @@ async def create_test_user_with_plan():
     async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
     async with async_session() as session:
-        # Use the EXACT UUID from eval dataset (query_agent_simple_v1.json)
-        EVAL_TEST_USER_ID = UUID("c2608a59-3af8-4600-9de3-3ce004d40187")
-        
-        # Check if test user already exists
+        # Find existing test user by email (don't assume UUID)
         result = await session.execute(
-            select(User).where(User.id == EVAL_TEST_USER_ID)
+            select(User).where(User.email == "eval_test_user@fitness.ai")
         )
         existing_user = result.scalar_one_or_none()
 
-        if existing_user:
-            print(f"✓ Test user already exists: {existing_user.id}")
-            print(f"  Deleting existing fitness plans to recreate with complete data...")
-            
-            # Delete existing fitness plans (cascade will handle related data)
-            await session.execute(
-                select(FitnessPlan).where(FitnessPlan.user_id == EVAL_TEST_USER_ID)
-            )
-            plans_result = await session.execute(
-                select(FitnessPlan).where(FitnessPlan.user_id == EVAL_TEST_USER_ID)
-            )
-            for plan in plans_result.scalars():
-                await session.delete(plan)
-            await session.commit()
-
-        else:
-            # Create test user with specific UUID
+        if not existing_user:
+            # Create new test user
             test_user = User(
-                id=EVAL_TEST_USER_ID,
+                id=uuid4(),
                 email="eval_test_user@fitness.ai",
-            password_hash="$2b$12$dummy_hash_for_test_user_only",  # Won't be used for login
-            name="Evaluation Test User",
-            date_of_birth=datetime(1990, 1, 1),
-            gender="male",
-            height_cm="178",
-            weight_kg="80",
-            fitness_level="intermediate",
-            activity_level="moderately_active",
-            equipment_access=["dumbbells", "barbell", "bench", "pull_up_bar"],
-            dietary_restrictions=[],
-            preferences={},
-            timezone="America/New_York",
-            is_active=True,
-        )
+                password_hash="$2b$12$dummy_hash_for_test_user_only",
+                name="Evaluation Test User",
+                date_of_birth=datetime(1990, 1, 1),
+                gender="male",
+                height_cm="178",
+                weight_kg="80",
+                fitness_level="intermediate",
+                activity_level="moderately_active",
+                equipment_access=["dumbbells", "barbell", "bench", "pull_up_bar"],
+                dietary_restrictions=[],
+                preferences={},
+                timezone="America/New_York",
+                is_active=True,
+            )
             session.add(test_user)
             await session.commit()
-            print(f"✓ Created new test user: {EVAL_TEST_USER_ID}")
-
-        # Create fitness plan
+            print(f"✓ Created new test user: {test_user.id}")
+            existing_user = test_user
+        else:
+            print(f"✓ Test user already exists: {existing_user.id}")
+            print(f"  Email: {existing_user.email}")
+            
+            # Delete existing fitness plans to recreate with complete data
+            plans_result = await session.execute(
+                select(FitnessPlan).where(FitnessPlan.user_id == existing_user.id)
+            )
+            plans = plans_result.scalars().all()
+            if plans:
+                print(f"  Deleting {len(plans)} existing fitness plan(s)...")
+                for plan in plans:
+                    await session.delete(plan)
+                await session.commit()
+                print(f"  ✓ Deleted old fitness plans")
+        # Create fitness plan for the actual user
         start_date = datetime.now().date()
         end_date = start_date + timedelta(weeks=12)
 
         fitness_plan = FitnessPlan(
             id=uuid4(),
-            user_id=EVAL_TEST_USER_ID,
+            user_id=existing_user.id,
             goal_type="muscle_gain",
             goal_description="12-Week Muscle Building Program",
             duration_weeks=12,
@@ -187,6 +184,7 @@ async def create_test_user_with_plan():
             id=uuid4(),
             fitness_plan_id=fitness_plan.id,
             daily_calorie_target=2800,  # Muscle gain surplus
+            macronutrient_distribution={"protein_percent": 30, "carbs_percent": 40, "fats_percent": 30},
             protein_grams_target=180,  # 1g per lb bodyweight
             carbs_grams_target=350,
             fats_grams_target=78,
@@ -199,7 +197,7 @@ async def create_test_user_with_plan():
         )
         session.add(meal_plan)
 
-        # Create sample meals
+        # Create sample meals (using correct column names: protein_grams, carbs_grams, fats_grams)
         meals = [
             Meal(
                 id=uuid4(),
@@ -208,16 +206,18 @@ async def create_test_user_with_plan():
                 meal_type="breakfast",
                 name="High Protein Breakfast",
                 calories=700,
-                protein_g=50,
-                carbs_g=75,
-                fat_g=20,
-                ingredients=[
-                    "4 whole eggs",
-                    "1 cup oatmeal",
-                    "1 banana",
-                    "1 tbsp peanut butter",
-                ],
-                preparation_instructions="Scramble eggs, cook oatmeal with banana and peanut butter",
+                protein_grams=50,
+                carbs_grams=75,
+                fats_grams=20,
+                meal_details={
+                    "ingredients": [
+                        {"name": "4 whole eggs", "calories": 280, "protein": 24},
+                        {"name": "1 cup oatmeal", "calories": 150, "carbs": 27},
+                        {"name": "1 banana", "calories": 105, "carbs": 27},
+                        {"name": "1 tbsp peanut butter", "calories": 95, "fat": 8},
+                    ],
+                    "preparation": "Scramble eggs, cook oatmeal with banana and peanut butter",
+                },
             ),
             Meal(
                 id=uuid4(),
@@ -226,16 +226,18 @@ async def create_test_user_with_plan():
                 meal_type="lunch",
                 name="Chicken and Rice",
                 calories=750,
-                protein_g=55,
-                carbs_g=90,
-                fat_g=15,
-                ingredients=[
-                    "8oz chicken breast",
-                    "1.5 cups brown rice",
-                    "Mixed vegetables",
-                    "1 tbsp olive oil",
-                ],
-                preparation_instructions="Grill chicken, cook rice, sauté vegetables in olive oil",
+                protein_grams=55,
+                carbs_grams=90,
+                fats_grams=15,
+                meal_details={
+                    "ingredients": [
+                        {"name": "8oz chicken breast", "calories": 330, "protein": 50},
+                        {"name": "1.5 cups brown rice", "calories": 330, "carbs": 69},
+                        {"name": "Mixed vegetables", "calories": 50, "carbs": 10},
+                        {"name": "1 tbsp olive oil", "calories": 120, "fat": 14},
+                    ],
+                    "preparation": "Grill chicken, cook rice, sauté vegetables in olive oil",
+                },
             ),
             Meal(
                 id=uuid4(),
@@ -244,16 +246,18 @@ async def create_test_user_with_plan():
                 meal_type="dinner",
                 name="Steak and Sweet Potato",
                 calories=800,
-                protein_g=50,
-                carbs_g=85,
-                fat_g=25,
-                ingredients=[
-                    "6oz sirloin steak",
-                    "1 large sweet potato",
-                    "Broccoli",
-                    "1 tbsp butter",
-                ],
-                preparation_instructions="Grill steak, bake sweet potato, steam broccoli",
+                protein_grams=50,
+                carbs_grams=85,
+                fats_grams=25,
+                meal_details={
+                    "ingredients": [
+                        {"name": "6oz sirloin steak", "calories": 350, "protein": 45},
+                        {"name": "1 large sweet potato", "calories": 180, "carbs": 41},
+                        {"name": "Broccoli", "calories": 50, "carbs": 10},
+                        {"name": "1 tbsp butter", "calories": 100, "fat": 11},
+                    ],
+                    "preparation": "Grill steak, bake sweet potato, steam broccoli",
+                },
             ),
             Meal(
                 id=uuid4(),
@@ -262,16 +266,18 @@ async def create_test_user_with_plan():
                 meal_type="snack",
                 name="Post-Workout Shake",
                 calories=550,
-                protein_g=45,
-                carbs_g=100,
-                fat_g=8,
-                ingredients=[
-                    "2 scoops protein powder",
-                    "1 banana",
-                    "2 cups milk",
-                    "1 tbsp honey",
-                ],
-                preparation_instructions="Blend all ingredients",
+                protein_grams=45,
+                carbs_grams=100,
+                fats_grams=8,
+                meal_details={
+                    "ingredients": [
+                        {"name": "2 scoops protein powder", "calories": 240, "protein": 40},
+                        {"name": "1 banana", "calories": 105, "carbs": 27},
+                        {"name": "2 cups milk", "calories": 240, "protein": 16, "carbs": 24},
+                        {"name": "1 tbsp honey", "calories": 64, "carbs": 17},
+                    ],
+                    "preparation": "Blend all ingredients",
+                },
             ),
         ]
         session.add_all(meals)
@@ -339,8 +345,8 @@ async def create_test_user_with_plan():
 
         await session.commit()
 
-        print(f"✓ Created complete test data for user: {EVAL_TEST_USER_ID}")
-        print(f"  Email: eval_test_user@fitness.ai")
+        print(f"\n✓ Created complete test data for user: {existing_user.id}")
+        print(f"  Email: {existing_user.email}")
         print(f"  Fitness Plan: {fitness_plan.goal_description} (status: {fitness_plan.status})")
         print(f"  Phases: {len([phase1, phase2, phase3])}")
         print(f"  Workout Plan: {workout_plan.program_type}")
@@ -350,8 +356,11 @@ async def create_test_user_with_plan():
         print(f"  Current Phase: {phase1.name}")
         print()
         print(f"✓ All data ready for query_agent evaluation tests!")
+        print()
+        print(f"⚠️  IMPORTANT: Update eval dataset user_id to: {existing_user.id}")
+        print(f"   File: backend/evaluations/datasets/query_agent_simple_v1.json")
 
-        return str(EVAL_TEST_USER_ID)
+        return str(existing_user.id)
 
     await engine.dispose()
 

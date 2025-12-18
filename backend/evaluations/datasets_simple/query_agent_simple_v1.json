@@ -6,7 +6,7 @@
     {
       "id": "query_001",
       "inputs": {
-        "user_id": "c2608a59-3af8-4600-9de3-3ce004d40187",
+        "user_id": "fa19dc54-a35b-4aab-adf8-816933f96fa4",
         "query_request": "Get my current active fitness plan with all workout and meal details"
       },
       "expectations": {
@@ -35,7 +35,7 @@
     {
       "id": "query_002",
       "inputs": {
-        "user_id": "c2608a59-3af8-4600-9de3-3ce004d40187",
+        "user_id": "fa19dc54-a35b-4aab-adf8-816933f96fa4",
         "query_request": "What are my daily calorie and protein targets from my meal plan?"
       },
       "expectations": {

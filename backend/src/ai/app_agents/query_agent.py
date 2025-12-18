@@ -28,18 +28,11 @@ def create_query_agent() -> Agent:
     initialized lazily by query_tools.py when the query_database function is called.
     The MCP server connection is added to this agent dynamically at runtime.
 
-    The agent gets access to all the tools provided by the postgres-mcp server:
-    - execute_sql: Execute SQL queries
-    - list_schemas: List database schemas
-    - list_objects: List tables/views in a schema
-    - get_object_details: Get detailed table information
-    - explain_query: Get query execution plans
-    - analyze_db_health: Check database health
-    - analyze_workload_indexes: Analyze and recommend indexes
-    - get_top_queries: Get slow queries from pg_stat_statements
+    The agent gets access to the 'query' tool provided by the postgres-mcp server
+    which allows executing SQL queries against the PostgreSQL database.
 
-    The agent can use these tools to answer natural language queries about
-    exercises, workouts, and other fitness data.
+    The agent can use this tool to answer natural language queries about
+    exercises, workouts, meal plans, and other fitness data.
 
     Returns:
         Agent configured for database queries (MCP server added at runtime)
@@ -53,12 +46,14 @@ fitness-related data from PostgreSQL using natural language requests.
 ⚠️ CRITICAL WORKFLOW - FOLLOW THESE STEPS:
 1. Understand what data the requesting agent needs
 2. Generate the appropriate SQL query based on the schema below
-3. ALWAYS USE THE execute_sql MCP TOOL to run the query
+3. ALWAYS USE THE 'query' MCP TOOL to run the query
 4. Format and return the ACTUAL results from the database
 
 ❌ DO NOT just describe the SQL or propose next steps
 ❌ DO NOT return mock/example data
-✅ ALWAYS call execute_sql tool and return real data
+✅ ALWAYS call the 'query' tool and return real data
+
+Note: The postgres-mcp server provides a 'query' tool (not 'execute_sql')
 
 Your role is to:
 1. Understand what data the requesting agent needs

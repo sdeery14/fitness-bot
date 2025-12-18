@@ -7,8 +7,9 @@ from sqlalchemy.orm import declarative_base
 from src.config import settings
 
 # Create async engine
+# Uses DATABASE_URL_LOCAL if set (for local scripts), otherwise DATABASE_URL (for Docker)
 engine = create_async_engine(
-    settings.DATABASE_URL,
+    settings.get_database_url(),
     echo=settings.ENVIRONMENT == "development",
     future=True,
     pool_pre_ping=True,

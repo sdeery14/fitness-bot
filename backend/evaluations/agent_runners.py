@@ -7,6 +7,7 @@ evaluation framework. Each runner:
 3. Returns outputs in a format suitable for judge evaluation
 """
 
+import asyncio
 import json
 from typing import Any
 from agents import Runner
@@ -15,6 +16,7 @@ from src.ai.app_agents.workout_phase_agent import workout_phase_agent
 from src.ai.app_agents.intake_specialist_agent import intake_specialist_agent
 from src.ai.app_agents.fitness_coach_agent import fitness_coach_agent
 from src.ai.app_agents.query_agent import query_agent
+from src.ai.tools.query_tools import initialize_mcp_server, _mcp_server
 
 
 # ============================================================================
@@ -351,60 +353,98 @@ async def run_query_agent(**inputs) -> dict[str, Any]:
     agent_input = f"""User ID: {user_id}
 Query: {query_request}"""
     
-    try:
-        # Initialize MCP server for database access
-        await initialize_mcp_server()
-        
-        # DEBUG: Verify MCP server connection
-        print(f"\n[DEBUG] MCP Server initialized: {_mcp_server is not None}")
-        print(f"[DEBUG] Query agent has MCP servers: {len(query_agent.mcp_servers) if query_agent.mcp_servers else 0}")
-        
-        if query_agent.mcp_servers:
-            try:
-                tools = await query_agent.mcp_servers[0].list_tools()
-                tool_names = [t.name for t in tools]
-                print(f"[DEBUG] Available MCP tools: {tool_names}")
-                print(f"[DEBUG] execute_sql available: {'execute_sql' in tool_names}")
-            except Exception as e:
-                print(f"[DEBUG] Failed to list MCP tools: {e}")
-        else:
-            print(f"[DEBUG] WARNING: query_agent.mcp_servers is empty!")
-        
-        print(f"[DEBUG] Running query agent with input: {agent_input[:100]}...\n")
-        
-        # Run query agent (uses postgres-mcp MCP server)
-        result = await Runner.run(
-            starting_agent=query_agent,
-            input=agent_input,
-            session=None
-        )
-        
-        response_text = result.final_output
-        
-        # Extract SQL queries and results from the response if possible
-        # Note: The actual SQL and results are in the MCP tool calls
-        return {
-            "response": response_text,
-            "query_executed": True,  # Assume query executed if agent responded
-            "user_id": user_id,
-            "query_request": query_request,
-        }
-    finally:
-        # Clean up MCP server after execution
-        await cleanup_mcp_server()
+    # Note: MCP server initialized once in run_query_agent_sync, not per-call
+    
+    # DEBUG: Verify MCP server connection
+    print(f"\n[DEBUG] MCP Server initialized: {_mcp_server is not None}")
+    print(f"[DEBUG] Query agent has MCP servers: {len(query_agent.mcp_servers) if query_agent.mcp_servers else 0}")
+    
+    if query_agent.mcp_servers:
+        try:
+            tools = await query_agent.mcp_servers[0].list_tools()
+            tool_names = [t.name for t in tools]
+            print(f"[DEBUG] Available MCP tools: {tool_names}")
+            print(f"[DEBUG] 'query' tool available: {'query' in tool_names}")
+        except Exception as e:
+            print(f"[DEBUG] Failed to list MCP tools: {e}")
+    else:
+        print(f"[DEBUG] WARNING: query_agent.mcp_servers is empty!")
+    
+    print(f"[DEBUG] Running query agent with input: {agent_input[:100]}...\n")
+    
+    # Run query agent (uses postgres-mcp MCP server)
+    result = await Runner.run(
+        starting_agent=query_agent,
+        input=agent_input,
+        session=None
+    )
+    
+    response_text = result.final_output
+    
+    # Extract SQL queries and results from the response if possible
+    # Note: The actual SQL and results are in the MCP tool calls
+    return {
+        "response": response_text,
+        "query_executed": True,  # Assume query executed if agent responded
+        "user_id": user_id,
+        "query_request": query_request,
+    }
+
+
+# Persistent event loop and initialization flag for query_agent
+import threading
+_query_agent_loop: asyncio.AbstractEventLoop | None = None
+_query_agent_loop_thread: threading.Thread | None = None
+_query_agent_initialized = False
+_query_agent_lock = threading.Lock()
+
+
+def _run_event_loop_forever(loop: asyncio.AbstractEventLoop):
+    """Background thread that runs the event loop forever."""
+    asyncio.set_event_loop(loop)
+    loop.run_forever()
 
 
 def run_query_agent_sync(**inputs) -> dict[str, Any]:
-    """Synchronous wrapper for run_query_agent."""
+    """Synchronous wrapper for run_query_agent.
+    
+    Uses a dedicated background thread with an event loop to keep MCP server
+    alive across test cases. Worker threads submit coroutines via 
+    run_coroutine_threadsafe for thread-safe concurrent execution.
+    """
     import asyncio
+    global _query_agent_loop, _query_agent_loop_thread, _query_agent_initialized
     
-    try:
-        loop = asyncio.get_event_loop()
-    except RuntimeError:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
+    # Initialize event loop thread once
+    with _query_agent_lock:
+        if _query_agent_loop is None:
+            # Create new event loop for the background thread
+            _query_agent_loop = asyncio.new_event_loop()
+            
+            # Start background thread to run the loop
+            _query_agent_loop_thread = threading.Thread(
+                target=_run_event_loop_forever,
+                args=(_query_agent_loop,),
+                daemon=True,
+                name="query_agent_loop_thread"
+            )
+            _query_agent_loop_thread.start()
+        
+        # Initialize MCP server once in the background loop
+        if not _query_agent_initialized:
+            future = asyncio.run_coroutine_threadsafe(
+                initialize_mcp_server(),
+                _query_agent_loop
+            )
+            future.result(timeout=30)  # Wait for initialization
+            _query_agent_initialized = True
     
-    return loop.run_until_complete(run_query_agent(**inputs))
+    # Submit coroutine to background loop and wait for result
+    future = asyncio.run_coroutine_threadsafe(
+        run_query_agent(**inputs),
+        _query_agent_loop
+    )
+    return future.result(timeout=120)  # 2 minute timeout for query execution
 
 
 # ============================================================================

@@ -179,7 +179,7 @@ workout_safety_guideline = Guidelines(
 query_agent_quality = make_judge(
     name="query_agent_quality",
     instructions="""
-You are evaluating a database query agent that helps retrieve fitness data using SQL.
+You are evaluating a database query agent that uses MCP (Model Context Protocol) tools to retrieve fitness data.
 
 User Request:
 {{ inputs }}
@@ -190,41 +190,50 @@ Agent Response:
 Expected Behavior:
 {{ expectations }}
 
-Evaluate the agent on:
+Trace Data (Tool Calls):
+{{ trace }}
 
-1. **SQL Correctness** (40%):
-   - Uses correct column names from schema (e.g., daily_calorie_target NOT daily_calories)
+⚠️ CRITICAL: This agent uses MCP tools to execute SQL queries. The SQL is NOT shown in the user-facing response.
+You MUST examine the {{ trace }} data to see the actual tool calls and SQL queries executed.
+
+Evaluation Criteria:
+
+1. **MCP Tool Usage** (30%):
+   - Did the agent call the 'query' MCP tool? (Check {{ trace }} for tool calls)
+   - Were tools called appropriately for the request?
+   - Did tool calls succeed or error?
+   
+2. **SQL Correctness** (30%):
+   - Examine the SQL in tool call arguments (in {{ trace }})
+   - Uses correct column names (daily_calorie_target NOT daily_calories, protein_grams_target NOT protein_g)
    - Proper JOIN syntax and table relationships
-   - Correct filtering and WHERE clauses
-   - Uses appropriate data types and UUIDs
+   - Correct filtering with user_id and status='active'
+   - Uses UUIDs correctly
 
-2. **Query Efficiency** (20%):
+3. **Query Efficiency** (15%):
+   - Check SQL in {{ trace }} for efficiency
    - Minimizes unnecessary JOINs
-   - Appropriate use of WHERE to limit results
-   - Returns only needed columns
-   - Good query structure
+   - Appropriate use of WHERE clauses
+   - Returns only needed data
 
-3. **Result Completeness** (20%):
-   - Returns all requested data
-   - Includes relevant related information
-   - Properly handles NULL values
-   - Structured results that answer the question
-
-4. **MCP Tool Usage** (10%):
-   - Properly uses execute_sql or other MCP tools
-   - Calls appropriate database functions
-   - Handles tool responses correctly
-
+4. **Result Completeness** (15%):
+   - Does the final response include all requested data?
+   - Is the response well-formatted and user-friendly?
+   - Are all expected fields present (calories, protein, workouts, meals, etc.)?
+   
 5. **Error Handling** (10%):
    - Handles missing data gracefully
    - Provides clear explanations when no data found
-   - Catches and explains SQL errors
+   - Catches and reports errors appropriately
 
-Rate the overall quality:
-- excellent: Perfect SQL, efficient, complete results
-- good: Minor issues but achieves goal
-- acceptable: Works but has inefficiencies or minor errors
-- poor: Major SQL errors, wrong columns, or fails to retrieve data
+Rating Guidelines:
+- excellent: Called MCP tools correctly, perfect SQL with correct columns, complete formatted results
+- good: Called tools correctly, minor SQL inefficiencies but gets data, complete results
+- acceptable: Called tools, SQL works but has issues, results mostly complete
+- poor: Failed to call tools, SQL errors, wrong columns, incomplete or missing results
+
+⚠️ DO NOT penalize the agent for not showing SQL in the user-facing response. 
+That is by design - the SQL is executed via MCP tools and the agent returns formatted results.
 
 Return only: excellent, good, acceptable, or poor
 """,
