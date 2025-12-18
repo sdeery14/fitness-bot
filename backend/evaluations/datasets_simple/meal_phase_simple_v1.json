@@ -1,7 +1,7 @@
 {
   "name": "meal_phase_simple_v1",
-  "version": "1.0.0",
-  "description": "Meal phase agent evaluation - phase-specific nutrition planning",
+  "version": "2.0.0",
+  "description": "Meal phase agent evaluation - phase-specific nutrition planning with comprehensive coverage (10 test cases)",
   "test_cases": [
     {
       "id": "mp_001",
@@ -106,6 +106,428 @@
         "diet_type": "omnivore",
         "phase": "hypertrophy",
         "goal": "muscle_growth",
+        "priority": "high"
+      }
+    },
+    {
+      "id": "mp_003",
+      "inputs": {
+        "meal_plan_description": "Plant-based cutting plan with focus on protein and satiety",
+        "phase_number": 1,
+        "phase_name": "Cutting Phase",
+        "phase_objectives": [
+          "Create sustainable calorie deficit",
+          "Preserve muscle mass",
+          "Maintain energy and performance"
+        ],
+        "phase_duration_weeks": 6,
+        "phase_start_date": "2026-01-05",
+        "phase_start_day": "Monday",
+        "dietary_restrictions": [
+          "Vegan"
+        ],
+        "meal_frequency": 4
+      },
+      "expectations": {
+        "expected_behavior": "Generate cutting phase meal plan with calorie deficit (0.8-0.85 modifier). High protein for vegan diet (30-35% minimum) using plant-based sources. Must include 2 sample days. All percentage-based schema requirements met.",
+        "calorie_goal_modifier_range": "0.8-0.85",
+        "calorie_goal_modifier_description": "Moderate deficit for fat loss (15-20% below TDEE)",
+        "macro_split_carbs_percent": "40-50",
+        "macro_split_protein_percent": "30-35",
+        "macro_split_fat_percent": "20-30",
+        "macros_sum_to_100": true,
+        "sample_days_count": 2,
+        "meals_per_day": 4,
+        "meal_percentages_sum_to_100": true,
+        "food_percentages_sum_to_100": true,
+        "honors_dietary_restrictions": true,
+        "includes_grocery_list": true,
+        "includes_shopping_schedule": true,
+        "includes_prep_sessions": true,
+        "includes_prep_schedule": true
+      },
+      "source": {
+        "source_type": "HUMAN",
+        "source_data": {
+          "curator": "nutrition_expert",
+          "date": "2025-12-18",
+          "guidelines": "meal_agent_eval_v1"
+        }
+      },
+      "tags": {
+        "agent": "meal_phase_agent",
+        "diet_type": "vegan",
+        "phase": "cutting",
+        "goal": "fat_loss",
+        "priority": "high"
+      }
+    },
+    {
+      "id": "mp_004",
+      "inputs": {
+        "meal_plan_description": "Strength-focused meal plan with intermittent fasting approach",
+        "phase_number": 2,
+        "phase_name": "Strength Phase",
+        "phase_objectives": [
+          "Support maximal strength gains",
+          "Optimize pre/post workout nutrition",
+          "Maintain body composition"
+        ],
+        "phase_duration_weeks": 6,
+        "phase_start_date": "2026-01-12",
+        "phase_start_day": "Monday",
+        "dietary_restrictions": [],
+        "meal_frequency": 3
+      },
+      "expectations": {
+        "expected_behavior": "Generate strength phase meal plan with 3 meals/day (IF pattern). Slight surplus (1.05 modifier). Pre/post workout timing critical. Must include 2 sample days with proper nutrient timing.",
+        "calorie_goal_modifier_range": "1.0-1.1",
+        "calorie_goal_modifier_description": "Maintenance to slight surplus for strength",
+        "macro_split_carbs_percent": "35-45",
+        "macro_split_protein_percent": "30-35",
+        "macro_split_fat_percent": "25-35",
+        "macros_sum_to_100": true,
+        "sample_days_count": 2,
+        "meals_per_day": 3,
+        "meal_percentages_sum_to_100": true,
+        "food_percentages_sum_to_100": true,
+        "includes_preworkout_meal": true,
+        "includes_postworkout_meal": true,
+        "includes_shopping_schedule": true,
+        "includes_prep_schedule": true
+      },
+      "source": {
+        "source_type": "HUMAN",
+        "source_data": {
+          "curator": "nutrition_expert",
+          "date": "2025-12-18",
+          "guidelines": "meal_agent_eval_v1"
+        }
+      },
+      "tags": {
+        "agent": "meal_phase_agent",
+        "diet_type": "omnivore",
+        "phase": "strength",
+        "goal": "strength_gain",
+        "meal_pattern": "intermittent_fasting",
+        "priority": "high"
+      }
+    },
+    {
+      "id": "mp_005",
+      "inputs": {
+        "meal_plan_description": "Aggressive cutting plan for competition prep with multiple restrictions",
+        "phase_number": 3,
+        "phase_name": "Peak Week Prep",
+        "phase_objectives": [
+          "Maximize fat loss",
+          "Preserve muscle mass",
+          "Manage hunger and energy"
+        ],
+        "phase_duration_weeks": 4,
+        "phase_start_date": "2026-02-01",
+        "phase_start_day": "Saturday",
+        "dietary_restrictions": [
+          "Vegetarian",
+          "No gluten"
+        ],
+        "meal_frequency": 5
+      },
+      "expectations": {
+        "expected_behavior": "Generate aggressive cutting phase with deficit (0.75-0.8 modifier). Very high protein (35-40%) to preserve muscle. 5 meals for satiety. Must honor vegetarian + gluten-free restrictions.",
+        "calorie_goal_modifier_range": "0.75-0.8",
+        "calorie_goal_modifier_description": "Aggressive deficit for late-stage cut (20-25% below TDEE)",
+        "macro_split_carbs_percent": "30-40",
+        "macro_split_protein_percent": "35-40",
+        "macro_split_fat_percent": "25-30",
+        "macros_sum_to_100": true,
+        "sample_days_count": 2,
+        "meals_per_day": 5,
+        "meal_percentages_sum_to_100": true,
+        "food_percentages_sum_to_100": true,
+        "honors_dietary_restrictions": true,
+        "includes_grocery_list": true,
+        "includes_shopping_schedule": true,
+        "includes_prep_sessions": true
+      },
+      "source": {
+        "source_type": "HUMAN",
+        "source_data": {
+          "curator": "nutrition_expert",
+          "date": "2025-12-18",
+          "guidelines": "meal_agent_eval_v1"
+        }
+      },
+      "tags": {
+        "agent": "meal_phase_agent",
+        "diet_type": "vegetarian",
+        "dietary_restrictions": "gluten_free",
+        "phase": "aggressive_cut",
+        "goal": "competition_prep",
+        "priority": "high"
+      }
+    },
+    {
+      "id": "mp_006",
+      "inputs": {
+        "meal_plan_description": "Ketogenic muscle building plan with high fat emphasis",
+        "phase_number": 2,
+        "phase_name": "Keto Hypertrophy Phase",
+        "phase_objectives": [
+          "Build muscle in ketosis",
+          "Maintain ketogenic macros",
+          "Optimize workout performance"
+        ],
+        "phase_duration_weeks": 8,
+        "phase_start_date": "2026-02-15",
+        "phase_start_day": "Sunday",
+        "dietary_restrictions": [
+          "Keto (under 25g net carbs/day)"
+        ],
+        "meal_frequency": 4
+      },
+      "expectations": {
+        "expected_behavior": "Generate keto hypertrophy plan with surplus (1.15-1.2 modifier). Extreme macro split: very low carbs (5-10%), high fat (60-70%), moderate-high protein (25-30%). Must validate percentages sum to 100% with unusual ratios.",
+        "calorie_goal_modifier_range": "1.15-1.2",
+        "calorie_goal_modifier_description": "Calorie surplus for keto muscle building",
+        "macro_split_carbs_percent": "5-10",
+        "macro_split_protein_percent": "25-30",
+        "macro_split_fat_percent": "60-70",
+        "macros_sum_to_100": true,
+        "sample_days_count": 2,
+        "meals_per_day": 4,
+        "meal_percentages_sum_to_100": true,
+        "food_percentages_sum_to_100": true,
+        "honors_dietary_restrictions": true,
+        "includes_grocery_list": true,
+        "includes_shopping_schedule": true
+      },
+      "source": {
+        "source_type": "HUMAN",
+        "source_data": {
+          "curator": "nutrition_expert",
+          "date": "2025-12-18",
+          "guidelines": "meal_agent_eval_v1"
+        }
+      },
+      "tags": {
+        "agent": "meal_phase_agent",
+        "diet_type": "keto",
+        "phase": "hypertrophy",
+        "goal": "muscle_growth",
+        "macro_challenge": "extreme_split",
+        "priority": "high"
+      }
+    },
+    {
+      "id": "mp_007",
+      "inputs": {
+        "meal_plan_description": "Foundation plan for beginners with food allergies and frequent meals",
+        "phase_number": 1,
+        "phase_name": "Habit Building Phase",
+        "phase_objectives": [
+          "Establish meal routine",
+          "Learn food prep basics",
+          "Build sustainable habits"
+        ],
+        "phase_duration_weeks": 4,
+        "phase_start_date": "2026-03-01",
+        "phase_start_day": "Saturday",
+        "dietary_restrictions": [
+          "No dairy",
+          "No tree nuts",
+          "No shellfish"
+        ],
+        "meal_frequency": 6
+      },
+      "expectations": {
+        "expected_behavior": "Generate beginner-friendly foundation plan with maintenance calories (1.0 modifier). 6 smaller meals for consistency. Must strictly avoid dairy, tree nuts, and shellfish. Grocery list must be allergy-aware.",
+        "calorie_goal_modifier_range": "0.95-1.05",
+        "calorie_goal_modifier_description": "Maintenance for habit building",
+        "macro_split_carbs_percent": "40-50",
+        "macro_split_protein_percent": "25-30",
+        "macro_split_fat_percent": "25-30",
+        "macros_sum_to_100": true,
+        "sample_days_count": 2,
+        "meals_per_day": 6,
+        "meal_percentages_sum_to_100": true,
+        "food_percentages_sum_to_100": true,
+        "honors_dietary_restrictions": true,
+        "includes_grocery_list": true,
+        "includes_shopping_schedule": true,
+        "includes_prep_sessions": true
+      },
+      "source": {
+        "source_type": "HUMAN",
+        "source_data": {
+          "curator": "nutrition_expert",
+          "date": "2025-12-18",
+          "guidelines": "meal_agent_eval_v1"
+        }
+      },
+      "tags": {
+        "agent": "meal_phase_agent",
+        "diet_type": "omnivore",
+        "dietary_restrictions": "multiple_allergies",
+        "phase": "foundation",
+        "goal": "habit_building",
+        "priority": "high"
+      }
+    },
+    {
+      "id": "mp_008",
+      "inputs": {
+        "meal_plan_description": "Budget-friendly cutting plan with minimal meal prep time",
+        "phase_number": 1,
+        "phase_name": "Budget Cut Phase",
+        "phase_objectives": [
+          "Reduce body fat economically",
+          "Use simple, affordable ingredients",
+          "Minimize prep time"
+        ],
+        "phase_duration_weeks": 6,
+        "phase_start_date": "2026-03-15",
+        "phase_start_day": "Sunday",
+        "dietary_restrictions": [],
+        "meal_frequency": 3
+      },
+      "expectations": {
+        "expected_behavior": "Generate budget-conscious cutting plan with deficit (0.85 modifier). 3 meals for simplicity. Focus on affordable staples (eggs, rice, chicken, frozen vegetables). Minimal prep time. Quick assembly meals preferred.",
+        "calorie_goal_modifier_range": "0.8-0.85",
+        "calorie_goal_modifier_description": "Moderate deficit for sustainable fat loss",
+        "macro_split_carbs_percent": "35-45",
+        "macro_split_protein_percent": "30-35",
+        "macro_split_fat_percent": "25-30",
+        "macros_sum_to_100": true,
+        "sample_days_count": 2,
+        "meals_per_day": 3,
+        "meal_percentages_sum_to_100": true,
+        "food_percentages_sum_to_100": true,
+        "includes_grocery_list": true,
+        "includes_shopping_schedule": true,
+        "practicality_focus": "budget_and_time"
+      },
+      "source": {
+        "source_type": "HUMAN",
+        "source_data": {
+          "curator": "nutrition_expert",
+          "date": "2025-12-18",
+          "guidelines": "meal_agent_eval_v1"
+        }
+      },
+      "tags": {
+        "agent": "meal_phase_agent",
+        "diet_type": "omnivore",
+        "phase": "cutting",
+        "goal": "fat_loss",
+        "constraint": "budget",
+        "priority": "high"
+      }
+    },
+    {
+      "id": "mp_009",
+      "inputs": {
+        "meal_plan_description": "Mid-program maintenance plan for pescatarian with gluten sensitivity",
+        "phase_number": 2,
+        "phase_name": "Maintenance Phase",
+        "phase_objectives": [
+          "Maintain progress from Phase 1",
+          "Assess body composition changes",
+          "Prepare for Phase 3 progression"
+        ],
+        "phase_duration_weeks": 4,
+        "phase_start_date": "2026-04-01",
+        "phase_start_day": "Tuesday",
+        "dietary_restrictions": [
+          "Pescatarian",
+          "Gluten-sensitive (avoid wheat)"
+        ],
+        "meal_frequency": 4
+      },
+      "expectations": {
+        "expected_behavior": "Generate mid-program maintenance plan (1.0 modifier). Pescatarian with gluten-free grains. Must show consistency with previous phase approach while avoiding gluten.",
+        "calorie_goal_modifier_range": "0.95-1.05",
+        "calorie_goal_modifier_description": "Maintenance between phases",
+        "macro_split_carbs_percent": "40-45",
+        "macro_split_protein_percent": "25-30",
+        "macro_split_fat_percent": "25-30",
+        "macros_sum_to_100": true,
+        "sample_days_count": 2,
+        "meals_per_day": 4,
+        "meal_percentages_sum_to_100": true,
+        "food_percentages_sum_to_100": true,
+        "honors_dietary_restrictions": true,
+        "includes_grocery_list": true,
+        "includes_shopping_schedule": true
+      },
+      "source": {
+        "source_type": "HUMAN",
+        "source_data": {
+          "curator": "nutrition_expert",
+          "date": "2025-12-18",
+          "guidelines": "meal_agent_eval_v1"
+        }
+      },
+      "tags": {
+        "agent": "meal_phase_agent",
+        "diet_type": "pescatarian",
+        "dietary_restrictions": "gluten_sensitive",
+        "phase": "maintenance",
+        "goal": "maintain",
+        "priority": "medium"
+      }
+    },
+    {
+      "id": "mp_010",
+      "inputs": {
+        "meal_plan_description": "High-carb performance plan for endurance athlete",
+        "phase_number": 2,
+        "phase_name": "Peak Performance Phase",
+        "phase_objectives": [
+          "Maximize glycogen stores",
+          "Support high training volume",
+          "Optimize recovery nutrition"
+        ],
+        "phase_duration_weeks": 6,
+        "phase_start_date": "2026-04-20",
+        "phase_start_day": "Sunday",
+        "dietary_restrictions": [
+          "Vegan"
+        ],
+        "meal_frequency": 5
+      },
+      "expectations": {
+        "expected_behavior": "Generate performance-focused vegan plan with surplus (1.15 modifier). High carbs (50-55%) for endurance. Pre/post workout timing critical. Must include refeed day strategy.",
+        "calorie_goal_modifier_range": "1.1-1.2",
+        "calorie_goal_modifier_description": "Surplus for performance and recovery",
+        "macro_split_carbs_percent": "50-55",
+        "macro_split_protein_percent": "20-25",
+        "macro_split_fat_percent": "20-30",
+        "macros_sum_to_100": true,
+        "sample_days_count": 2,
+        "meals_per_day": 5,
+        "meal_percentages_sum_to_100": true,
+        "food_percentages_sum_to_100": true,
+        "honors_dietary_restrictions": true,
+        "includes_preworkout_meal": true,
+        "includes_postworkout_meal": true,
+        "includes_grocery_list": true,
+        "includes_shopping_schedule": true
+      },
+      "source": {
+        "source_type": "HUMAN",
+        "source_data": {
+          "curator": "nutrition_expert",
+          "date": "2025-12-18",
+          "guidelines": "meal_agent_eval_v1"
+        }
+      },
+      "tags": {
+        "agent": "meal_phase_agent",
+        "diet_type": "vegan",
+        "phase": "performance",
+        "goal": "endurance",
+        "athlete_type": "endurance",
         "priority": "high"
       }
     }
