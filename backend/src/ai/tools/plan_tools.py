@@ -14,7 +14,7 @@ from pydantic import BaseModel, Field
 
 from src.ai.app_agents.meal_phase_agent import meal_phase_agent
 from src.ai.app_agents.workout_phase_agent import workout_phase_agent
-from src.ai.schemas import MealPlanMetadata, WorkoutPlanMetadata
+from src.ai.schemas import MealPlanMetadata, UserBiometrics, WorkoutPlanMetadata
 from src.services.plan_service import PlanService
 
 # Context variables for passing user_id, db_session, and conversation_id to function tools
@@ -524,6 +524,7 @@ class FitnessPlanInput(BaseModel):
     """Input parameters for complete fitness plan generation.
     
     A fitness plan contains:
+    - User biometrics (for TDEE/calorie calculation)
     - Basic plan information (name, goal, description)
     - Phases with explicit dates
     - A workout plan (with its own requirements, metadata, and schedule preferences)
@@ -531,6 +532,11 @@ class FitnessPlanInput(BaseModel):
     """
 
     model_config = {"extra": "forbid"}
+
+    # User biometric data for calorie calculation
+    biometrics: UserBiometrics = Field(
+        description="User's biometric data (age, sex, height, weight, activity level) for TDEE/calorie calculation"
+    )
 
     # Plan-level basic information
     name: str = Field(
