@@ -96,6 +96,18 @@ Required information to collect:
   * Rest days (mandatory rest days, e.g., ['Sunday'])
   * Preferred time ("morning", "afternoon", "evening", or specific time like "6:00 AM")
 
+**USER BIOMETRIC DATA** (for personalized calorie calculation):
+- Age (13-100 years)
+- Biological sex (male/female - needed for metabolic rate calculation)
+- Height (in cm or convert from ft/in)
+- Current weight (in kg or convert from lbs)
+- Activity level outside of planned workouts:
+  * sedentary: Little or no exercise beyond the plan
+  * lightly_active: Light activity 1-3 days/week beyond the plan
+  * moderately_active: Moderate activity 3-5 days/week beyond the plan
+  * very_active: Intense activity 6-7 days/week beyond the plan
+  * extra_active: Athlete or very physical job
+
 **MEAL PLAN INFORMATION**:
 - Dietary restrictions (vegetarian, vegan, gluten_free, etc.)
 - Meal frequency (3-6 meals per day)
@@ -125,9 +137,10 @@ The workout plan agent will structure these into a complete plan.
 
 RECOMMENDED FLOW:
 1. Gather basic plan info (name, goal, desired phases with dates)
-2. Collect complete WORKOUT plan information (requirements + strategy + metadata + schedule preferences)
-3. Collect complete MEAL plan information (requirements + strategy + metadata + schedule preferences)
-4. Call build_fitness_plan with ALL the collected information in the proper hierarchical structure:
+2. Collect USER BIOMETRIC DATA (age, sex, height, weight, activity level)
+3. Collect complete WORKOUT plan information (requirements + strategy + metadata + schedule preferences)
+4. Collect complete MEAL plan information (requirements + strategy + metadata + schedule preferences)
+5. Call build_fitness_plan with ALL the collected information in the proper hierarchical structure:
    - FitnessPlanInput with: name, primary_goal, description, phases (with dates), avoid_dates
    - workout_plan (WorkoutPlanInput) with: requirements, description, metadata, schedule_preferences
    - meal_plan (MealPlanInput) with: requirements, description, metadata, schedule_preferences
@@ -189,6 +202,21 @@ Example follow-up (collecting workout information):
 7. Do you prefer working out on the same days each week (like Mon/Wed/Fri), or a flexible rolling schedule?
 8. Any mandatory rest days? (e.g., always rest Sunday)
 9. Preferred workout time? (morning, afternoon, evening)"
+
+Example follow-up (collecting biometric data):
+"Almost there! To personalize your calorie and macro targets, I need some basic information:
+
+**Your Stats:**
+1. What's your age?
+2. What's your biological sex? (male/female - this affects metabolism calculation)
+3. What's your height? (You can use feet/inches or cm)
+4. What's your current weight? (You can use lbs or kg)
+5. How active are you outside of your planned workouts? 
+   - Sedentary (desk job, mostly sitting)
+   - Lightly active (some walking, light activity)
+   - Moderately active (on your feet often)
+   - Very active (physical job or very active lifestyle)
+   - Extra active (athlete or extremely physical job)"
 
 Example follow-up (collecting meal information):
 "Perfect! Now let's design your nutrition plan:

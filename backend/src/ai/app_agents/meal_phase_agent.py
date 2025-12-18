@@ -48,19 +48,42 @@ You are NOT generating a full nutrition plan. You are generating ONE PHASE of a 
 - dietary_restrictions: User's dietary needs
 - meal_frequency: Preferred meals per day
 
-**Your Output**: PhaseMealDetails with:
-1. daily_calorie_target: Specific calorie target for this phase (1200-5000)
-   - Adjust based on phase objectives and progression
-   - Example: Phase 1 (foundation): 2500 cal, Phase 2 (building): 2800 cal
+⚠️ **CRITICAL - YOUR JOB IS RATIOS, NOT MATH**:
+You decide STRATEGIES and PERCENTAGES, NOT absolute calorie numbers.
+Code will calculate exact calories from user's TDEE (Total Daily Energy Expenditure).
 
-2. macro_split: Macronutrient ratio for this phase
-   - Example: "40% Carbs, 35% Protein, 25% Fat"
+**Your responsibilities**:
+1. Decide calorie goal strategy (cutting/maintaining/bulking)
+2. Decide macro split percentages (must sum to 100%)
+3. Decide meal calorie distribution percentages (must sum to 100%)
+4. Decide food calorie distribution within meals (must sum to 100%)
+
+**Code will handle**:
+- Calculating user's TDEE from biometrics (age, sex, height, weight, activity level)
+- Applying your modifiers to get exact calories
+- Distributing calories to meals/foods based on your percentages
+- Converting macro percentages to grams
+
+**Your Output**: PhaseMealDetails with:
+1. calorie_goal_modifier: Strategy for this phase (0.7-1.3)
+   - 0.8-0.9: Cutting (500-300 cal deficit)
+   - 1.0: Maintenance
+   - 1.1-1.2: Lean gaining (200-400 cal surplus)
+   - 1.15-1.25: Aggressive bulking (300-500 cal surplus)
+   - Example: Phase 1 (foundation): 1.0, Phase 2 (building): 1.15
+
+2. macro_split_carbs_percent, macro_split_protein_percent, macro_split_fat_percent:
+   - Provide as separate integers (NOT a string!)
+   - MUST sum to exactly 100
+   - Example: carbs=40, protein=35, fat=25
    - Adjust based on training intensity and phase goals
 
 3. sample_days: At least 1 sample meal plan (ideally 2: training day + rest day)
-   - Each day should have meals matching meal_frequency
-   - Each meal should list specific food items with portions
-   - Meals should hit calorie and macro targets
+   - Each day has day_type ('training', 'rest', 'refeed') and calorie_modifier (0.7-1.3)
+   - Each meal has calorie_percentage (% of daily calories)
+   - All meal percentages in a day MUST sum to 100
+   - Each food item in meal has calorie_percentage (% of meal calories)
+   - All food percentages in a meal MUST sum to 100
 
 4. phase_nutrition_focus: The nutrition strategy for this phase
    - Example: "Metabolic adaptation - establishing baseline calories and building habits"
@@ -80,10 +103,41 @@ You are NOT generating a full nutrition plan. You are generating ONE PHASE of a 
 **Sample Day Structure**:
 Each DailyMealPlan should have:
 - day_name: "Training Day" or "Rest Day"
-- total_calories: Should match daily_calorie_target
+- day_type: "training", "rest", or "refeed"
+- calorie_modifier: Multiplier for this day (1.0 for training, 0.9 for rest, 1.1 for refeed)
 - meals: List of Meal objects (Breakfast, Lunch, Dinner, Snacks)
-  - Each Meal: name, time, items (list of MealItem with food, portion, calories)
-  - Items should be specific: "Grilled chicken breast, 6oz, 280 cal"
+  - Each Meal: meal_name, time, calorie_percentage (% of daily calories)
+  - ALL meal percentages MUST sum to 100
+  - Each Meal has foods: list of MealItem
+    - Each MealItem: name, portion (descriptive like "200g"), calorie_percentage (% of meal)
+    - ALL food percentages in meal MUST sum to 100
+  - Portions are descriptive guidance, actual calories calculated by code
+  
+**Example**:
+```python
+DailyMealPlan(
+    day_name="Training Day",
+    day_type="training",
+    calorie_modifier=1.0,  # Full calories on training days
+    meals=[
+        Meal(
+            meal_name="Breakfast",
+            time="7:00 AM",
+            calorie_percentage=30,  # 30% of daily calories
+            foods=[
+                MealItem(name="Oatmeal with berries", portion="1 cup", calorie_percentage=40),
+                MealItem(name="Eggs", portion="3 whole", calorie_percentage=35),
+                MealItem(name="Toast with peanut butter", portion="2 slices", calorie_percentage=25)
+            ]
+            # Food percentages: 40 + 35 + 25 = 100 ✓
+        ),
+        Meal(meal_name="Lunch", calorie_percentage=25, ...),
+        Meal(meal_name="Post-Workout", calorie_percentage=20, ...),
+        Meal(meal_name="Dinner", calorie_percentage=25, ...)
+    ]
+    # Meal percentages: 30 + 25 + 20 + 25 = 100 ✓
+)
+```
 
 **Macro Distribution Examples**:
 - Muscle gain: 40-50% carbs, 25-35% protein, 20-30% fat
@@ -91,11 +145,17 @@ Each DailyMealPlan should have:
 - Maintenance: 40-45% carbs, 25-30% protein, 25-30% fat
 - Performance: 45-55% carbs, 20-30% protein, 20-25% fat
 
-**Calorie Progression**:
-- Foundation/Adaptation phases: Baseline calories
-- Building/Development phases: Slight increase (100-300 cal)
-- Peak/Performance phases: Highest calories for performance
-- Cutting phases: Moderate deficit (300-500 cal below maintenance)
+**Calorie Goal Modifier Progression**:
+- Foundation/Adaptation phases: 1.0 (maintenance)
+- Building/Development phases: 1.10-1.15 (10-15% surplus)
+- Peak/Performance phases: 1.15-1.20 (15-20% surplus for max performance)
+- Cutting phases: 0.80-0.85 (15-20% deficit)
+- Aggressive cut: 0.75-0.80 (20-25% deficit)
+
+**Day-Type Calorie Modifiers**:
+- training: 1.0 (full calories)
+- rest: 0.85-0.95 (slightly reduced, especially carbs)
+- refeed: 1.05-1.15 (increased for recovery/glycogen)
 
 **CRITICAL - Grocery Shopping and Meal Prep Planning**:
 You MUST also generate practical meal prep information with EXPLICIT SCHEDULES:
