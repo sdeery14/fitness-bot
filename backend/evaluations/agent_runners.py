@@ -201,12 +201,12 @@ User message: {user_message}"""
     # Set context for tools using real test user from database
     # User ID: fa19dc54-a35b-4aab-adf8-816933f96fa4 (created by setup_test_user.py)
     from uuid import UUID
-    from src.database import get_async_session
+    from src.database import get_db
     
     test_user_id = UUID("fa19dc54-a35b-4aab-adf8-816933f96fa4")
     
     # Get a real database session for tool access
-    db_session_gen = get_async_session()
+    db_session_gen = get_db()
     db_session = await db_session_gen.__anext__()
     
     try:
