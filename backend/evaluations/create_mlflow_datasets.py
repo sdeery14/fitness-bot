@@ -347,6 +347,76 @@ meal_phase_dataset = {
 
 def save_datasets():
     """Save datasets to JSON files."""
+# Query Agent Dataset
+query_agent_dataset = {
+    "name": "query_agent_simple_v1",
+    "version": "1.0.0",
+    "description": "Query agent database query evaluation",
+    "test_cases": [
+        {
+            "id": "query_001",
+            "inputs": {
+                "user_id": "c2608a59-3af8-4600-9de3-3ce004d40187",  # eval_test_user@fitness.ai
+                "query_request": "Get my current active fitness plan with all workout and meal details"
+            },
+            "expectations": {
+                "expected_behavior": "Execute SQL query to retrieve active fitness plan with phases, workout_plan metadata, and meal_plan metadata. Use correct column names (daily_calorie_target, protein_grams_target, etc.). Return structured results with plan info, workout frequency, progression strategy, calorie targets, and macro targets.",
+                "uses_correct_columns": True,
+                "includes_workout_plan": True,
+                "includes_meal_plan": True,
+                "uses_mcp_tools": True,
+                "returns_structured_data": True,
+                "query_efficiency": "good"
+            },
+            "source": {
+                "source_type": "HUMAN",
+                "source_data": {
+                    "curator": "database_expert",
+                    "date": datetime.now().strftime("%Y-%m-%d"),
+                    "guidelines": "query_agent_eval_v1"
+                }
+            },
+            "tags": {
+                "query_type": "complex_join",
+                "priority": "high",
+                "complexity": "medium"
+            }
+        },
+        {
+            "id": "query_002",
+            "inputs": {
+                "user_id": "c2608a59-3af8-4600-9de3-3ce004d40187",
+                "query_request": "What are my daily calorie and protein targets from my meal plan?"
+            },
+            "expectations": {
+                "expected_behavior": "Execute SQL query to get meal_plan data with CORRECT column names: daily_calorie_target, protein_grams_target. Return simple, clear answer with numeric values. Must NOT use incorrect column names like 'daily_calories' or 'protein_g'.",
+                "uses_correct_column_names": True,
+                "includes_calorie_target": True,
+                "includes_protein_target": True,
+                "query_simplicity": "simple",
+                "returns_numeric_values": True
+            },
+            "source": {
+                "source_type": "HUMAN",
+                "source_data": {
+                    "curator": "database_expert",
+                    "date": datetime.now().strftime("%Y-%m-%d"),
+                    "guidelines": "query_agent_eval_v1"
+                }
+            },
+            "tags": {
+                "query_type": "simple_select",
+                "priority": "critical",
+                "complexity": "low",
+                "schema_accuracy_test": "true"
+            }
+        }
+    ]
+}
+
+
+def save_datasets():
+    """Save all datasets to JSON files."""
     datasets_dir = Path(__file__).parent / "datasets_simple"
     datasets_dir.mkdir(exist_ok=True)
     
@@ -354,7 +424,8 @@ def save_datasets():
         (workout_phase_dataset, "workout_phase_simple_v1.json"),
         (intake_dataset, "intake_simple_v1.json"),
         (coach_dataset, "fitness_coach_simple_v1.json"),
-        (meal_phase_dataset, "meal_phase_simple_v1.json")
+        (meal_phase_dataset, "meal_phase_simple_v1.json"),
+        (query_agent_dataset, "query_agent_simple_v1.json")
     ]
     
     for dataset, filename in datasets:

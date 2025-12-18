@@ -175,6 +175,63 @@ workout_safety_guideline = Guidelines(
     model="openai:/gpt-5-mini",
 )
 
+# Query Agent Judge: Database query quality and correctness
+query_agent_quality = make_judge(
+    name="query_agent_quality",
+    instructions="""
+You are evaluating a database query agent that helps retrieve fitness data using SQL.
+
+User Request:
+{{ inputs }}
+
+Agent Response:
+{{ outputs }}
+
+Expected Behavior:
+{{ expectations }}
+
+Evaluate the agent on:
+
+1. **SQL Correctness** (40%):
+   - Uses correct column names from schema (e.g., daily_calorie_target NOT daily_calories)
+   - Proper JOIN syntax and table relationships
+   - Correct filtering and WHERE clauses
+   - Uses appropriate data types and UUIDs
+
+2. **Query Efficiency** (20%):
+   - Minimizes unnecessary JOINs
+   - Appropriate use of WHERE to limit results
+   - Returns only needed columns
+   - Good query structure
+
+3. **Result Completeness** (20%):
+   - Returns all requested data
+   - Includes relevant related information
+   - Properly handles NULL values
+   - Structured results that answer the question
+
+4. **MCP Tool Usage** (10%):
+   - Properly uses execute_sql or other MCP tools
+   - Calls appropriate database functions
+   - Handles tool responses correctly
+
+5. **Error Handling** (10%):
+   - Handles missing data gracefully
+   - Provides clear explanations when no data found
+   - Catches and explains SQL errors
+
+Rate the overall quality:
+- excellent: Perfect SQL, efficient, complete results
+- good: Minor issues but achieves goal
+- acceptable: Works but has inefficiencies or minor errors
+- poor: Major SQL errors, wrong columns, or fails to retrieve data
+
+Return only: excellent, good, acceptable, or poor
+""",
+    feedback_value_type=Literal["excellent", "good", "acceptable", "poor"],
+    model="openai:/gpt-5-mini",
+)
+
 
 # ============================================================================
 # Convenience: All Judges Registry
@@ -185,6 +242,7 @@ JUDGES = {
     "intake": intake_agent_judge,
     "fitness_coach": fitness_coach_judge,
     "meal_phase": meal_phase_judge,
+    "query_agent": query_agent_quality,
 }
 
 GUIDELINES = {
@@ -210,6 +268,7 @@ def get_judges_for_agent(agent_name: str, include_guidelines: bool = True):
         "intake_agent": [intake_agent_judge],
         "fitness_coach_agent": [fitness_coach_judge],
         "meal_phase_agent": [meal_phase_judge],
+        "query_agent": [query_agent_quality],
     }
 
     # Secondary guideline-based scorers (safety & compliance)
@@ -218,6 +277,7 @@ def get_judges_for_agent(agent_name: str, include_guidelines: bool = True):
         "intake_agent": [safety_guideline, tone_guideline],
         "fitness_coach_agent": [safety_guideline, tone_guideline],
         "meal_phase_agent": [safety_guideline],
+        "query_agent": [],  # No safety guidelines needed for database queries
     }
 
     judges = primary_judges.get(agent_name)

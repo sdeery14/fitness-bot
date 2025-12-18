@@ -14,6 +14,7 @@ from agents import Runner
 from src.ai.app_agents.workout_phase_agent import workout_phase_agent
 from src.ai.app_agents.intake_specialist_agent import intake_specialist_agent
 from src.ai.app_agents.fitness_coach_agent import fitness_coach_agent
+from src.ai.app_agents.query_agent import query_agent
 
 
 # ============================================================================
@@ -327,6 +328,69 @@ def run_meal_phase_agent_sync(**inputs) -> dict[str, Any]:
 
 
 # ============================================================================
+# Query Agent Runner
+# ============================================================================
+
+async def run_query_agent(**inputs) -> dict[str, Any]:
+    """Run query_agent with MLflow dataset inputs.
+    
+    Args:
+        **inputs: Keyword args containing:
+            - user_id: User UUID (str)
+            - query_request: Natural language query (str)
+    
+    Returns:
+        Dict with agent response and query execution details
+    """
+    from src.ai.tools.query_tools import initialize_mcp_server, cleanup_mcp_server
+    
+    user_id = inputs.get("user_id")
+    query_request = inputs.get("query_request")
+    
+    # Build input with user context
+    agent_input = f"""User ID: {user_id}
+Query: {query_request}"""
+    
+    try:
+        # Initialize MCP server for database access
+        await initialize_mcp_server()
+        
+        # Run query agent (uses postgres-mcp MCP server)
+        result = await Runner.run(
+            starting_agent=query_agent,
+            input=agent_input,
+            session=None
+        )
+        
+        response_text = result.final_output
+        
+        # Extract SQL queries and results from the response if possible
+        # Note: The actual SQL and results are in the MCP tool calls
+        return {
+            "response": response_text,
+            "query_executed": True,  # Assume query executed if agent responded
+            "user_id": user_id,
+            "query_request": query_request,
+        }
+    finally:
+        # Clean up MCP server after execution
+        await cleanup_mcp_server()
+
+
+def run_query_agent_sync(**inputs) -> dict[str, Any]:
+    """Synchronous wrapper for run_query_agent."""
+    import asyncio
+    
+    try:
+        loop = asyncio.get_event_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+    
+    return loop.run_until_complete(run_query_agent(**inputs))
+
+
+# ============================================================================
 # Registry: Map agent names to runner functions
 # ============================================================================
 
@@ -335,6 +399,7 @@ AGENT_RUNNERS = {
     "intake_agent": run_intake_agent_sync,
     "fitness_coach_agent": run_fitness_coach_agent_sync,
     "meal_phase_agent": run_meal_phase_agent_sync,
+    "query_agent": run_query_agent_sync,
 }
 
 
