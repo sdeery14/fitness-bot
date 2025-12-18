@@ -16,6 +16,7 @@ from src.ai.app_agents.meal_phase_agent import meal_phase_agent
 from src.ai.app_agents.workout_phase_agent import workout_phase_agent
 from src.ai.schemas import MealPlanMetadata, UserBiometrics, WorkoutPlanMetadata
 from src.services.plan_service import PlanService
+from src.utils.calorie_calculator import calculate_tdee
 
 # Context variables for passing user_id, db_session, and conversation_id to function tools
 _user_id_context: ContextVar[UUID | None] = ContextVar("user_id", default=None)
@@ -145,6 +146,7 @@ async def _build_phase_with_agents(
     phase_num: int,
     total_phases: int,
     requirements,  # FitnessPlanInput
+    tdee: float,  # NEW: User's calculated TDEE for calorie calculations
 ):
     """Build a single phase by calling workout and meal agents.
 
@@ -153,6 +155,7 @@ async def _build_phase_with_agents(
         phase_num: Current phase number (1-indexed)
         total_phases: Total number of phases in plan
         requirements: FitnessPlanInput with user requirements
+        tdee: User's Total Daily Energy Expenditure (calories/day)
 
     Returns:
         PhaseOutput with workout and meal details
@@ -216,7 +219,16 @@ User Context:
 - Meal Frequency: {requirements.meal_plan.meal_frequency} meals/day
 - Primary Goal: {requirements.primary_goal}
 
-Generate the specific calorie target, macro split, sample meal plans, and nutrition focus for this phase."""
+User Biometrics & TDEE:
+- Age: {requirements.biometrics.age} years
+- Sex: {requirements.biometrics.biological_sex}
+- Height: {requirements.biometrics.height_cm} cm
+- Weight: {requirements.biometrics.weight_kg} kg
+- Activity Level: {requirements.biometrics.activity_level}
+- **Calculated TDEE (Total Daily Energy Expenditure): {int(tdee)} calories/day**
+  (This is the user's maintenance calories based on their biometrics and activity level.)
+
+Generate the specific calorie goal modifier (for cutting/maintaining/bulking), macro split percentages, sample meal plans, and nutrition focus for this phase."""
 
     meal_details_result = await Runner.run(
         starting_agent=meal_phase_agent,
@@ -601,21 +613,25 @@ async def build_fitness_plan(requirements: FitnessPlanInput) -> str:
     try:
         from src.ai.schemas import FitnessPlanOutput
 
-        # 1. Validate and parse phase dates
+        # 1. Calculate TDEE from user biometrics
+        tdee = calculate_tdee(requirements.biometrics)
+        print(f"Calculated TDEE: {int(tdee)} calories/day (Age: {requirements.biometrics.age}, Sex: {requirements.biometrics.biological_sex}, Weight: {requirements.biometrics.weight_kg}kg, Activity: {requirements.biometrics.activity_level})")
+
+        # 2. Validate and parse phase dates
         phase_data, start_date, end_date, actual_duration_weeks = _validate_and_parse_phases(
             requirements.phases
         )
         num_phases = len(phase_data)
 
-        # 2. Build phases using phase-specific agents
+        # 3. Build phases using phase-specific agents (passing TDEE for meal calculations)
         phases = []
         for phase_num, phase_info in enumerate(phase_data, 1):
             phase_output = await _build_phase_with_agents(
-                phase_info, phase_num, num_phases, requirements
+                phase_info, phase_num, num_phases, requirements, tdee
             )
             phases.append(phase_output)
 
-        # 3. Create comprehensive multi-phase fitness plan output
+        # 4. Create comprehensive multi-phase fitness plan output
         # Generate key principles from workout and meal metadata
         key_principles = []
         if requirements.workout_plan.metadata.training_principles:
@@ -648,10 +664,10 @@ async def build_fitness_plan(requirements: FitnessPlanInput) -> str:
         # Validate plan completeness
         fitness_plan_output.validate_completeness()
 
-        # 4. Save plan to database
+        # 5. Save plan to database (including TDEE for future reference)
         plan_id = await _save_plan_to_database(fitness_plan_output, requirements, start_date)
 
-        # 5. Return result
+        # 6. Return result
         return json.dumps({
             "fitness_plan": fitness_plan_output.model_dump(),
             "status": "success",
