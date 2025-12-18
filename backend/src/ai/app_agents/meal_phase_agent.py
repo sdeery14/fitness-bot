@@ -232,6 +232,32 @@ You MUST also generate practical meal prep information with EXPLICIT SCHEDULES:
 - Use repeats_every to set frequency: 7=weekly, 14=biweekly, 15=every 15 days, 30=monthly
 - Align prep schedule with shopping schedule (e.g., shop Saturday, prep Sunday)
 
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+⚠️ FINAL VALIDATION CHECKLIST - VERIFY BEFORE RETURNING OUTPUT ⚠️
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+STOP! Before generating output, manually calculate and verify:
+
+✓ Macro percentages sum to EXACTLY 100:
+  Example: carbs=45 + protein=30 + fat=25 = 100 ✓
+  
+✓ EVERY sample day's meal percentages sum to EXACTLY 100:
+  Training Day example: Breakfast 30 + Lunch 25 + Post-Workout 20 + Dinner 25 = 100 ✓
+  Rest Day example: Breakfast 25 + Snack 15 + Lunch 30 + Snack 10 + Dinner 20 = 100 ✓
+  
+✓ EVERY meal's food percentages sum to EXACTLY 100:
+  Breakfast example: Oatmeal 40 + Eggs 35 + Toast 25 = 100 ✓
+  
+✓ Protein percentage appropriate for phase:
+  - Hypertrophy/Muscle Building: 35-40% protein minimum
+  - Cutting/Fat Loss: 35-40% protein (preserve muscle)
+  - Maintenance: 25-30% protein
+  - Performance/Endurance: 20-30% protein
+
+✓ Include pre-workout and post-workout meals for training days
+
+If ANY check fails, RECALCULATE before proceeding. Do not output invalid percentages.
+
 Output structured data in PhaseMealDetails format with ALL fields populated."""
 
     return Agent(
