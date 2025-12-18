@@ -83,17 +83,11 @@ def run_workout_phase_agent_sync(**inputs) -> dict[str, Any]:
     """Synchronous wrapper for workout phase agent (for MLflow compatibility).
     
     MLflow's evaluate function expects synchronous predict functions.
-    This wrapper runs the async agent in a new event loop.
+    This wrapper runs the async agent using asyncio.run().
     """
     import asyncio
     
-    try:
-        loop = asyncio.get_event_loop()
-    except RuntimeError:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-    
-    return loop.run_until_complete(run_workout_phase_agent(**inputs))
+    return asyncio.run(run_workout_phase_agent(**inputs))
 
 
 # ============================================================================
@@ -150,13 +144,7 @@ def run_intake_agent_sync(**inputs) -> dict[str, Any]:
     """Synchronous wrapper for intake agent."""
     import asyncio
     
-    try:
-        loop = asyncio.get_event_loop()
-    except RuntimeError:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-    
-    return loop.run_until_complete(run_intake_agent(**inputs))
+    return asyncio.run(run_intake_agent(**inputs))
 
 
 # ============================================================================
@@ -248,13 +236,7 @@ def run_fitness_coach_agent_sync(**inputs) -> dict[str, Any]:
     """Synchronous wrapper for fitness coach agent."""
     import asyncio
     
-    try:
-        loop = asyncio.get_event_loop()
-    except RuntimeError:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-    
-    return loop.run_until_complete(run_fitness_coach_agent(**inputs))
+    return asyncio.run(run_fitness_coach_agent(**inputs))
 
 
 async def run_meal_phase_agent(**inputs) -> dict[str, Any]:
@@ -316,17 +298,11 @@ def run_meal_phase_agent_sync(**inputs) -> dict[str, Any]:
     """Synchronous wrapper for meal phase agent evaluation.
     
     MLflow's evaluate function expects synchronous predict functions.
-    This wrapper runs the async agent in a new event loop.
+    This wrapper runs the async agent using asyncio.run().
     """
     import asyncio
     
-    try:
-        loop = asyncio.get_event_loop()
-    except RuntimeError:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-    
-    return loop.run_until_complete(run_meal_phase_agent(**inputs))
+    return asyncio.run(run_meal_phase_agent(**inputs))
 
 
 # ============================================================================
