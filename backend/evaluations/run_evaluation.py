@@ -42,6 +42,25 @@ def run_evaluation(
         dataset_id: MLflow dataset ID (e.g., 'd-e984081e783a491a869dafc6c9e3e403')
         run_name: Optional name for this evaluation run
     """
+    # Pre-initialize MCP server if agent needs it (before MLflow starts)
+    if agent_name in ['fitness_coach_agent', 'intake_agent', 'query_agent']:
+        print("[INFO] Pre-initializing MCP server (this may take 10-15 seconds)...")
+        import asyncio
+        from src.ai.tools.query_tools import initialize_mcp_server
+        
+        # Run initialization synchronously
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            loop.run_until_complete(initialize_mcp_server())
+            print("[INFO] ✓ MCP server pre-initialized successfully")
+        except Exception as e:
+            print(f"[WARN] MCP server pre-initialization failed: {e}")
+            print("[INFO] Evaluation will continue without MCP functionality")
+        finally:
+            # Don't close the loop - keep it for later use
+            pass
+    
     # Set MLflow tracking
     mlflow.set_tracking_uri("http://localhost:5000")
     mlflow.set_experiment(experiment_id=str(experiment_id))

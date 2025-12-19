@@ -72,11 +72,14 @@ async def initialize_mcp_server() -> None:
     global _mcp_server
     
     if _mcp_server is not None:
+        print("[DEBUG] MCP server already initialized, skipping")
         return  # Already initialized
 
     try:
         # Create new MCP server with stdio transport
         database_uri = _get_database_uri()
+        print(f"[DEBUG] Connecting MCP server to database: {database_uri}")
+        print(f"[DEBUG] Starting npx subprocess...")
         _mcp_server = MCPServerStdio(
             name="Postgres MCP",
             params={
@@ -85,17 +88,23 @@ async def initialize_mcp_server() -> None:
             },
         )
         
+        print(f"[DEBUG] Entering MCP server context (this may take 5-10 seconds)...")
         # Initialize the server (enter async context)
         await _mcp_server.__aenter__()
+        print(f"[DEBUG] MCP server context entered successfully")
 
         # Lazy import to avoid circular dependency
         from src.ai.app_agents.query_agent import query_agent
         # Add the MCP server to the query agent
         query_agent.mcp_servers = [_mcp_server]
+        print(f"[DEBUG] MCP server added to query_agent")
         
         print("✓ MCP server initialized successfully")
     except Exception as e:
-        print(f"⚠ MCP server initialization failed (app will continue without it): {e}")
+        import traceback
+        print(f"⚠ MCP server initialization failed: {e}")
+        print(f"[DEBUG] Full traceback:")
+        traceback.print_exc()
         _mcp_server = None
 
 
@@ -126,8 +135,13 @@ async def _execute_database_query(description: str) -> str:
         JSON string with query results or error message
     """
     try:
-        # Get the initialized MCP server (raises if not initialized)
-        _get_mcp_server()
+        # Check if MCP server is initialized (fail fast if not)
+        if _mcp_server is None:
+            return json.dumps({
+                "error": "MCP server not initialized. Database queries are unavailable.",
+                "description": description,
+                "suggestion": "The query_fitness_plan tool is currently unavailable. Try answering based on the user context provided in the prompt."
+            })
 
         # Lazy import to avoid circular dependency
         from src.ai.app_agents.query_agent import query_agent

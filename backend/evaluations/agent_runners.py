@@ -9,6 +9,7 @@ evaluation framework. Each runner:
 
 import asyncio
 import json
+import threading
 from typing import Any
 from agents import Runner
 
@@ -17,6 +18,24 @@ from src.ai.app_agents.intake_specialist_agent import intake_specialist_agent
 from src.ai.app_agents.fitness_coach_agent import fitness_coach_agent
 from src.ai.app_agents.query_agent import query_agent
 from src.ai.tools.query_tools import initialize_mcp_server, _mcp_server
+
+
+# ============================================================================
+# Shared Event Loop Infrastructure (for MCP server)
+# ============================================================================
+# 
+# All agents share a single persistent event loop and MCP server instance.
+# This is the SAME infrastructure used by query_agent (defined at bottom of file).
+# Reusing the proven query_agent pattern ensures consistent MCP initialization.
+# ============================================================================
+
+def _run_event_loop_forever(loop: asyncio.AbstractEventLoop):
+    """Background thread that runs the event loop forever.
+    
+    Used by all agent runners that need persistent MCP server connections.
+    """
+    asyncio.set_event_loop(loop)
+    loop.run_forever()
 
 
 # ============================================================================
@@ -141,10 +160,52 @@ async def run_intake_agent(**inputs) -> dict[str, Any]:
 
 
 def run_intake_agent_sync(**inputs) -> dict[str, Any]:
-    """Synchronous wrapper for intake agent."""
-    import asyncio
+    """Synchronous wrapper for intake agent.
     
-    return asyncio.run(run_intake_agent(**inputs))
+    Uses query_agent's event loop infrastructure (proven to work with MCP).
+    """
+    # Import the query_agent event loop infrastructure
+    global _query_agent_loop, _query_agent_loop_thread, _query_agent_initialized, _query_agent_lock
+    
+    try:
+        # Initialize event loop thread once (same as query_agent)
+        with _query_agent_lock:
+            if _query_agent_loop is None:
+                print("[DEBUG] Creating event loop for MCP server (query_agent infrastructure)...")
+                _query_agent_loop = asyncio.new_event_loop()
+                
+                _query_agent_loop_thread = threading.Thread(
+                    target=_run_event_loop_forever,
+                    args=(_query_agent_loop,),
+                    daemon=True,
+                    name="query_agent_loop_thread"
+                )
+                _query_agent_loop_thread.start()
+            
+            # Initialize MCP server once in the background loop
+            if not _query_agent_initialized:
+                print("[DEBUG] Initializing MCP server...")
+                future = asyncio.run_coroutine_threadsafe(
+                    initialize_mcp_server(),
+                    _query_agent_loop
+                )
+                future.result(timeout=30)  # Wait for initialization
+                _query_agent_initialized = True
+        
+        # Submit coroutine to query_agent loop and wait for result
+        future = asyncio.run_coroutine_threadsafe(
+            run_intake_agent(**inputs),
+            _query_agent_loop
+        )
+        return future.result()  # No timeout - let agent take as long as needed
+    except Exception as e:
+        error_msg = str(e)
+        print(f"[ERROR] Intake agent runner failed: {error_msg}")
+        return {
+            "response": f"System error: {error_msg}",
+            "error": True,
+            "error_message": error_msg,
+        }
 
 
 # ============================================================================
@@ -233,10 +294,52 @@ User message: {user_message}"""
 
 
 def run_fitness_coach_agent_sync(**inputs) -> dict[str, Any]:
-    """Synchronous wrapper for fitness coach agent."""
-    import asyncio
+    """Synchronous wrapper for fitness coach agent.
     
-    return asyncio.run(run_fitness_coach_agent(**inputs))
+    Uses query_agent's event loop infrastructure (proven to work with MCP).
+    """
+    # Import the query_agent event loop infrastructure
+    global _query_agent_loop, _query_agent_loop_thread, _query_agent_initialized, _query_agent_lock
+    
+    try:
+        # Initialize event loop thread once (same as query_agent)
+        with _query_agent_lock:
+            if _query_agent_loop is None:
+                print("[DEBUG] Creating event loop for MCP server (query_agent infrastructure)...")
+                _query_agent_loop = asyncio.new_event_loop()
+                
+                _query_agent_loop_thread = threading.Thread(
+                    target=_run_event_loop_forever,
+                    args=(_query_agent_loop,),
+                    daemon=True,
+                    name="query_agent_loop_thread"
+                )
+                _query_agent_loop_thread.start()
+            
+            # Initialize MCP server once in the background loop
+            if not _query_agent_initialized:
+                print("[DEBUG] Initializing MCP server...")
+                future = asyncio.run_coroutine_threadsafe(
+                    initialize_mcp_server(),
+                    _query_agent_loop
+                )
+                future.result(timeout=30)  # Wait for initialization
+                _query_agent_initialized = True
+        
+        # Submit coroutine to query_agent loop and wait for result
+        future = asyncio.run_coroutine_threadsafe(
+            run_fitness_coach_agent(**inputs),
+            _query_agent_loop
+        )
+        return future.result()  # No timeout - let agent take as long as needed
+    except Exception as e:
+        error_msg = str(e)
+        print(f"[ERROR] Fitness coach agent runner failed: {error_msg}")
+        return {
+            "response": f"System error: {error_msg}",
+            "error": True,
+            "error_message": error_msg,
+        }
 
 
 async def run_meal_phase_agent(**inputs) -> dict[str, Any]:
@@ -382,17 +485,10 @@ Query: {query_request}"""
 
 
 # Persistent event loop and initialization flag for query_agent
-import threading
 _query_agent_loop: asyncio.AbstractEventLoop | None = None
 _query_agent_loop_thread: threading.Thread | None = None
 _query_agent_initialized = False
 _query_agent_lock = threading.Lock()
-
-
-def _run_event_loop_forever(loop: asyncio.AbstractEventLoop):
-    """Background thread that runs the event loop forever."""
-    asyncio.set_event_loop(loop)
-    loop.run_forever()
 
 
 def run_query_agent_sync(**inputs) -> dict[str, Any]:
@@ -438,13 +534,14 @@ def run_query_agent_sync(**inputs) -> dict[str, Any]:
             run_query_agent(**inputs),
             _query_agent_loop
         )
-        return future.result(timeout=120)  # 2 minute timeout for query execution
+        return future.result()  # No timeout - let agent take as long as needed
         
-    except TimeoutError as e:
-        # Timeout waiting for query to complete
-        print(f"[ERROR] Query agent timeout after 120s: {inputs.get('query_request', 'unknown query')}")
+    except Exception as e:
+        # Handle any errors during query execution
+        print(f"[ERROR] Query agent error: {inputs.get('query_request', 'unknown query')}")
+        print(f"[ERROR] Exception: {e}")
         return {
-            "response": f"Query timed out after 120 seconds",
+            "response": f"Query failed: {str(e)}",
             "query_executed": False,
             "error": True,
             "error_message": "Timeout waiting for query execution",
