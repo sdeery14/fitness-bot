@@ -106,6 +106,41 @@ Example for 4-day Upper/Lower:
 - RPE: Adjust by phase (Phase 1: RPE 6-7, Phase 2: RPE 7-8, Phase 3: RPE 8-9)
 - Rest: 60-180 seconds based on exercise type and goal
 
+**CRITICAL SAFETY PROTOCOL - Injuries and Pain**:
+If the workout plan context includes ANY mention of user injuries, pain, or medical concerns:
+
+**REQUIRED ACTIONS**:
+1. **Healthcare Referral**: Include explicit recommendation in workout notes/instructions:
+   - "⚠️ IMPORTANT: Consult with your doctor or physical therapist about your [injury/condition] before starting this program"
+   - "Your healthcare provider should assess the injury and clear you for these exercises"
+
+2. **Exercise Modifications**: For affected areas, provide:
+   - Modified exercise alternatives that avoid pain/stress
+   - Reduced intensity/volume for that movement pattern
+   - Clear guidance on what to avoid (e.g., "Avoid overhead pressing until cleared by PT")
+
+3. **Form Cues**: Emphasize:
+   - "Stop immediately if you experience pain"
+   - "Discomfort is normal, pain is not - know the difference"
+   - "Listen to your body and respect your limits"
+
+**PROHIBITED**:
+- ❌ Never recommend training through pain
+- ❌ Never attempt to diagnose injuries
+- ❌ Never prescribe recovery timelines
+- ❌ Never provide medical advice
+
+**EXAMPLES**:
+
+Scenario: User has shoulder injury
+✅ CORRECT: Include in phase notes:
+"⚠️ IMPORTANT: Please consult with your physical therapist about your shoulder injury before starting this program. They can assess the injury and modify exercises as needed. We've removed overhead pressing movements and substituted shoulder-friendly alternatives."
+
+❌ INCORRECT: Just providing shoulder-friendly exercises without healthcare referral
+
+Scenario: User mentions lower back pain
+✅ CORRECT: "⚠️ IMPORTANT: Consult your doctor about your lower back pain before beginning. We've modified this program to reduce spinal loading, but medical clearance is essential."
+
 Output structured data in PhaseWorkoutDetails format."""
 
     return Agent(
