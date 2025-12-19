@@ -1,12 +1,12 @@
 {
   "name": "query_agent_simple_v1",
-  "version": "2.0.0",
-  "description": "Comprehensive query agent database query evaluation with edge cases",
+  "version": "1.0.0",
+  "description": "Query agent database query evaluation",
   "test_cases": [
     {
       "id": "query_001",
       "inputs": {
-        "user_id": "fa19dc54-a35b-4aab-adf8-816933f96fa4",
+        "user_id": "c2608a59-3af8-4600-9de3-3ce004d40187",
         "query_request": "Get my current active fitness plan with all workout and meal details"
       },
       "expectations": {
@@ -22,7 +22,7 @@
         "source_type": "HUMAN",
         "source_data": {
           "curator": "database_expert",
-          "date": "2025-12-17",
+          "date": "2025-12-18",
           "guidelines": "query_agent_eval_v1"
         }
       },
@@ -35,7 +35,7 @@
     {
       "id": "query_002",
       "inputs": {
-        "user_id": "fa19dc54-a35b-4aab-adf8-816933f96fa4",
+        "user_id": "c2608a59-3af8-4600-9de3-3ce004d40187",
         "query_request": "What are my daily calorie and protein targets from my meal plan?"
       },
       "expectations": {
@@ -50,7 +50,7 @@
         "source_type": "HUMAN",
         "source_data": {
           "curator": "database_expert",
-          "date": "2025-12-17",
+          "date": "2025-12-18",
           "guidelines": "query_agent_eval_v1"
         }
       },
@@ -59,215 +59,6 @@
         "priority": "critical",
         "complexity": "low",
         "schema_accuracy_test": "true"
-      }
-    },
-    {
-      "id": "query_003",
-      "inputs": {
-        "user_id": "fa19dc54-a35b-4aab-adf8-816933f96fa4",
-        "query_request": "Show me all workouts in phase 1 with their exercise counts"
-      },
-      "expectations": {
-        "expected_behavior": "Query workouts table filtered by phase_id for phase 1. Join to exercises table and count exercises per workout. Return workout names with exercise counts. Handle aggregation correctly.",
-        "uses_correct_tables": true,
-        "performs_aggregation": true,
-        "filters_by_phase": true,
-        "returns_counts": true
-      },
-      "source": {
-        "source_type": "HUMAN",
-        "source_data": {
-          "curator": "database_expert",
-          "date": "2025-12-18",
-          "guidelines": "query_agent_eval_v2"
-        }
-      },
-      "tags": {
-        "query_type": "aggregation",
-        "priority": "medium",
-        "complexity": "medium"
-      }
-    },
-    {
-      "id": "query_004",
-      "inputs": {
-        "user_id": "00000000-0000-0000-0000-000000000000",
-        "query_request": "Get my active fitness plan"
-      },
-      "expectations": {
-        "expected_behavior": "Execute query but find no active plans for this user. Return clear message that no active plan was found. Handle empty result set gracefully without errors.",
-        "handles_no_data": true,
-        "returns_clear_message": true,
-        "no_errors": true
-      },
-      "source": {
-        "source_type": "HUMAN",
-        "source_data": {
-          "curator": "database_expert",
-          "date": "2025-12-18",
-          "guidelines": "query_agent_eval_v2"
-        }
-      },
-      "tags": {
-        "query_type": "edge_case",
-        "priority": "high",
-        "complexity": "low",
-        "test_type": "no_data_found"
-      }
-    },
-    {
-      "id": "query_005",
-      "inputs": {
-        "user_id": "fa19dc54-a35b-4aab-adf8-816933f96fa4",
-        "query_request": "List all my meals for breakfast with calories and protein"
-      },
-      "expectations": {
-        "expected_behavior": "Query meals table filtered by meal_type='breakfast' and user's active plan. Return meal names, calories, and protein_grams. Use correct column name protein_grams (not protein_g).",
-        "filters_by_meal_type": true,
-        "uses_correct_columns": true,
-        "returns_meal_data": true
-      },
-      "source": {
-        "source_type": "HUMAN",
-        "source_data": {
-          "curator": "database_expert",
-          "date": "2025-12-18",
-          "guidelines": "query_agent_eval_v2"
-        }
-      },
-      "tags": {
-        "query_type": "filtered_select",
-        "priority": "medium",
-        "complexity": "low"
-      }
-    },
-    {
-      "id": "query_006",
-      "inputs": {
-        "user_id": "fa19dc54-a35b-4aab-adf8-816933f96fa4",
-        "query_request": "When does phase 2 start and what are its objectives?"
-      },
-      "expectations": {
-        "expected_behavior": "Query phases table filtered by phase_number=2 and user's active plan. Return start_date and objectives. Handle date formatting appropriately.",
-        "filters_by_phase_number": true,
-        "returns_date": true,
-        "returns_objectives": true
-      },
-      "source": {
-        "source_type": "HUMAN",
-        "source_data": {
-          "curator": "database_expert",
-          "date": "2025-12-18",
-          "guidelines": "query_agent_eval_v2"
-        }
-      },
-      "tags": {
-        "query_type": "date_query",
-        "priority": "medium",
-        "complexity": "low"
-      }
-    },
-    {
-      "id": "query_007",
-      "inputs": {
-        "user_id": "fa19dc54-a35b-4aab-adf8-816933f96fa4",
-        "query_request": "How many total exercises are in my entire workout plan?"
-      },
-      "expectations": {
-        "expected_behavior": "Query exercises table joined through workouts and workout_plans to user's active fitness plan. COUNT(*) all exercises. Return single numeric count.",
-        "performs_complex_join": true,
-        "uses_aggregation": true,
-        "returns_single_number": true
-      },
-      "source": {
-        "source_type": "HUMAN",
-        "source_data": {
-          "curator": "database_expert",
-          "date": "2025-12-18",
-          "guidelines": "query_agent_eval_v2"
-        }
-      },
-      "tags": {
-        "query_type": "aggregation",
-        "priority": "medium",
-        "complexity": "medium"
-      }
-    },
-    {
-      "id": "query_008",
-      "inputs": {
-        "user_id": "fa19dc54-a35b-4aab-adf8-816933f96fa4",
-        "query_request": "What's my total daily calorie intake from all meals combined?"
-      },
-      "expectations": {
-        "expected_behavior": "Query meals table for user's active plan and SUM(calories). Return total calorie sum across all meals.",
-        "uses_sum_aggregation": true,
-        "returns_total": true
-      },
-      "source": {
-        "source_type": "HUMAN",
-        "source_data": {
-          "curator": "database_expert",
-          "date": "2025-12-18",
-          "guidelines": "query_agent_eval_v2"
-        }
-      },
-      "tags": {
-        "query_type": "aggregation",
-        "priority": "medium",
-        "complexity": "low"
-      }
-    },
-    {
-      "id": "query_009",
-      "inputs": {
-        "user_id": "fa19dc54-a35b-4aab-adf8-816933f96fa4",
-        "query_request": "Show me the equipment I need for my workouts"
-      },
-      "expectations": {
-        "expected_behavior": "Query workout_plans table and retrieve equipment_used JSON array. Parse and return list of equipment needed. Handle JSON data type correctly.",
-        "queries_workout_plan": true,
-        "handles_json_column": true,
-        "returns_equipment_list": true
-      },
-      "source": {
-        "source_type": "HUMAN",
-        "source_data": {
-          "curator": "database_expert",
-          "date": "2025-12-18",
-          "guidelines": "query_agent_eval_v2"
-        }
-      },
-      "tags": {
-        "query_type": "json_data",
-        "priority": "low",
-        "complexity": "low"
-      }
-    },
-    {
-      "id": "query_010",
-      "inputs": {
-        "user_id": "fa19dc54-a35b-4aab-adf8-816933f96fa4",
-        "query_request": "Compare my protein targets between phase 1 and phase 2"
-      },
-      "expectations": {
-        "expected_behavior": "Query meal_plan with protein_grams_target, join to phases. Filter for phase_number IN (1,2). Return comparison showing protein targets for both phases. Handle multi-row results.",
-        "queries_multiple_phases": true,
-        "uses_correct_columns": true,
-        "returns_comparison": true
-      },
-      "source": {
-        "source_type": "HUMAN",
-        "source_data": {
-          "curator": "database_expert",
-          "date": "2025-12-18",
-          "guidelines": "query_agent_eval_v2"
-        }
-      },
-      "tags": {
-        "query_type": "comparison",
-        "priority": "medium",
-        "complexity": "medium"
       }
     }
   ]

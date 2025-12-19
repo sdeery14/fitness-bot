@@ -139,7 +139,7 @@ def main():
         },
         "meal_phase_agent": {
             "experiment_id": 5,
-            "dataset_id": "d-e87ebc1a7d654daab83bacc43579ee61",
+            "dataset_id": "d-09627bd84c704c1b88f227bd1f3eb2f5",  # v2.0.0: 10 comprehensive test cases
         },
         "query_agent": {
             "experiment_id": 6,
