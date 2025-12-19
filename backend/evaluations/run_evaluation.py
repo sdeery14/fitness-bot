@@ -135,7 +135,7 @@ def main():
         },
         "fitness_coach_agent": {
             "experiment_id": 4,
-            "dataset_id": "d-c97983c9ec99494fbb63ec1bc534c0fe",
+            "dataset_id": "d-beae4e9d7cc8439e848bc1e149f6c0d3",  # v2.0.0: 10 comprehensive test cases
         },
         "meal_phase_agent": {
             "experiment_id": 5,

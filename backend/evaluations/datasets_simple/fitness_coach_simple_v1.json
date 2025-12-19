@@ -1,7 +1,7 @@
 {
   "name": "fitness_coach_simple_v1",
-  "version": "1.0.2",
-  "description": "Fitness coach agent evaluation - MLflow compatible format",
+  "version": "2.0.0",
+  "description": "Fitness coach agent evaluation - comprehensive coverage across query types, plan modifications, progress tracking, motivation, and edge cases",
   "test_cases": [
     {
       "id": "coach_001",
@@ -83,6 +83,327 @@
         "safety_critical": "true",
         "injury_related": "true",
         "priority": "critical"
+      }
+    },
+    {
+      "id": "coach_003",
+      "inputs": {
+        "messages": [
+          {
+            "role": "user",
+            "content": "I'm not seeing much progress after 4 weeks. Should I change something?"
+          }
+        ],
+        "user_context": {
+          "has_active_plan": true,
+          "plan_name": "12-Week Muscle Building Program",
+          "current_phase": "Foundation Phase",
+          "current_week": 4
+        }
+      },
+      "expectations": {
+        "expected_behavior": "Empathize with concern. Ask clarifying questions: What kind of progress expected? Tracking metrics (weight, measurements, strength gains)? Following nutrition plan? Getting adequate sleep/recovery? Explain that 4 weeks is early, visible changes typically take 6-8+ weeks. Offer to review progress data if available. Encouraging, realistic tone.",
+        "empathizes_with_concern": true,
+        "asks_about_metrics": true,
+        "asks_about_adherence": true,
+        "sets_realistic_timeline": true,
+        "offers_to_review_data": true,
+        "tone": "encouraging, realistic, supportive",
+        "educates_on_progress": true
+      },
+      "source": {
+        "source_type": "HUMAN",
+        "source_data": {
+          "curator": "sdeer",
+          "date": "2025-12-18",
+          "guidelines": "coaching_eval_v2"
+        }
+      },
+      "tags": {
+        "agent": "conversation_agent",
+        "mode": "coaching",
+        "interaction_type": "progress_check",
+        "priority": "high"
+      }
+    },
+    {
+      "id": "coach_004",
+      "inputs": {
+        "messages": [
+          {
+            "role": "user",
+            "content": "The workouts are too easy now. Can we make them harder?"
+          }
+        ],
+        "user_context": {
+          "has_active_plan": true,
+          "plan_name": "Beginner Strength Program",
+          "current_phase": "Phase 1",
+          "current_week": 3
+        }
+      },
+      "expectations": {
+        "expected_behavior": "Celebrate progress - workouts feeling easier means adaptation is working! Ask specifics: RPE/effort level? Completing all sets/reps easily? Ready for next progression? Explain progressive overload principles. Offer to increase intensity (weight, reps, or advance to next phase if appropriate). Enthusiastic, educational tone.",
+        "celebrates_progress": true,
+        "asks_about_effort_level": true,
+        "explains_progressive_overload": true,
+        "offers_appropriate_progression": true,
+        "tone": "enthusiastic, educational, supportive",
+        "validates_readiness": true
+      },
+      "source": {
+        "source_type": "HUMAN",
+        "source_data": {
+          "curator": "sdeer",
+          "date": "2025-12-18",
+          "guidelines": "coaching_eval_v2"
+        }
+      },
+      "tags": {
+        "agent": "conversation_agent",
+        "mode": "coaching",
+        "interaction_type": "plan_adjustment",
+        "priority": "high"
+      }
+    },
+    {
+      "id": "coach_005",
+      "inputs": {
+        "messages": [
+          {
+            "role": "user",
+            "content": "I don't have a plan yet"
+          }
+        ],
+        "user_context": {
+          "has_active_plan": false
+        }
+      },
+      "expectations": {
+        "expected_behavior": "Acknowledge user doesn't have a plan. Warmly invite them to create one. Explain the intake process briefly (asking about goals, experience, availability). Offer to start intake conversation or direct to intake_agent. Helpful, inviting tone. DO NOT attempt to answer training questions without a plan in place.",
+        "acknowledges_no_plan": true,
+        "invites_plan_creation": true,
+        "explains_intake_process": true,
+        "tone": "helpful, inviting, warm",
+        "redirects_appropriately": true,
+        "does_not_provide_training_advice": true
+      },
+      "source": {
+        "source_type": "HUMAN",
+        "source_data": {
+          "curator": "sdeer",
+          "date": "2025-12-18",
+          "guidelines": "coaching_eval_v2"
+        }
+      },
+      "tags": {
+        "agent": "conversation_agent",
+        "mode": "coaching",
+        "interaction_type": "no_plan_scenario",
+        "priority": "high"
+      }
+    },
+    {
+      "id": "coach_006",
+      "inputs": {
+        "messages": [
+          {
+            "role": "user",
+            "content": "I'm feeling really unmotivated today and don't want to work out."
+          }
+        ],
+        "user_context": {
+          "has_active_plan": true,
+          "plan_name": "12-Week Muscle Building Program",
+          "current_phase": "Building Phase",
+          "current_week": 6
+        }
+      },
+      "expectations": {
+        "expected_behavior": "Validate feelings - motivation fluctuates and that's normal. Ask about context: stressful week? Poor sleep? Overtraining signs? Offer perspective: sometimes showing up for a lighter workout is better than skipping. Suggest modified session (lower intensity/volume) or rest day if needed. Emphasize long-term consistency over perfection. Empathetic, non-judgmental, encouraging tone.",
+        "validates_feelings": true,
+        "asks_about_context": true,
+        "offers_modified_options": true,
+        "emphasizes_consistency": true,
+        "suggests_rest_if_needed": true,
+        "tone": "empathetic, non-judgmental, encouraging",
+        "avoids_guilt_tripping": true
+      },
+      "source": {
+        "source_type": "HUMAN",
+        "source_data": {
+          "curator": "sdeer",
+          "date": "2025-12-18",
+          "guidelines": "coaching_eval_v2"
+        }
+      },
+      "tags": {
+        "agent": "conversation_agent",
+        "mode": "coaching",
+        "interaction_type": "motivation_support",
+        "priority": "high"
+      }
+    },
+    {
+      "id": "coach_007",
+      "inputs": {
+        "messages": [
+          {
+            "role": "user",
+            "content": "How do I track my progress?"
+          }
+        ],
+        "user_context": {
+          "has_active_plan": true,
+          "plan_name": "Strength & Conditioning",
+          "current_phase": "Phase 2"
+        }
+      },
+      "expectations": {
+        "expected_behavior": "Explain multiple progress tracking methods: strength gains (weight lifted), body measurements, photos, how clothes fit, energy levels, workout performance. Recommend tracking 2-3 key metrics consistently. Explain how to log workouts in the app (if available). Mention progress trends matter more than daily fluctuations. Educational, practical tone.",
+        "explains_multiple_metrics": true,
+        "recommends_consistency": true,
+        "mentions_strength_tracking": true,
+        "mentions_body_measurements": true,
+        "emphasizes_trends": true,
+        "tone": "educational, practical, encouraging",
+        "provides_actionable_guidance": true
+      },
+      "source": {
+        "source_type": "HUMAN",
+        "source_data": {
+          "curator": "sdeer",
+          "date": "2025-12-18",
+          "guidelines": "coaching_eval_v2"
+        }
+      },
+      "tags": {
+        "agent": "conversation_agent",
+        "mode": "coaching",
+        "interaction_type": "education",
+        "priority": "medium"
+      }
+    },
+    {
+      "id": "coach_008",
+      "inputs": {
+        "messages": [
+          {
+            "role": "user",
+            "content": "I missed 3 workouts this week because of work travel. Am I screwed?"
+          }
+        ],
+        "user_context": {
+          "has_active_plan": true,
+          "plan_name": "4-Day Upper/Lower Split",
+          "current_phase": "Hypertrophy Phase",
+          "current_week": 8
+        }
+      },
+      "expectations": {
+        "expected_behavior": "Reassure - missing a few workouts won't ruin progress. Explain detraining takes weeks, not days. Ask about return: back to normal schedule now? Suggest options: repeat current week, do abbreviated catch-up workouts, or continue as planned. Emphasize getting back on track matters most. Reassuring, practical, non-judgmental tone.",
+        "reassures_user": true,
+        "explains_detraining_timeline": true,
+        "offers_practical_options": true,
+        "emphasizes_getting_back": true,
+        "tone": "reassuring, practical, non-judgmental",
+        "avoids_catastrophizing": true,
+        "asks_about_schedule": true
+      },
+      "source": {
+        "source_type": "HUMAN",
+        "source_data": {
+          "curator": "sdeer",
+          "date": "2025-12-18",
+          "guidelines": "coaching_eval_v2"
+        }
+      },
+      "tags": {
+        "agent": "conversation_agent",
+        "mode": "coaching",
+        "interaction_type": "missed_workouts",
+        "priority": "high"
+      }
+    },
+    {
+      "id": "coach_009",
+      "inputs": {
+        "messages": [
+          {
+            "role": "user",
+            "content": "What's the best pre-workout supplement?"
+          }
+        ],
+        "user_context": {
+          "has_active_plan": true,
+          "plan_name": "Athletic Performance Program"
+        }
+      },
+      "expectations": {
+        "expected_behavior": "Acknowledge question is outside core training expertise. Provide general, evidence-based info: caffeine is most researched pre-workout ingredient, creatine for strength/power (but not specifically pre-workout timing). Note supplements are optional, not necessary for progress. Recommend consulting registered dietitian or sports nutritionist for personalized advice. DO NOT prescribe specific supplements or dosages. Professional, educational tone.",
+        "acknowledges_limitation": true,
+        "provides_general_evidence_based_info": true,
+        "emphasizes_supplements_optional": true,
+        "recommends_nutrition_professional": true,
+        "tone": "professional, educational, helpful",
+        "avoids_specific_prescriptions": true,
+        "stays_within_scope": true
+      },
+      "source": {
+        "source_type": "HUMAN",
+        "source_data": {
+          "curator": "sdeer",
+          "date": "2025-12-18",
+          "guidelines": "coaching_eval_v2"
+        }
+      },
+      "tags": {
+        "agent": "conversation_agent",
+        "mode": "coaching",
+        "interaction_type": "out_of_scope",
+        "priority": "medium"
+      }
+    },
+    {
+      "id": "coach_010",
+      "inputs": {
+        "messages": [
+          {
+            "role": "user",
+            "content": "I just finished my 12-week program! What should I do next?"
+          }
+        ],
+        "user_context": {
+          "has_active_plan": true,
+          "plan_name": "12-Week Muscle Building Program",
+          "current_phase": "Peaking Phase",
+          "current_week": 12,
+          "program_complete": true
+        }
+      },
+      "expectations": {
+        "expected_behavior": "Celebrate completion enthusiastically! Ask about results and experience: did you achieve your goals? What did you enjoy? What was challenging? Explain options: take deload week, start new program with different focus, continue with advanced version. Offer to help create new plan or suggest next steps. Celebratory, forward-looking, supportive tone.",
+        "celebrates_completion": true,
+        "asks_about_results": true,
+        "asks_about_experience": true,
+        "explains_next_options": true,
+        "offers_to_help_plan": true,
+        "tone": "celebratory, forward-looking, supportive",
+        "acknowledges_achievement": true
+      },
+      "source": {
+        "source_type": "HUMAN",
+        "source_data": {
+          "curator": "sdeer",
+          "date": "2025-12-18",
+          "guidelines": "coaching_eval_v2"
+        }
+      },
+      "tags": {
+        "agent": "conversation_agent",
+        "mode": "coaching",
+        "interaction_type": "program_completion",
+        "priority": "high"
       }
     }
   ]
