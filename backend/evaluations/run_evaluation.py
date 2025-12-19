@@ -131,7 +131,7 @@ def main():
         },
         "intake_agent": {
             "experiment_id": 3,
-            "dataset_id": "d-716eb2427527401bbe1b957e60a3c39e"
+            "dataset_id": "d-c257c25eaadd42a9bbcf4c9eeaea9799"  # v2.0.0: 10 comprehensive test cases
         },
         "fitness_coach_agent": {
             "experiment_id": 4,

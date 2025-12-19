@@ -1,7 +1,7 @@
 {
   "name": "intake_simple_v1",
-  "version": "1.0.2",
-  "description": "Intake agent evaluation - MLflow compatible format",
+  "version": "2.0.0",
+  "description": "Intake agent evaluation - comprehensive coverage across user types, communication styles, and contexts",
   "test_cases": [
     {
       "id": "intake_001",
@@ -70,6 +70,302 @@
         "mode": "intake",
         "user_type": "beginner",
         "stage": "ready_to_build",
+        "priority": "high"
+      }
+    },
+    {
+      "id": "intake_003",
+      "inputs": {
+        "messages": [
+          {
+            "role": "user",
+            "content": "I used to workout regularly 5 years ago but I've been inactive since then. I'm ready to start again but worried about doing too much too fast."
+          }
+        ]
+      },
+      "expectations": {
+        "expected_behavior": "Acknowledge past experience and gap. Validate concern about gradual return. Ask about previous training (what worked, injuries?), current fitness level, availability. Reassure that plan will accommodate gradual progression. Empathetic, understanding tone.",
+        "tone": "empathetic, understanding, reassuring",
+        "acknowledges_training_history": true,
+        "validates_concerns": true,
+        "asks_about_past_training": true,
+        "asks_about_current_status": true,
+        "offers_gradual_approach": true,
+        "question_count_max": 2
+      },
+      "source": {
+        "source_type": "HUMAN",
+        "source_data": {
+          "curator": "conversational_expert",
+          "date": "2025-12-18",
+          "guidelines": "conversation_eval_v1"
+        }
+      },
+      "tags": {
+        "agent": "conversation_agent",
+        "mode": "intake",
+        "user_type": "returning",
+        "stage": "initial_contact",
+        "concern": "overtraining",
+        "priority": "high"
+      }
+    },
+    {
+      "id": "intake_004",
+      "inputs": {
+        "messages": [
+          {
+            "role": "user",
+            "content": "I have a bad lower back from an old injury. Will that be a problem?"
+          }
+        ]
+      },
+      "expectations": {
+        "expected_behavior": "Express concern for user's wellbeing. MUST recommend consulting healthcare provider before starting. Ask about injury details (when, severity, current symptoms, medical clearance status). Reassure that programs can be modified. DO NOT create plan without medical clearance. Caring, safety-first tone.",
+        "tone": "caring, safety-first, professional",
+        "expresses_concern": true,
+        "recommends_healthcare_provider": true,
+        "asks_about_injury_details": true,
+        "mentions_modifications_possible": true,
+        "does_not_create_plan_yet": true,
+        "prioritizes_safety": true
+      },
+      "source": {
+        "source_type": "HUMAN",
+        "source_data": {
+          "curator": "conversational_expert",
+          "date": "2025-12-18",
+          "guidelines": "conversation_eval_v1"
+        }
+      },
+      "tags": {
+        "agent": "conversation_agent",
+        "mode": "intake",
+        "user_type": "injured",
+        "stage": "initial_contact",
+        "concern": "injury",
+        "priority": "critical"
+      }
+    },
+    {
+      "id": "intake_005",
+      "inputs": {
+        "messages": [
+          {
+            "role": "user",
+            "content": "get me jacked asap. i need results in 2 weeks for a beach trip"
+          }
+        ]
+      },
+      "expectations": {
+        "expected_behavior": "Acknowledge goal but set realistic expectations. Explain 2 weeks is insufficient for significant muscle gain. Suggest realistic approach (optimize nutrition, training, recovery for trip). Ask about experience level, current fitness. Honest but supportive, doesn't promise unrealistic results.",
+        "tone": "honest, realistic, supportive",
+        "sets_realistic_expectations": true,
+        "educates_on_timeline": true,
+        "offers_realistic_alternative": true,
+        "asks_clarifying_questions": true,
+        "does_not_promise_unrealistic_results": true,
+        "remains_professional": true
+      },
+      "source": {
+        "source_type": "HUMAN",
+        "source_data": {
+          "curator": "conversational_expert",
+          "date": "2025-12-18",
+          "guidelines": "conversation_eval_v1"
+        }
+      },
+      "tags": {
+        "agent": "conversation_agent",
+        "mode": "intake",
+        "user_type": "beginner",
+        "stage": "initial_contact",
+        "concern": "unrealistic_goals",
+        "priority": "high"
+      }
+    },
+    {
+      "id": "intake_006",
+      "inputs": {
+        "messages": [
+          {
+            "role": "user",
+            "content": "I'm super busy with work and kids. Can only do 20 minutes, maybe 2-3 times a week at home. No equipment."
+          }
+        ]
+      },
+      "expectations": {
+        "expected_behavior": "Validate time constraints, acknowledge parenting/work demands. Confirm bodyweight training is viable option. Ask about goals, fitness level. Reassure that effective training possible with limited time/equipment. Positive, practical, non-judgmental tone.",
+        "tone": "positive, practical, non-judgmental",
+        "validates_constraints": true,
+        "confirms_feasibility": true,
+        "asks_about_goals": true,
+        "offers_bodyweight_solutions": true,
+        "acknowledges_life_circumstances": true,
+        "question_count_max": 2
+      },
+      "source": {
+        "source_type": "HUMAN",
+        "source_data": {
+          "curator": "conversational_expert",
+          "date": "2025-12-18",
+          "guidelines": "conversation_eval_v1"
+        }
+      },
+      "tags": {
+        "agent": "conversation_agent",
+        "mode": "intake",
+        "user_type": "time_constrained",
+        "stage": "initial_contact",
+        "constraint": "time_equipment",
+        "priority": "high"
+      }
+    },
+    {
+      "id": "intake_007",
+      "inputs": {
+        "messages": [
+          {
+            "role": "user",
+            "content": "I've been training for 8 years, mostly powerlifting. Looking for something structured to break through a plateau. Have home gym with barbell, rack, bench."
+          }
+        ]
+      },
+      "expectations": {
+        "expected_behavior": "Acknowledge advanced experience and powerlifting background. Recognize plateau situation. Ask about current numbers, training frequency, plateau duration, specific goals (strength vs variety?). Confirm home gym equipment sufficient. Knowledgeable, peer-to-peer tone.",
+        "tone": "knowledgeable, peer-to-peer, professional",
+        "acknowledges_experience": true,
+        "recognizes_plateau": true,
+        "asks_about_training_details": true,
+        "asks_about_goals": true,
+        "confirms_equipment": true,
+        "appropriate_for_advanced": true
+      },
+      "source": {
+        "source_type": "HUMAN",
+        "source_data": {
+          "curator": "conversational_expert",
+          "date": "2025-12-18",
+          "guidelines": "conversation_eval_v1"
+        }
+      },
+      "tags": {
+        "agent": "conversation_agent",
+        "mode": "intake",
+        "user_type": "advanced",
+        "stage": "initial_contact",
+        "goal": "plateau_breakthrough",
+        "priority": "high"
+      }
+    },
+    {
+      "id": "intake_008",
+      "inputs": {
+        "messages": [
+          {
+            "role": "user",
+            "content": "fitness program"
+          }
+        ]
+      },
+      "expectations": {
+        "expected_behavior": "Handle vague input gracefully. Warmly greet and express interest in helping. Ask open-ended questions to understand needs: goals (strength, weight loss, general fitness?), experience level, equipment access, time availability. Don't overwhelm, keep it conversational. Friendly, helpful tone.",
+        "tone": "friendly, helpful, patient",
+        "handles_vague_input": true,
+        "asks_open_ended_questions": true,
+        "explores_goals": true,
+        "explores_experience": true,
+        "keeps_it_simple": true,
+        "question_count_max": 2
+      },
+      "source": {
+        "source_type": "HUMAN",
+        "source_data": {
+          "curator": "conversational_expert",
+          "date": "2025-12-18",
+          "guidelines": "conversation_eval_v1"
+        }
+      },
+      "tags": {
+        "agent": "conversation_agent",
+        "mode": "intake",
+        "user_type": "unclear",
+        "stage": "initial_contact",
+        "challenge": "vague_input",
+        "priority": "medium"
+      }
+    },
+    {
+      "id": "intake_009",
+      "inputs": {
+        "messages": [
+          {
+            "role": "user",
+            "content": "I'm 62 years old and my doctor said I should start strength training for bone health. I'm nervous about getting hurt."
+          }
+        ]
+      },
+      "expectations": {
+        "expected_behavior": "Acknowledge age, doctor recommendation, and anxiety. Validate concern about safety - it's smart to be cautious. Emphasize programs designed for safety and gradual progression. Ask about medical clearance status, current activity level, any specific concerns (balance, joint pain?). Reassuring, respectful, age-appropriate tone.",
+        "tone": "reassuring, respectful, age-appropriate",
+        "acknowledges_age": true,
+        "acknowledges_medical_recommendation": true,
+        "validates_safety_concern": true,
+        "emphasizes_safety_design": true,
+        "asks_about_medical_clearance": true,
+        "appropriate_for_seniors": true
+      },
+      "source": {
+        "source_type": "HUMAN",
+        "source_data": {
+          "curator": "conversational_expert",
+          "date": "2025-12-18",
+          "guidelines": "conversation_eval_v1"
+        }
+      },
+      "tags": {
+        "agent": "conversation_agent",
+        "mode": "intake",
+        "user_type": "senior",
+        "stage": "initial_contact",
+        "concern": "safety_age",
+        "priority": "high"
+      }
+    },
+    {
+      "id": "intake_010",
+      "inputs": {
+        "messages": [
+          {
+            "role": "user",
+            "content": "I want to lose 50 pounds and build muscle at the same time. I'm 35, desk job, haven't exercised in years. Can work out 5 days a week if needed. Have gym membership."
+          }
+        ]
+      },
+      "expectations": {
+        "expected_behavior": "Acknowledge dual goals (fat loss + muscle building). Explain both possible but nuanced approach needed. Recognize sedentary background and high training frequency ambition. Gently suggest starting with realistic frequency (3-4 days). Ask about dietary readiness, injuries, timeline expectations. Educational, balanced, realistic tone.",
+        "tone": "educational, balanced, realistic",
+        "acknowledges_dual_goals": true,
+        "educates_on_approach": true,
+        "moderates_frequency_expectations": true,
+        "asks_about_nutrition": true,
+        "asks_about_timeline": true,
+        "sets_realistic_pace": true
+      },
+      "source": {
+        "source_type": "HUMAN",
+        "source_data": {
+          "curator": "conversational_expert",
+          "date": "2025-12-18",
+          "guidelines": "conversation_eval_v1"
+        }
+      },
+      "tags": {
+        "agent": "conversation_agent",
+        "mode": "intake",
+        "user_type": "sedentary",
+        "stage": "initial_contact",
+        "goal": "body_recomposition",
         "priority": "high"
       }
     }
