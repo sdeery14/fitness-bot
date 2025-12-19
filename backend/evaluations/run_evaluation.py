@@ -127,7 +127,7 @@ def main():
     agent_configs = {
         "workout_phase_agent": {
             "experiment_id": 2,
-            "dataset_id": "d-e984081e783a491a869dafc6c9e3e403"
+            "dataset_id": "d-451b6f30a7094d8781c67255dd5a73a9"  # v2.0.0: 10 comprehensive test cases
         },
         "intake_agent": {
             "experiment_id": 3,

@@ -1,7 +1,7 @@
 {
   "name": "workout_phase_simple_v1",
-  "version": "1.0.2",
-  "description": "Workout phase agent evaluation - MLflow compatible format",
+  "version": "2.0.0",
+  "description": "Workout phase agent evaluation - comprehensive coverage across fitness levels, equipment, and training styles",
   "test_cases": [
     {
       "id": "wp_001",
@@ -87,6 +87,347 @@
         "agent": "workout_phase_agent",
         "fitness_level": "intermediate",
         "program_type": "upper_lower",
+        "priority": "high"
+      }
+    },
+    {
+      "id": "wp_003",
+      "inputs": {
+        "workout_plan_description": "Advanced 6-day Push/Pull/Legs split for maximum muscle growth",
+        "phase_number": 3,
+        "phase_name": "Advanced Hypertrophy Phase",
+        "phase_objectives": [
+          "Maximize muscle hypertrophy",
+          "Increase training volume capacity",
+          "Refine technique on isolation work"
+        ],
+        "phase_duration_weeks": 12,
+        "fitness_level": "advanced",
+        "equipment_access": [
+          "full_gym"
+        ],
+        "workout_frequency": 6
+      },
+      "expectations": {
+        "expected_behavior": "Generate 6 workouts (2 push, 2 pull, 2 legs) for advanced hypertrophy. Push: chest/shoulders/triceps (8-10 exercises). Pull: back/biceps/rear delts (8-10 exercises). Legs: quads/hams/glutes/calves (8-10 exercises). Volume: 4-5 sets x 8-15 reps. High volume (20-25 sets per muscle/week). Intensity: RPE 8-9. Includes advanced techniques (drop sets, supersets). Progression: periodized.",
+        "workouts_count": 6,
+        "ppl_split": true,
+        "high_volume": true,
+        "advanced_techniques": true,
+        "intensity_level": "high"
+      },
+      "source": {
+        "source_type": "HUMAN",
+        "source_data": {
+          "curator": "fitness_expert",
+          "date": "2025-12-18",
+          "guidelines": "fitness_agent_eval_v1"
+        }
+      },
+      "tags": {
+        "agent": "workout_phase_agent",
+        "fitness_level": "advanced",
+        "program_type": "ppl",
+        "priority": "high"
+      }
+    },
+    {
+      "id": "wp_004",
+      "inputs": {
+        "workout_plan_description": "Home bodyweight training for beginners with no equipment",
+        "phase_number": 1,
+        "phase_name": "Bodyweight Foundation Phase",
+        "phase_objectives": [
+          "Build base strength with bodyweight",
+          "Master movement patterns",
+          "Develop consistency"
+        ],
+        "phase_duration_weeks": 6,
+        "fitness_level": "beginner",
+        "equipment_access": [
+          "bodyweight_only"
+        ],
+        "workout_frequency": 4
+      },
+      "expectations": {
+        "expected_behavior": "Generate 4 bodyweight workouts with NO equipment needed. Focus on push-ups, squats, lunges, planks, dips (chair), rows (table edge). Include progressions (knee push-ups → regular → decline). Volume: 3 sets x 8-15 reps or time. Workout cycle: 4 training + 3 rest days. Appropriate for complete beginners at home.",
+        "workouts_count": 4,
+        "bodyweight_only": true,
+        "includes_progressions": true,
+        "appropriate_for_beginner": true,
+        "no_equipment_required": true
+      },
+      "source": {
+        "source_type": "HUMAN",
+        "source_data": {
+          "curator": "fitness_expert",
+          "date": "2025-12-18",
+          "guidelines": "fitness_agent_eval_v1"
+        }
+      },
+      "tags": {
+        "agent": "workout_phase_agent",
+        "fitness_level": "beginner",
+        "program_type": "bodyweight",
+        "equipment": "none",
+        "priority": "high"
+      }
+    },
+    {
+      "id": "wp_005",
+      "inputs": {
+        "workout_plan_description": "Strength-focused powerlifting program for intermediate lifters",
+        "phase_number": 2,
+        "phase_name": "Strength Development Phase",
+        "phase_objectives": [
+          "Increase 1RM on squat, bench, deadlift",
+          "Build work capacity",
+          "Improve technique under heavy loads"
+        ],
+        "phase_duration_weeks": 8,
+        "fitness_level": "intermediate",
+        "equipment_access": [
+          "barbell",
+          "squat_rack",
+          "bench"
+        ],
+        "workout_frequency": 4
+      },
+      "expectations": {
+        "expected_behavior": "Generate 4 strength-focused workouts centered on squat, bench, deadlift. Main lifts: 4-6 sets x 1-5 reps at high intensity (RPE 8-9). Accessory work: 3 sets x 6-10 reps. Each workout focuses on one main lift. Include variations (pause squats, close-grip bench, deficit deadlifts). Progression: linear with deload week 7.",
+        "workouts_count": 4,
+        "strength_focus": true,
+        "includes_main_lifts": true,
+        "low_rep_range": true,
+        "includes_variations": true,
+        "intensity_level": "high"
+      },
+      "source": {
+        "source_type": "HUMAN",
+        "source_data": {
+          "curator": "fitness_expert",
+          "date": "2025-12-18",
+          "guidelines": "fitness_agent_eval_v1"
+        }
+      },
+      "tags": {
+        "agent": "workout_phase_agent",
+        "fitness_level": "intermediate",
+        "program_type": "powerlifting",
+        "goal": "strength",
+        "priority": "high"
+      }
+    },
+    {
+      "id": "wp_006",
+      "inputs": {
+        "workout_plan_description": "Time-efficient 3-day full body for busy professionals",
+        "phase_number": 1,
+        "phase_name": "Efficient Strength Phase",
+        "phase_objectives": [
+          "Build strength with minimal time",
+          "Focus on compound movements",
+          "Maximize training efficiency"
+        ],
+        "phase_duration_weeks": 8,
+        "fitness_level": "intermediate",
+        "equipment_access": [
+          "full_gym"
+        ],
+        "workout_frequency": 3
+      },
+      "expectations": {
+        "expected_behavior": "Generate 3 full-body workouts optimized for 45-minute sessions. Each workout: 4-5 compound exercises only (squat variations, hinge patterns, push, pull, carry). Volume: 3-4 sets x 5-8 reps. Supersets where appropriate to save time. No isolation work. Focus on efficiency and results per time invested.",
+        "workouts_count": 3,
+        "time_efficient": true,
+        "compound_focus": true,
+        "exercises_per_workout_max": 5,
+        "includes_supersets": true,
+        "minimal_isolation": true
+      },
+      "source": {
+        "source_type": "HUMAN",
+        "source_data": {
+          "curator": "fitness_expert",
+          "date": "2025-12-18",
+          "guidelines": "fitness_agent_eval_v1"
+        }
+      },
+      "tags": {
+        "agent": "workout_phase_agent",
+        "fitness_level": "intermediate",
+        "program_type": "full_body",
+        "constraint": "time",
+        "priority": "high"
+      }
+    },
+    {
+      "id": "wp_007",
+      "inputs": {
+        "workout_plan_description": "Upper body focused training for someone with lower body injury",
+        "phase_number": 1,
+        "phase_name": "Upper Body Maintenance Phase",
+        "phase_objectives": [
+          "Maintain upper body strength",
+          "Avoid lower body stress",
+          "Work around knee injury"
+        ],
+        "phase_duration_weeks": 6,
+        "fitness_level": "intermediate",
+        "equipment_access": [
+          "full_gym"
+        ],
+        "workout_frequency": 4
+      },
+      "expectations": {
+        "expected_behavior": "Generate 4 upper body focused workouts with NO lower body exercises (avoid squats, deadlifts, lunges). Focus on chest, back, shoulders, arms. Include seated/supported variations. Core work allowed (no standing). Volume: 3-4 sets x 8-12 reps. Emphasize injury-safe movements. Maintain upper body strength during recovery.",
+        "workouts_count": 4,
+        "upper_body_only": true,
+        "avoids_lower_body": true,
+        "injury_modification": true,
+        "safe_variations": true
+      },
+      "source": {
+        "source_type": "HUMAN",
+        "source_data": {
+          "curator": "fitness_expert",
+          "date": "2025-12-18",
+          "guidelines": "fitness_agent_eval_v1"
+        }
+      },
+      "tags": {
+        "agent": "workout_phase_agent",
+        "fitness_level": "intermediate",
+        "program_type": "upper_body",
+        "constraint": "injury",
+        "priority": "high"
+      }
+    },
+    {
+      "id": "wp_008",
+      "inputs": {
+        "workout_plan_description": "Dumbbell-only home gym program for muscle growth",
+        "phase_number": 2,
+        "phase_name": "Home Hypertrophy Phase",
+        "phase_objectives": [
+          "Build muscle with limited equipment",
+          "Master unilateral exercises",
+          "Maximize dumbbell training"
+        ],
+        "phase_duration_weeks": 10,
+        "fitness_level": "intermediate",
+        "equipment_access": [
+          "dumbbells"
+        ],
+        "workout_frequency": 4
+      },
+      "expectations": {
+        "expected_behavior": "Generate 4 workouts using ONLY dumbbells. Include: goblet squats, DB bench press, DB rows, lunges, shoulder press, curls, tricep extensions. Emphasize unilateral work (single-leg, single-arm). Volume: 3-4 sets x 10-15 reps. Focus on time under tension. Creative exercise selection for full-body coverage.",
+        "workouts_count": 4,
+        "dumbbells_only": true,
+        "unilateral_emphasis": true,
+        "creative_exercise_selection": true,
+        "hypertrophy_focus": true
+      },
+      "source": {
+        "source_type": "HUMAN",
+        "source_data": {
+          "curator": "fitness_expert",
+          "date": "2025-12-18",
+          "guidelines": "fitness_agent_eval_v1"
+        }
+      },
+      "tags": {
+        "agent": "workout_phase_agent",
+        "fitness_level": "intermediate",
+        "program_type": "upper_lower",
+        "equipment": "limited",
+        "priority": "high"
+      }
+    },
+    {
+      "id": "wp_009",
+      "inputs": {
+        "workout_plan_description": "2-day per week maintenance program for active lifestyle",
+        "phase_number": 1,
+        "phase_name": "Minimum Effective Dose Phase",
+        "phase_objectives": [
+          "Maintain strength with minimal frequency",
+          "Support other physical activities",
+          "Prevent detraining"
+        ],
+        "phase_duration_weeks": 8,
+        "fitness_level": "intermediate",
+        "equipment_access": [
+          "full_gym"
+        ],
+        "workout_frequency": 2
+      },
+      "expectations": {
+        "expected_behavior": "Generate 2 full-body workouts designed for maintenance (not progression). Each workout: 5-6 compound exercises covering all major patterns. Volume: 2-3 sets x 6-10 reps. Intensity: RPE 7-8. Efficient, sustainable, prevents muscle loss. Designed for someone focused on other sports/activities.",
+        "workouts_count": 2,
+        "maintenance_focus": true,
+        "full_body": true,
+        "sustainable_volume": true,
+        "efficient_design": true
+      },
+      "source": {
+        "source_type": "HUMAN",
+        "source_data": {
+          "curator": "fitness_expert",
+          "date": "2025-12-18",
+          "guidelines": "fitness_agent_eval_v1"
+        }
+      },
+      "tags": {
+        "agent": "workout_phase_agent",
+        "fitness_level": "intermediate",
+        "program_type": "full_body",
+        "frequency": "low",
+        "goal": "maintenance",
+        "priority": "medium"
+      }
+    },
+    {
+      "id": "wp_010",
+      "inputs": {
+        "workout_plan_description": "5-day bodybuilding split for advanced muscle development",
+        "phase_number": 3,
+        "phase_name": "Bodybuilding Specialization Phase",
+        "phase_objectives": [
+          "Maximize muscle detail and size",
+          "Target weak points",
+          "Peak conditioning"
+        ],
+        "phase_duration_weeks": 10,
+        "fitness_level": "advanced",
+        "equipment_access": [
+          "full_gym"
+        ],
+        "workout_frequency": 5
+      },
+      "expectations": {
+        "expected_behavior": "Generate 5 workouts in bro-split style (chest, back, shoulders, legs, arms). Each workout: 8-12 exercises with mix of compounds and isolations. Volume: 3-5 sets x 8-20 reps (varied rep ranges). Include advanced techniques (rest-pause, drop sets, pre-exhaust). Very high volume. Focus on muscle detail and aesthetics.",
+        "workouts_count": 5,
+        "bro_split": true,
+        "high_volume": true,
+        "includes_isolation": true,
+        "advanced_techniques": true,
+        "bodybuilding_focus": true
+      },
+      "source": {
+        "source_type": "HUMAN",
+        "source_data": {
+          "curator": "fitness_expert",
+          "date": "2025-12-18",
+          "guidelines": "fitness_agent_eval_v1"
+        }
+      },
+      "tags": {
+        "agent": "workout_phase_agent",
+        "fitness_level": "advanced",
+        "program_type": "bro_split",
+        "goal": "bodybuilding",
         "priority": "high"
       }
     }
