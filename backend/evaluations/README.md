@@ -13,54 +13,114 @@ This framework enables systematic testing, measurement, and improvement of AI ag
 
 ## Quick Start
 
-### Run Evaluation for All Agents
+### Prerequisites
 ```bash
+# 1. Start MLflow server (from backend/ directory)
 cd backend
-uv run python evaluations/run_evaluation.py --agent all --run-name "your_run_name"
+uv run mlflow ui --backend-store-uri sqlite:///mlflow.db --default-artifact-root ./mlruns --port 5000
+
+# Server will run at http://localhost:5000
 ```
 
-### Run Evaluation for Specific Agent
+### Complete Workflow
+
+#### Step 1: Load Datasets into MLflow
 ```bash
-uv run python evaluations/run_evaluation.py --agent workout_phase_agent --run-name "iteration_v2"
+# Load all datasets (recommended for first time)
+uv run python evaluations/load_datasets.py --all
+
+# Or load specific dataset
+uv run python evaluations/load_datasets.py --agent meal_phase_agent
+
+# Output will show dataset IDs - these are automatically used by run_evaluation.py
 ```
 
-### View Results
+#### Step 2: Run Evaluation
 ```bash
-# MLflow UI (runs on http://localhost:5000)
-uv run mlflow ui --backend-store-uri sqlite:///mlflow.db --default-artifact-root ./mlruns
+# Run evaluation for all agents
+uv run python evaluations/run_evaluation.py --agent all --run-name "baseline_v1"
 
-# Or use MLflow MCP to query traces
-uv run mlflow traces search --experiment-id 2 --max-results 10 --output json
+# Or run for specific agent
+uv run python evaluations/run_evaluation.py --agent meal_phase_agent --run-name "iteration_v2"
 ```
+
+#### Step 3: View Results
+```bash
+# Option A: MLflow Web UI
+# Open browser to http://localhost:5000
+# Navigate to experiment (e.g., "meal_phase_agent_evaluation")
+
+# Option B: Query traces with MLflow CLI
+uv run mlflow traces search --experiment-id 5 --max-results 10 --output json
+
+# Option C: Generate comprehensive report (using MLflow MCP server)
+# See meal_phase_v2_10tests_report.md for example
+```
+
+## Files & Organization
+
+### Core Workflow Scripts
+| Script | Purpose | Usage |
+|--------|---------|-------|
+| **load_datasets.py** | 📤 Upload datasets to MLflow | `uv run python evaluations/load_datasets.py --all` |
+| **run_evaluation.py** | ▶️ Execute agent evaluations | `uv run python evaluations/run_evaluation.py --agent meal_phase_agent` |
+
+### Dataset Files
+| Directory | Contents |
+|-----------|----------|
+| **datasets_simple/** | JSON test datasets (source of truth) |
+| ├─ workout_phase_simple_v1.json | Workout phase agent tests (2 cases) |
+| ├─ intake_simple_v1.json | Intake agent tests (2 cases) |
+| ├─ fitness_coach_simple_v1.json | Fitness coach tests (2 cases) |
+| ├─ meal_phase_simple_v1.json | Meal phase agent tests (2 cases) |
+| └─ query_agent_simple_v1.json | Query agent tests (2 cases) |
+
+### Evaluation Components
+| File | Purpose |
+|------|---------|
+| **judges.py** | LLM judge definitions with evaluation criteria |
+| **agent_runners.py** | Agent execution wrappers for evaluation |
+| **setup_test_user.py** | Create test database fixtures |
+
+### Reports & Documentation
+| File | Purpose |
+|------|---------|
+| **meal_phase_v2_10tests_report.md** | Example comprehensive evaluation report |
+| **DATASET_DESIGN.md** | Dataset schema and design guidelines |
+| **RESULTS.md** | Evaluation results summary |
+
+### Deprecated/Utility Scripts
+(These exist but are not part of the standard workflow)
+- `create_mlflow_datasets.py` - Old dataset generator (use `datasets_simple/*.json` instead)
+- `upload_*.py` - Old upload scripts (use `load_datasets.py` instead)
+- `verify_dataset.py` - Dataset validation utility
 
 ## Architecture
 
-### Components
+### Evaluation Pipeline
 
 ```
-Evaluation Pipeline:
-  Dataset (JSON) → Agent Runner → Agent Execution → Judge Evaluation → MLflow Storage
-                                       ↓
-                                  MCP Tools / Database
+Dataset (JSON) → load_datasets.py → MLflow Server (localhost:5000)
+                                            ↓
+                                    Dataset Registered
+                                            ↓
+Test Cases → run_evaluation.py → Agent Runner → Agent Execution → Judge → MLflow Traces
+                                                       ↓
+                                                  MCP Tools
+                                                  Database
 ```
-
-**Key Files**:
-- `datasets_simple/` - Test case datasets (inputs + expectations)
-- `judges.py` - LLM judge definitions with evaluation criteria
-- `agent_runners.py` - Wrappers that execute agents with test inputs
-- `run_evaluation.py` - Main orchestration script
-- `create_mlflow_datasets.py` - Generate dataset JSON files
-- `upload_query_agent_dataset.py` - Upload datasets to MLflow
 
 ### Agent Coverage
 
-| Agent | Experiment ID | Dataset ID | Test Cases | Status |
-|-------|---------------|------------|------------|--------|
-| workout_phase_agent | 2 | d-e984081e... | 2 | ✅ Excellent |
-| intake_agent | 3 | d-716eb242... | 2 | ⚠️ Pacing issues |
-| fitness_coach_agent | 4 | d-c97983c9... | 2 | ⚠️ Tool usage issues |
-| meal_phase_agent | 5 | d-e87ebc1a... | 2 | 🔄 Needs re-run |
-| query_agent | 6 | d-493cf40b... | 2 | ⚠️ MCP tool execution |
+| Agent | Experiment ID | Dataset File | Test Cases | Last Evaluation | Status |
+|-------|---------------|--------------|------------|-----------------|--------|
+| workout_phase_agent | 2 | workout_phase_simple_v1.json | 2 | baseline_v1_fixed | ✅ Baseline |
+| intake_agent | 3 | intake_simple_v1.json | 2 | - | 📋 Ready |
+| fitness_coach_agent | 4 | fitness_coach_simple_v1.json | 2 | - | 📋 Ready |
+| meal_phase_agent | 5 | meal_phase_simple_v1.json | 2 (10 expanded) | expanded_v2_10tests_retry | ✅ 40% Good+ |
+| query_agent | 6 | query_agent_simple_v1.json | 2 | - | 📋 Ready |
+
+**Note**: meal_phase_agent has expanded dataset (10 tests) available. See `meal_phase_v2_10tests_report.md` for results.
 
 ## Creating New Test Cases
 
